@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import axios from 'axios';
 
 // On configure Axios pour qu'il envoie automatiquement les cookies aux requêtes Cross-Origin
+axios.defaults.baseURL = import.meta.env.VITE_API_URL;
 axios.defaults.withCredentials = true;
 
 interface User {
