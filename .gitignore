@@ -1,0 +1,10 @@
+# Bloquer les fichiers d'environnement partout dans le projet
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Bloquer les dossiers de dépendances lourds
+node_modules/
+dist/

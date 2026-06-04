@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-foret: #1A5C38;
+  --color-savane: #2E7D4F;
+  --color-or: #F2B705;
+  --color-or-deep: #D4A003;
+  --color-creme: #F8F5EF;
+  --color-creme2: #F0EBE1;
+  --color-noir: #111111;
+  --color-gris: #4A5568;
+  --color-gris-lt: #9AA5B4;
+
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Animations globales migrées depuis style.css */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.3); }
+  50%      { box-shadow: 0 0 0 7px rgba(74, 222, 128, 0.08); }
+}
+
+@keyframes scrollHint {
+  0%, 100% { opacity: .4; transform: scaleY(1); transform-origin: top; }
+  50% { opacity: 1; transform: scaleY(.5); transform-origin: top; }
+}
+
+/* Base resets & smooth behaviors */
+html {
+  scroll-behavior: smooth;
+}
+body {
+  @apply bg-creme text-noir font-body antialiased overflow-x-hidden;
+}
+
+/* @media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    display: flex;
+    place-items: center;
+  }
+
+  #app {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 0 2rem;
+  }
+} */
