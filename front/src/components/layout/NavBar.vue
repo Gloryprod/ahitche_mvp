@@ -2,12 +2,14 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useToast } from 'vue-toastification'
 
 const router = useRouter()
 const isScrolled = ref(false)
 const isMenuOpen = ref(false)
 const scrollProgress = ref(0)
 const authStore = useAuthStore()
+const toast = useToast()
 
 const isLoginModalOpen = ref(false)
 const isLoading = ref(false)
@@ -49,7 +51,7 @@ const handleLogin = async () => {
     formLogin.value = { email: '', password: '' }
     router.push('/dashboard/user') // Redirige vers le tableau de bord utilisateur
   } catch (error: any) {
-    alert(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
+    toast.error(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
   } finally {
     isLoading.value = false
   }
