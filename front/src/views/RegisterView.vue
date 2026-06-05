@@ -87,7 +87,7 @@ const toast = useToast()
 const handleRegister = async () => {
   isLoading.value = true
   try {
-    const response = await axios.post('http://localhost:5000/api/auth/register', formRegister.value)
+    const response = await axios.post('api/auth/register', formRegister.value)
     toast.success(response.data.message || "Inscription réussie !")
     formRegister.value = { username: '', email: '', password: '' } // Reset
   } catch (error: any) {
