@@ -1,6 +1,7 @@
 const mongoose = require('mongoose'); 
 const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
+const User = require('../models/user');
 
 dotenv.config(); // Charge ton fichier .env
 
@@ -25,7 +26,9 @@ async function createAdmin() {
     };
     
     // Insertion en BDD (Exemple Mongoose : await User.create(adminData))
-    // Exemple SQL brut : await db.query('INSERT INTO users...', [...])
+    const newUser = new User(adminData);
+    await newUser.save();
+    
     console.log(`✅ Administrateur créé avec succès !`);
     console.log(`Email : ${adminEmail}`);
     
