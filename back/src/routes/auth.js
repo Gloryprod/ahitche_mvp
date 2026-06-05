@@ -46,7 +46,7 @@ router.post('/login', async (req, res) => {
         res.cookie('token', token, {
             httpOnly: true,                         // Protège contre les attaques XSS (invisible en JS)
             secure: process.env.NODE_ENV === 'production', // true en production (HTTPS requis)
-            sameSite: 'lax',                        // Protection CSRF basique
+            sameSite: 'none',                        // Protection CSRF basique
             maxAge: 24 * 60 * 60 * 1000            // Expire au bout de 1 jour (comme le JWT)
         });
 
