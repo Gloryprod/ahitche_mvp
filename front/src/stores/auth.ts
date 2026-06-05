@@ -1,5 +1,8 @@
 import { ref, computed } from 'vue';
 import axios from 'axios';
+import { useToast } from 'vue-toastification'; 
+
+const toast = useToast();
 
 // On configure Axios pour qu'il envoie automatiquement les cookies aux requêtes Cross-Origin
 axios.defaults.baseURL = import.meta.env.VITE_API_URL;
@@ -37,9 +40,9 @@ export function useAuthStore() {
       // Le serveur Express va injecter le cookie HttpOnly ici
       const response = await axios.post('/api/auth/login', credentials);
       user.value = response.data.user; 
-      alert("Connexion réussie !");
+      toast.success("Connexion réussie !");
     } catch (error: any) {
-      alert(error.response?.data?.message || "Une erreur est survenue.");
+      toast.error(error.response?.data?.message || "Une erreur est survenue.");
       throw error;
     }
   }
@@ -49,7 +52,7 @@ export function useAuthStore() {
       await axios.post('/api/auth/logout');
     } finally {
       user.value = null;
-      alert("Déconnexion réussie !");
+      toast.success("À bientôt ! Déconnexion réussie.");
     }
   }
 

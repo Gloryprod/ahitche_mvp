@@ -67,20 +67,22 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useToast } from 'vue-toastification';
 
 const formLogin = ref({ email: '', password: '' })
 const isLoading = ref(false)
 const router = useRouter()
 const authStore = useAuthStore()
+const toast = useToast()
 
 const handleLogin = async () => {
   isLoading.value = true
   try {
-      await authStore.login(formLogin.value) // On utilise la méthode de connexion pour enregistrer l'utilisateur
-      // formLogin.value = { email: '', password: '' }
-      router.push('/dashboard/user') // Redirige vers le tableau de bord utilisateur
+    await authStore.login(formLogin.value) // On utilise la méthode de connexion pour enregistrer l'utilisateur
+    // formLogin.value = { email: '', password: '' }
+    router.push('/dashboard/user') // Redirige vers le tableau de bord utilisateur
   } catch (error: any) {
-    alert(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
+    toast.error(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
   } finally {
     isLoading.value = false
   }

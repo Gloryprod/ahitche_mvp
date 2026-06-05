@@ -2,11 +2,14 @@
 import { ref, onMounted, computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useRouter } from 'vue-router';
+import { useToast } from 'vue-toastification';
+import Swal from 'sweetalert2';
 
 // 1. Authentification et Routage
 const authStore = useAuthStore();
 const isLoading = ref(false);
 const router = useRouter();
+const toast = useToast();
 
 // Extraction de l'initiale du nom pour l'avatar
 const avatarInitiale = computed(() => {
@@ -65,33 +68,57 @@ const fetchDashboardData = async () => {
 
 // Action de Déconnexion
 const handleLogout = async () => {
-  isLoading.value = true;
-  try {
-    await authStore.logout(); // On attend la déconnexion (destruction du cookie back)
-    router.push('/'); // Redirection vers l'accueil ou le login
-  } catch (error: any) {
-    alert("Une erreur est survenue lors de la déconnexion.");
-  } finally {
-    isLoading.value = false;
+  // 💡 Boîte de dialogue SweetAlert2 moderne et stylée
+  const result = await Swal.fire({
+    title: 'Êtes-vous sûr ?',
+    text: "Vous allez être déconnecté de votre espace.",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#1e3a1f', // Adapte avec ta couleur "foret"
+    cancelButtonColor: '#d33',
+    confirmButtonText: 'Oui, me déconnecter',
+    cancelButtonText: 'Annuler',
+    background: '#ffffff',
+    customClass: {
+      popup: 'rounded-2xl font-body'
+    }
+  });
+
+  if (result.isConfirmed) {
+    isLoading.value = true;
+    try {
+      await authStore.logout();      
+      router.push('/');
+    } catch (error: any) {
+      // 💡 Alerte SweetAlert2 en cas d'erreur serveur
+      Swal.fire({
+        title: 'Erreur',
+        text: 'Impossible de vous déconnecter pour le moment.',
+        icon: 'error',
+        confirmButtonColor: '#1e3a1f'
+      });
+    } finally {
+      isLoading.value = false;
+    }
   }
 };
 
-// 💡 4. Cycle de vie : Validation obligatoire de la session au montage
 onMounted(async () => {
-  // On demande au Store de vérifier auprès d'Express si le cookie est présent et valide
   await authStore.checkSession();
   
-  // Si après vérification l'utilisateur est toujours null, c'est qu'il n'est pas connecté
   if (!authStore.isAuthenticated) {
-    router.push('/'); // Renvoie vers l'accueil ou la modale de login
+    // 💡 Toast d'avertissement si l'utilisateur tente de forcer l'accès
+    toast.error("Accès refusé. Veuillez vous connecter.");
+    router.push('/');
     return;
   }
   
-  console.log("Utilisateur authentifié avec succès :", authStore.user);
-  
-  // Si le user est bien là, on charge ses données spécifiques
+  // Si tout est bon, on affiche un toast de bienvenue chaleureux
+  toast.info(`Ravi de vous revoir, ${authStore.user?.value?.username} ! ✨`);
   await fetchDashboardData();
 });
+
+
 </script>
 
 <template>

@@ -77,19 +77,21 @@
 import { ref } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
+import { useToast } from 'vue-toastification';
 
 const formRegister = ref({ username: '', email: '', password: '' })
 const isLoading = ref(false)
 const router = useRouter()
+const toast = useToast()
 
 const handleRegister = async () => {
   isLoading.value = true
   try {
     const response = await axios.post('http://localhost:5000/api/auth/register', formRegister.value)
-    alert(response.data.message || "Inscription réussie !")
+    toast.success(response.data.message || "Inscription réussie !")
     formRegister.value = { username: '', email: '', password: '' } // Reset
   } catch (error: any) {
-    alert(error.response?.data?.message || "Une erreur est survenue lors de l'inscription.")
+    toast.error(error.response?.data?.message || "Une erreur est survenue lors de l'inscription.")
   } finally {
     isLoading.value = false
   }
