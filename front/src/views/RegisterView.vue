@@ -127,7 +127,7 @@ const handleRegister = async () => {
   try {
     const response = await axios.post('api/auth/register', formRegister.value)
     toast.success(response.data.message || "Inscription réussie !")
-    formRegister.value = { username: '', email: '', password: '', phone: '' } // Reset
+    formRegister.value = { username: '', email: '', password: '' } // Reset
     router.push('/login') // Redirige vers la page de connexion
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Une erreur est survenue lors de l'inscription.")
