@@ -14,6 +14,16 @@
 
         <!-- Partie droite : Formulaire d'inscription -->
         <div class="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
+
+        <nav class="fixed top-0 left-0 right-0 z-100 padding py-3.5 transition-all duration-250">
+            <div class="flex items-center justify-between">
+                <a href="/" class="nav-logo">
+                    <span class="logo-mark">Ahi</span><span class="logo-accent">tché</span>
+                </a>
+                <a href="/" class="btn-retour">← Retour au site</a>
+            </div>
+        </nav>
+
         <div class="mb-6 text-center">
             <h2 class="text-2xl font-bold text-foret font-display">Rejoignez Ahitché</h2>
             <p class="text-sm text-gray-500 mt-1">Créez votre profil pour finaliser votre commande.</p>
@@ -41,6 +51,34 @@
                 class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all"
             />
             </div>
+
+            <!-- <div>
+                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Numéro WhatsApp / Mobile Money <span class="required">*</span></label>
+                <div class="">
+                  <vue-tel-input class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all" v-model="formRegister.phone"></vue-tel-input>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Ce numéro sera utilisé pour vos commandes et livraisons.</p>
+            </div>
+
+            <div >
+                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1" >Quartier <span class="required">*</span></label>
+                <select class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all">
+                <option value="">-- Choisissez votre quartier --</option>
+                <option value="Calavi Kpota">Calavi Kpota</option>
+                <option value="Godomey">Godomey</option>
+                <option value="Godomey-Togoudo">Godomey-Togoudo</option>
+                <option value="Calavi centre">Calavi centre</option>
+                <option value="Agori">Agori</option>
+                <option value="Cotonou">Cotonou</option>
+                <option value="Autre">Autre</option>
+                </select>
+            </div>
+
+            <div >
+                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Adresse / Point de repère <span class="required">*</span></label>
+                <textarea class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all" rows="3" placeholder="Ex : Près de l'école primaire de Kpota, maison bleue 2ème rue à droite"></textarea>
+                <p class="field-hint">Soyez précis — c'est ce que verra votre livreur.</p>
+            </div> -->
 
             <div>
             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Mot de passe</label>
@@ -89,7 +127,8 @@ const handleRegister = async () => {
   try {
     const response = await axios.post('api/auth/register', formRegister.value)
     toast.success(response.data.message || "Inscription réussie !")
-    formRegister.value = { username: '', email: '', password: '' } // Reset
+    formRegister.value = { username: '', email: '', password: '', phone: '' } // Reset
+    router.push('/login') // Redirige vers la page de connexion
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Une erreur est survenue lors de l'inscription.")
   } finally {

@@ -12,7 +12,9 @@ const authRoutes = require('./src/routes/auth');
 const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    'https://ahitche-mvp.vercel.app' // 👈 METS ICI L'URL EXACTE DE TON FRONT VERCEL (sans / à la fin)
+    'https://ahitche-mvp.vercel.app',
+    'https://ahitchebj.com',       // 👈 Ton domaine principal sans le www
+    'https://www.ahitchebj.com'
 ];
 
 app.use(cors({
@@ -34,7 +36,6 @@ app.use(cors({
 app.use(express.json());
 
 app.use(cookieParser());
-
 // Route exemple
 app.use('/api/auth', authRoutes);
 
