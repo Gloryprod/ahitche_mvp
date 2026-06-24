@@ -5,7 +5,11 @@ import { useToast } from 'vue-toastification';
 const toast = useToast();
 
 // On configure Axios pour qu'il envoie automatiquement les cookies aux requêtes Cross-Origin
-axios.defaults.baseURL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.PROD 
+  ? 'https://api.ahitchebj.com' // En ligne : ton sous-domaine
+  : '';
+
+axios.defaults.baseURL = API_URL;
 axios.defaults.withCredentials = true;
 
 interface User {
@@ -13,6 +17,10 @@ interface User {
   email: string;
   username: string;
   role: 'admin' | 'user';
+  adresse: string;
+  quartier: string;
+  telephone: string;
+  formuleHabituelle: string;
 }
 
 // Les variables restent en mémoire globale (très sécurisé)

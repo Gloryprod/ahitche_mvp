@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
-require('dotenv').config(); // Charge les variables du fichier .env
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -13,7 +13,7 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'https://ahitche-mvp.vercel.app',
-    'https://ahitchebj.com',       // 👈 Ton domaine principal sans le www
+    'https://ahitchebj.com',   
     'https://www.ahitchebj.com'
 ];
 
@@ -28,7 +28,7 @@ app.use(cors({
             callback(new Error('Bloqué par la politique CORS de l\'application'));
         }
     },
-    credentials: true, // ⚠️ INDISPENSABLE pour accepter les cookies
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));

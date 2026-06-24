@@ -1,68 +1,94 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, reactive } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 import Swal from 'sweetalert2';
+import api from '@/stores/api';
+
+interface Commande {
+  _id: string;
+  formule: string
+  date: string;
+  total: string;
+  statut: "En attente" | "Livré" ;
+  facture_url?: string;
+  createdAt: Date
+}
+
+interface Formule {
+  _id: string;
+  nom: string;
+  emoji: string;
+  prixActuel: string;
+  cible: string;
+}
 
 // 1. Authentification et Routage
 const authStore = useAuthStore();
 const isLoading = ref(false);
 const router = useRouter();
 const toast = useToast();
-
-// Extraction de l'initiale du nom pour l'avatar
-const avatarInitiale = computed(() => {
-  return authStore.user?.value?.username ? authStore.user.value.username.charAt(0).toUpperCase() : 'C';
-});
+const estEnEdition = ref(false);
+const enCoursDeSauvegarde = ref(false);
+const commandes = ref<Commande[]>([]);
+const formulesApi = ref<Formule[]>([]);
+const chargementInfos = ref(true);
+const sauvegardeEnCours = ref(false);
+const chargementCommandes = ref(true);
 
 // 2. États réactifs pour les données spécifiques du dashboard client
 const clientInfos = ref({
   quartier: '',
   adresse: '',
   formuleHabituelle: '',
-  lienCommande: '#',
-  lienWhatsApp: '#'
+  telephone:''
 });
 
-interface Commande {
-  id: string;
-  date: string;
-  total: string;
-  statut: string;
-  statutClass: string; 
-}
+// Extraction de l'initiale du nom pour l'avatar
+const avatarInitiale = computed(() => {
+  return authStore.user?.value?.username ? authStore.user.value.username.charAt(0).toUpperCase() : 'C';
+});
 
-const commandes = ref<Commande[]>([]);
-const chargementInfos = ref(true);
-const chargementCommandes = ref(true);
-
-// 3. Récupération des données métiers (Simulation ou API)
+// 3. Récupération des données métiers
 const fetchDashboardData = async () => {
-  try {
-    // Simulation d'un appel API pour l'adresse et les formules
-    setTimeout(() => {
-      clientInfos.value = {
-        quartier: 'Haie Vive',
-        adresse: 'Rue 128, Lot 452 - Cotonou',
-        formuleHabituelle: 'Formule Hebdo - Midi & Soir',
-        lienCommande: '/commander',
-        lienWhatsApp: 'https://wa.me/22998136635?text=Bonjour,%20je%20souhaite%20renouveler%20ma%20commande%20habituelle.'
-      };
-      chargementInfos.value = false;
-    }, 1000);
+  // On passe les loaders à true au début de la fonction
+  chargementInfos.value = true;
+  chargementCommandes.value = true;
 
-    // Simulation d'un appel API pour l'historique
-    setTimeout(() => {
-      commandes.value = [
-        { id: '#CMD-1042', date: '02 Juin 2026', total: '15 000 FCFA', statut: 'Livré', statutClass: 'bg-green-100 text-green-800' },
-        { id: '#CMD-0988', date: '26 Mai 2026', total: '15 000 FCFA', statut: 'Livré', statutClass: 'bg-green-100 text-green-800' },
-        { id: '#CMD-0812', date: '19 Mai 2026', total: '12 500 FCFA', statut: 'Annulé', statutClass: 'bg-red-100 text-red-800' }
-      ];
-      chargementCommandes.value = false;
-    }, 1500);
+  // 1. Assignation des informations du client  
+  clientInfos.value = {
+    quartier: authStore.user?.value?.quartier || '',
+    adresse: authStore.user?.value?.adresse || '',
+    telephone: authStore.user?.value?.telephone || '',
+    formuleHabituelle: authStore.user?.value?.formuleHabituelle || 'AHI ÉQUILIBRÉ',
+  };
+  chargementInfos.value = false;
+
+  try {
+    const [commandesRes,formulesRes] = await Promise.all([
+      api.get('/api/auth/my-orders', { withCredentials: true }),  // Récupère l'historique de ses commandes
+      api.get('/api/auth/formules')                                     // Récupère la liste des formules actives
+    ]);
+
+    // 2. Assignation de l'historique des commandes
+    commandes.value = commandesRes.data.map((cmd : Commande) => ({
+      _id: `#CMD-${cmd._id.substring(cmd._id.length - 4).toUpperCase()}`, // Génère un ID court lisible (Ex: #CMD-1042)
+      formule: cmd.formule,
+      date: new Date(cmd.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }),
+      total: `${cmd.total.toLocaleString()} FCFA`,
+      statut: cmd.statut,
+    }));
+    chargementCommandes.value = false;
+
+    // 3. Assignation des formules pour le sélecteur
+    formulesApi.value = formulesRes.data;
+
   } catch (error) {
     console.error("Erreur lors du chargement des données du dashboard", error);
+    
+    chargementInfos.value = false;
+    chargementCommandes.value = false;
   }
 };
 
@@ -89,7 +115,7 @@ const handleLogout = async () => {
     try {
       await authStore.logout();      
       router.push('/');
-    } catch (error: any) {
+    } catch (error) {
       // 💡 Alerte SweetAlert2 en cas d'erreur serveur
       Swal.fire({
         title: 'Erreur',
@@ -100,6 +126,104 @@ const handleLogout = async () => {
     } finally {
       isLoading.value = false;
     }
+  }
+};
+
+// Initialisation des Infos du formulaire
+const formFormulaire = reactive({
+  telephone: '',
+  quartier: '',
+  adresse: ''
+});
+
+// Activer le mode édition en pré-remplissant avec les infos existantes
+const activerEdition = () => {
+  formFormulaire.telephone = clientInfos.value.telephone || '';
+  formFormulaire.quartier = clientInfos.value.quartier || '';
+  formFormulaire.adresse = clientInfos.value.adresse || '';
+  estEnEdition.value = true;
+};
+
+// Fonction pour sauvegarder les infos (Appel API vers ton back Express)
+const sauvegarderInfos = async () => {
+  enCoursDeSauvegarde.value = true;
+  try {
+    // Remplacer par ton appel axios réel, ex:
+    const response = await api.post('/api/auth/user/delivery-info', formFormulaire);
+    
+    // Simulation de réussite : on met à jour l'affichage principal
+    clientInfos.value.telephone = formFormulaire.telephone;
+    clientInfos.value.quartier = formFormulaire.quartier;
+    clientInfos.value.adresse = formFormulaire.adresse;
+    
+    estEnEdition.value = false; // On ferme le formulaire
+    toast.success(response.data.message)
+  } catch (error) {
+    console.error("Erreur lors de l'enregistrement des infos", error);
+    toast.error(error);
+  } finally {
+    enCoursDeSauvegarde.value = false;
+  }
+};
+
+// Fonction pour générer le lien Whatsapp de commande avec le message dynamique contenant les infos de livraison
+const genererLienWhatsApp = computed(() => {
+  const numeroWhatsApp = "22998136635";
+  
+  // On cherche les infos de la formule actuellement sélectionnée dans notre liste API
+  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle) || { prixActuel: '22 500' };
+
+  // Construction du texte personnalisé
+  let message = `Bonjour Ahitché ! 👋\n\n`;
+  message += `Je souhaite commander la formule *${clientInfos.value.formuleHabituelle}* (${formuleChoisie.prixActuel} FCFA).\n\n`;
+  
+  // Si les infos de livraison sont remplies, on les greffe proprement au message
+  if (clientInfos.value.quartier || clientInfos.value.telephone) {
+    message += `📍 *Infos de livraison :*\n`;
+    message += `- *Quartier :* ${clientInfos.value.quartier || 'Non spécifié'}\n`;
+    message += `- *Repères/Maison :* ${clientInfos.value.adresse || 'Non spécifié'}\n`;
+    message += `- *Contact de livraison :* ${clientInfos.value.telephone || 'Non spécifié'}`;
+  } else {
+    message += `⚠️ _Je n'ai pas encore renseigné mes détails de livraison, nous ferons le point ici._`;
+  }
+
+  // Encodage strict au format URL
+  return `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(message)}`;
+});
+
+const lancerCommande = async () => {
+  // 1. Trouver les détails de la formule choisie dans formulesApi
+  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle);
+  
+  const payload = {
+    formule: clientInfos.value.formuleHabituelle,
+    total: formuleChoisie ? formuleChoisie.prixActuel : 22500
+  };
+
+  try {
+    // 2. Enregistrement silencieux dans ta base de données locale
+    await api.post('/api/auth/save/orders', payload);
+    console.log("Commande enregistrée en BDD !");
+  } catch (error) {
+    console.error("Impossible d'enregistrer la commande en BDD", error);
+  } finally {  
+    window.open(genererLienWhatsApp.value, '_blank');    
+  }
+};
+
+// Fonction pour changer la formule et l'enregistrer dans la DB
+const changerFormule = async (formule : Formule) => {
+  clientInfos.value.formuleHabituelle = formule.nom;
+  
+  sauvegardeEnCours.value = true;
+  try {
+    // Optionnel : Enregistre le choix de la formule sur le compte de l'utilisateur
+    const response = await api.put('/api/auth/user/preference-formule', { formule: formule.nom });
+    toast.success(response.data.message)
+  } catch (error) {
+    toast.error(error);
+  } finally {
+    sauvegardeEnCours.value = false;
   }
 };
 
@@ -114,10 +238,9 @@ onMounted(async () => {
   }
   
   // Si tout est bon, on affiche un toast de bienvenue chaleureux
-  toast.info(`Ravi de vous revoir, ${authStore.user?.value?.username} ! ✨`);
+  // toast.info(`Ravi de vous revoir, ${authStore.user?.value?.username} ! ✨`);
   await fetchDashboardData();
 });
-
 
 </script>
 
@@ -151,67 +274,168 @@ onMounted(async () => {
         </button>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-creme2 flex flex-col justify-between">
           <div>
-            <div class="flex items-center gap-2 mb-4">
-              <span class="text-xl">📍</span>
-              <h3 class="font-display font-bold text-lg text-noir">Mon adresse de livraison</h3>
+            <!-- En-tête avec bouton Modifier -->
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">📍</span>
+                <h3 class="font-display font-bold text-lg text-noir">Infos de livraison</h3>
+              </div>
+              <button 
+                v-if="!chargementInfos && !estEnEdition" 
+                @click="activerEdition"
+                class="cursor-pointer text-sm text-foret hover:underline font-medium focus:outline-none"
+              >
+                {{ clientInfos.telephone ? 'Modifier' : 'Ajouter' }}
+              </button>
             </div>
+
+            <!-- Mode Chargement -->
             <div v-if="chargementInfos" class="animate-pulse space-y-2">
               <div class="h-4 bg-creme2 rounded w-1/3"></div>
               <div class="h-4 bg-creme2 rounded w-3/4"></div>
+              <div class="h-4 bg-creme2 rounded w-1/2"></div>
             </div>
-            <div v-else>
-              <p class="font-semibold text-foret mb-1">{{ clientInfos.quartier }}</p>
-              <p class="text-gris text-sm leading-relaxed">{{ clientInfos.adresse }}</p>
+
+            <!-- Mode Affichage des infos -->
+            <div v-else-if="!estEnEdition">
+              <div v-if="clientInfos.telephone || clientInfos.quartier">
+                <p class="font-semibold text-foret mb-1">{{ clientInfos.quartier }}</p>
+                <p class="text-gris text-sm leading-relaxed mb-2">{{ clientInfos.adresse }}</p>
+                <p class="text-noir text-sm font-medium flex items-center gap-1">
+                  <span>📞</span> {{ clientInfos.telephone }}
+                </p>
+              </div>
+              <div v-else class="text-sm text-gris italic py-2">
+                Aucune information enregistrée pour la livraison.
+              </div>
             </div>
+
+            <!-- Mode Formulaire d'Édition -->
+            <form v-else @submit.prevent="sauvegarderInfos" class="space-y-10 mt-2">
+              <!-- Téléphone -->
+              <div>
+                <label class="block text-xs font-semibold text-noir mb-1">Téléphone (WhatsApp de préférence)</label>
+                <input 
+                  v-model="formFormulaire.telephone" 
+                  type="tel" 
+                  placeholder="Ex: 97000000" 
+                  required
+                  class="w-full px-3 py-2 border border-creme2 rounded-xl text-sm focus:outline-none focus:border-foret text-noir"
+                />
+              </div>
+
+              <!-- Quartier / Ville -->
+              <div>
+                <label class="block text-xs font-semibold text-noir mb-1">Quartier / Ville</label>
+                <input 
+                  v-model="formFormulaire.quartier" 
+                  type="text" 
+                  placeholder="Ex: Akassato, Calavi" 
+                  required
+                  class="w-full px-3 py-2 border border-creme2 rounded-xl text-sm focus:outline-none focus:border-foret text-noir"
+                />
+              </div>
+
+              <!-- Précisions adresse -->
+              <div>
+                <label class="block text-xs font-semibold text-noir mb-1">Précisions (Maison, repère...)</label>
+                <textarea 
+                  v-model="formFormulaire.adresse" 
+                  rows="2"
+                  placeholder="Ex: Maison verte en face de la pharmacie..." 
+                  required
+                  class="w-full px-3 py-2 border border-creme2 rounded-xl text-sm focus:outline-none focus:border-foret text-noir resize-none"
+                ></textarea>
+              </div>
+
+              <!-- Boutons d'action -->
+              <div class="flex items-center gap-2 pt-2">
+                <button 
+                  type="submit" 
+                  :disabled="enCoursDeSauvegarde"
+                  class="flex-1 bg-foret text-white text-xs font-bold px-4 py-3 rounded-xl hover:bg-opacity-90 transitiondisabled:opacity-50"
+                >
+                  {{ enCoursDeSauvegarde ? 'Enregistrement...' : 'Enregistrer' }}
+                </button>
+                <button 
+                  type="button" 
+                  @click="estEnEdition = false"
+                  class="px-4 py-3 border border-creme2 rounded-xl text-xs hover:bg-gray-50 text-noir"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
-        <div class="bg-white rounded-2xl p-6 shadow-sm border border-creme2 flex flex-col justify-between">
+        <div class="md:cols-2 bg-white rounded-2xl p-6 shadow-sm border border-creme2 flex flex-col justify-between h-full">
           <div>
-            <div class="flex items-center gap-2 mb-4">
-              <span class="text-xl">📦</span>
-              <h3 class="font-display font-bold text-lg text-noir">Ma formule habituelle</h3>
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <div class="flex items-center gap-2 mb-4">
+                  <span class="text-xl">💬</span>
+                  <h3 class="font-display font-bold text-lg text-noir">Commander rapidement</h3>
+                </div>
+                <p class="text-gris text-sm leading-relaxed mb-5">
+                  Faites le choix du pack qui vous convient et lancez la commande — votre livreur connaît déjà votre adresse et vos préférences.
+                </p>
+              </div>
+              <!-- Petit indicateur de sauvegarde si nécessaire -->
+              <span v-if="sauvegardeEnCours" class="text-xs text-savane animate-pulse">Mise à jour...</span>
             </div>
-            <div v-if="chargementInfos" class="animate-pulse space-y-2 mb-4">
-              <div class="h-5 bg-creme2 rounded w-2/3"></div>
+
+            <!-- Mode Chargement -->
+            <div v-if="chargementInfos" class="animate-pulse space-y-3 mb-4">
+              <div class="h-10 bg-creme2 rounded-xl w-full"></div>
+              <div class="h-10 bg-creme2 rounded-xl w-full"></div>
+              <div class="h-10 bg-creme2 rounded-xl w-full"></div>
             </div>
-            <p v-else class="text-noir font-medium mb-5">{{ clientInfos.formuleHabituelle }}</p>
+
+            <!-- Choix des formules -->
+            <div v-else class="space-y-3 mb-6">
+              <label 
+                v-for="formule in formulesApi" 
+                :key="formule._id"
+                :class="[
+                  'flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all duration-200 select-none',
+                  clientInfos.formuleHabituelle === formule.nom 
+                    ? 'border-foret bg-foret/5 ring-1 ring-foret' 
+                    : 'border-creme2 hover:border-gray-300 bg-white'
+                ]"
+                @click="changerFormule(formule)"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="text-xl">{{ formule.emoji }}</span>
+                  <div>
+                    <p class="font-semibold text-sm text-noir">{{ formule.nom }}</p>
+                    <p class="text-xs text-gris">{{ formule.prixActuel }} FCFA · {{ formule.cible.split('·')[0] }}</p>
+                  </div>
+                </div>
+                <!-- Bouton Radio personnalisé -->
+                <div 
+                  :class="[
+                    'w-4 h-4 rounded-full border flex items-center justify-center transition-colors',
+                    clientInfos.formuleHabituelle === formule.nom ? 'border-foret bg-foret' : 'border-gray-300'
+                  ]"
+                >
+                  <div v-if="clientInfos.formuleHabituelle === formule.nom" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                </div>
+              </label>
+            </div>
           </div>
-          <a 
-            :href="clientInfos.lienCommande" 
+
+          <!-- Bouton d'action dynamique -->
+          <button 
+            @click="lancerCommande" 
             class="inline-flex items-center justify-center w-full px-4 py-3 bg-foret text-white font-medium rounded-xl hover:bg-savane transition-colors duration-200 text-sm text-center"
           >
             Commander maintenant →
-          </a>
-        </div>
-
-        <div class="bg-white rounded-2xl p-6 shadow-sm border-2 border-savane/20 flex flex-col justify-between relative overflow-hidden">
-          <div class="absolute top-3 right-3 w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
-          <div>
-            <div class="flex items-center gap-2 mb-4">
-              <span class="text-xl">💬</span>
-              <h3 class="font-display font-bold text-lg text-noir">Commander rapidement</h3>
-            </div>
-            <p class="text-gris text-sm leading-relaxed mb-5">
-              Envoyez un message WhatsApp — votre livreur connaît déjà votre adresse et vos préférences.
-            </p>
-          </div>
-          <a 
-            :href="clientInfos.lienWhatsApp" 
-            target="_blank" 
-            rel="noopener"
-            class="inline-flex items-center justify-center gap-2 w-full px-4 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors duration-200 text-sm text-center shadow-sm"
-          >
-            <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-              <path d="M11.971 0C5.362 0 0 5.373 0 11.994c0 2.117.554 4.103 1.523 5.828L.057 23.882l6.218-1.632A11.946 11.946 0 0011.97 24c6.61 0 11.972-5.373 11.972-11.994C23.942 5.372 18.58 0 11.97 0zm.001 21.818a9.917 9.917 0 01-5.062-1.384l-.363-.216-3.761.987 1.004-3.665-.237-.376a9.918 9.918 0 01-1.523-5.295c0-5.475 4.453-9.934 9.942-9.934 5.488 0 9.941 4.46 9.941 9.934 0 5.476-4.453 9.935-9.941 9.935z" fill-rule="evenodd" clip-rule="evenodd"/>
-            </svg>
-            Renouveler sur WhatsApp
-          </a>
-        </div>
+          </button>
+        </div>        
       </div>
 
       <div class="bg-white rounded-2xl p-6 shadow-sm border border-creme2">
@@ -231,18 +455,20 @@ onMounted(async () => {
             <thead>
               <tr class="border-b border-creme2 text-gris text-xs uppercase tracking-wider">
                 <th class="pb-3 font-semibold">N° Commande</th>
+                <th class="pb-3 font-semibold">Pack Commandé</th>
                 <th class="pb-3 font-semibold">Date</th>
                 <th class="pb-3 font-semibold">Total</th>
                 <th class="pb-3 font-semibold">Statut</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-creme2 text-sm text-noir">
-              <tr v-for="commande in commandes" :key="commande.id" class="hover:bg-creme/50 transition-colors">
-                <td class="py-4 font-medium text-foret">{{ commande.id }}</td>
+              <tr v-for="commande in commandes" :key="commande._id" class="hover:bg-creme/50 transition-colors">
+                <td class="py-4 font-medium text-foret">{{ commande._id }}</td>
+                <td class="py-4 font-medium text-foret">{{ commande.formule }}</td>
                 <td class="py-4 text-gris">{{ commande.date }}</td>
                 <td class="py-4 font-medium">{{ commande.total }}</td>
                 <td class="py-4">
-                  <span :class="`px-2.5 py-1 rounded-full text-xs font-medium ${commande.statutClass}`">
+                  <span :class="`px-2.5 py-1 rounded-full text-xs font-medium ${commande.statut === 'Livré' ? 'bg-green-100 text-green-800' : commande.statut === 'En attente' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}`">
                     {{ commande.statut }}
                   </span>
                 </td>

@@ -5,17 +5,26 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../middlewares/auth');
 const authC  = require('../controllers/AuthController');
+const userC = require('../controllers/UserController');
+const formuleC = require('../controllers/FormuleController');
+const orderC = require('../controllers/OrderController');
 
-// 1. ROUTE D'INSCRIPTION (REGISTER)
+// Authentification
 router.post('/register', authC.register);
-
-// 2. ROUTE DE CONNEXION (LOGIN)
 router.post('/login', authC.login);
-
 router.post('/logout', authC.logout);
 
+// Profil
 router.get('/me', verifyToken, authC.getUser);
-    
+router.post('/user/delivery-info', verifyToken, userC.saveUserDetails);
+
+// Formules
+router.get('/formules', formuleC.index);
+router.put('/user/preference-formule', verifyToken, userC.updateFormulePreference);
+
+// Commandes
+router.post('/save/orders', verifyToken, orderC.saveOrder);
+router.get('/my-orders', verifyToken, orderC.index);
 
 module.exports = router;
         

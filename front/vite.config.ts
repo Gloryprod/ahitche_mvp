@@ -23,7 +23,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://ahitche-mvp.onrender.com', // L'adresse de ton backend Express
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
       }
