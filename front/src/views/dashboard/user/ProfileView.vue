@@ -207,7 +207,8 @@ const lancerCommande = async () => {
   } catch (error) {
     console.error("Impossible d'enregistrer la commande en BDD", error);
   } finally {  
-    window.open(genererLienWhatsApp.value, '_blank');    
+    window.open(genererLienWhatsApp.value, '_blank');
+    await fetchDashboardData();   
   }
 };
 
@@ -356,14 +357,14 @@ onMounted(async () => {
                 <button 
                   type="submit" 
                   :disabled="enCoursDeSauvegarde"
-                  class="flex-1 bg-foret text-white text-xs font-bold px-4 py-3 rounded-xl hover:bg-opacity-90 transitiondisabled:opacity-50"
+                  class="cursor-pointer flex-1 bg-foret text-white text-xs font-bold px-4 py-3 rounded-xl hover:bg-opacity-90 transitiondisabled:opacity-50"
                 >
                   {{ enCoursDeSauvegarde ? 'Enregistrement...' : 'Enregistrer' }}
                 </button>
                 <button 
                   type="button" 
                   @click="estEnEdition = false"
-                  class="px-4 py-3 border border-creme2 rounded-xl text-xs hover:bg-gray-50 text-noir"
+                  class="cursor-pointer px-4 py-3 border border-creme2 rounded-xl text-xs hover:bg-gray-50 text-noir"
                 >
                   Annuler
                 </button>
@@ -431,7 +432,7 @@ onMounted(async () => {
           <!-- Bouton d'action dynamique -->
           <button 
             @click="lancerCommande" 
-            class="inline-flex items-center justify-center w-full px-4 py-3 bg-foret text-white font-medium rounded-xl hover:bg-savane transition-colors duration-200 text-sm text-center"
+            class="cursor-pointer inline-flex items-center justify-center w-full px-4 py-3 bg-foret text-white font-medium rounded-xl hover:bg-savane transition-colors duration-200 text-sm text-center"
           >
             Commander maintenant →
           </button>
