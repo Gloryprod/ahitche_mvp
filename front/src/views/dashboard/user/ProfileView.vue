@@ -5,8 +5,14 @@ import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 import Swal from 'sweetalert2';
 import api from '@/stores/api';
+import { 
+  MapPinIcon, Edit3Icon, PhoneIcon, MailIcon, 
+  ShoppingBagIcon, ArrowRightIcon, HistoryIcon, 
+  LogOutIcon, XIcon 
+} from 'lucide-vue-next';
 
 interface Commande {
+  id: string;
   _id: string;
   formule: string
   date: string;
@@ -52,7 +58,7 @@ const avatarInitiale = computed(() => {
 
 // 3. Récupération des données métiers
 const fetchDashboardData = async () => {
-  // On passe les loaders à true au début de la fonction
+  // On passe les loaders à true au début de la fonction 
   chargementInfos.value = true;
   chargementCommandes.value = true;
 
@@ -73,7 +79,7 @@ const fetchDashboardData = async () => {
 
     // 2. Assignation de l'historique des commandes
     commandes.value = commandesRes.data.map((cmd : Commande) => ({
-      _id: `#CMD-${cmd._id.substring(cmd._id.length - 4).toUpperCase()}`, // Génère un ID court lisible (Ex: #CMD-1042)
+      _id: cmd._id,
       formule: cmd.formule,
       date: new Date(cmd.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }),
       total: `${cmd.total.toLocaleString()} FCFA`,
@@ -191,6 +197,23 @@ const genererLienWhatsApp = computed(() => {
   return `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(message)}`;
 });
 
+// Fonction pour générer le lien WhatsApp d'annulation pour une commande spécifique
+const genererLienAnnulation = (commande: Commande) => {
+  const numeroWhatsApp = "22998136635";
+  
+  // Construction du texte d'annulation clair et précis
+  let message = `Bonjour Ahitché ! ❌\n\n`;
+  message += `Je souhaite annuler ma commande *${commande._id}*.\n\n`;
+  message += `📍 *Détails de la commande à annuler :*\n`;
+  message += `- *Formule :* ${commande.formule || clientInfos.value.formuleHabituelle}\n`;
+  message += `- *Montant :* ${commande.total}\n`;
+  message += `- *Date du lancement :* ${commande.date}\n\n`;
+  message += `Merci de prendre en compte ma demande d'annulation.`;
+
+  // Encodage au format URL WhatsApp
+  return `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(message)}`;
+};
+
 const lancerCommande = async () => {
   // 1. Trouver les détails de la formule choisie dans formulesApi
   const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle);
@@ -203,11 +226,32 @@ const lancerCommande = async () => {
   try {
     // 2. Enregistrement silencieux dans ta base de données locale
     await api.post('/api/auth/save/orders', payload);
-    console.log("Commande enregistrée en BDD !");
+    console.log("Commande enregistrée!");
   } catch (error) {
-    console.error("Impossible d'enregistrer la commande en BDD", error);
+    console.error("Impossible d'enregistrer la commande", error);
   } finally {  
     window.open(genererLienWhatsApp.value, '_blank');
+    await fetchDashboardData();   
+  }
+};
+
+const annulerCommande = async (commande_id : string) => {
+  console.log(commande_id);
+  const commande = commandes.value.find(c => c._id === commande_id);
+
+  if (!commande) {
+    toast.error("Commande introuvable");
+    return;
+  }
+  
+  try {
+    await api.delete(`/api/auth/delete/order/${commande_id}`);
+    console.error("Commande supprimée avec succès !");
+  } catch (error) {
+    console.error("Impossible de supprimer la commande", error);
+    toast.error("Impossible de supprimer la commande")
+  } finally {  
+    window.open(genererLienAnnulation(commande), '_blank');
     await fetchDashboardData();   
   }
 };
@@ -246,125 +290,134 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto px-4 py-8 font-body">
+  <div class="max-w-6xl mx-auto px-4 py-10 font-body antialiased text-noir">
     
-    <div v-if="!authStore.isInitialized" class="flex flex-col items-center justify-center py-24 gap-3">
-      <div class="w-10 h-10 border-4 border-foret border-t-transparent rounded-full animate-spin"></div>
-      <p class="text-gris text-sm">Vérification de vos accès en cours...</p>
+    <!-- ÉTAT : CHARGEMENT INITIAL -->
+    <div v-if="!authStore.isInitialized" class="flex flex-col items-center justify-center py-32 gap-4">
+      <div class="w-12 h-12 border-[3px] border-foret border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-gris text-sm font-medium tracking-wide">Validation de vos accès...</p>
     </div>
 
-    <div v-else>
-      <div class="bg-white rounded-2xl p-6 shadow-sm border border-creme2 flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
-        <div class="flex items-center gap-4 text-center sm:text-left flex-col sm:flex-row">
-          <div class="w-16 h-16 bg-foret text-white font-display text-2xl font-bold rounded-full flex items-center justify-center shadow-inner">
+    <!-- ÉTAT : CONTENU PRINCIPAL -->
+    <div v-else class="space-y-8 animate-fadeIn">
+      
+      <!-- EN-TÊTE UTILISATEUR (HEADER BARS) -->
+      <div class="bg-white rounded-2xl p-6 border border-creme2 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm transition-all duration-300 hover:shadow-md">
+        <div class="flex items-center gap-5 text-center sm:text-left flex-col sm:flex-row">
+          <div class="w-16 h-16 bg-foret/10 text-foret font-display text-2xl font-bold rounded-2xl flex items-center justify-center shadow-sm border border-foret/20 select-none">
             {{ avatarInitiale }}
           </div>
           <div>
-            <h1 class="font-display text-2xl font-bold text-noir">
+            <h1 class="font-display text-2xl font-bold tracking-tight">
               Ravi de vous revoir, {{ authStore.user?.value?.username || 'Client' }} 👋
             </h1>
-            <p class="text-gris text-sm mt-0.5">{{ authStore.user?.value?.email }}</p>
+            <p class="text-gris text-sm mt-0.5 font-medium flex items-center gap-1.5 justify-center sm:justify-start">
+              <MailIcon class="w-4 h-4 opacity-70" /> {{ authStore.user?.value?.email }}
+            </p>
           </div>
         </div>
         <button 
           @click="handleLogout" 
           :disabled="isLoading"
-          class="cursor-pointer px-5 py-2.5 rounded-xl border border-gris-lt/30 text-gris hover:text-noir hover:bg-creme font-medium transition-all duration-200 text-sm disabled:opacity-50"
+          class="cursor-pointer w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-200 text-gris hover:text-red-600 hover:bg-red-50 hover:border-red-100 font-semibold transition-all duration-200 text-sm disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          {{ isLoading ? 'Déconnexion...' : 'Déconnexion' }}
+          <LogOutIcon class="w-4 h-4" />
+          <span>{{ isLoading ? 'Déconnexion...' : 'Déconnexion' }}</span>
         </button>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div class="bg-white rounded-2xl p-6 shadow-sm border border-creme2 flex flex-col justify-between">
+      <!-- SECTIONS ACTIONS INTERACTIVES -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        <!-- BLOC 1 : INFOS DE LIVRAISON -->
+        <div class="bg-white rounded-2xl p-6 border border-creme2 flex flex-col justify-between shadow-sm transition-all duration-300 hover:shadow-md">
           <div>
-            <!-- En-tête avec bouton Modifier -->
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center gap-2">
-                <span class="text-xl">📍</span>
-                <h3 class="font-display font-bold text-lg text-noir">Infos de livraison</h3>
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-gray-50 rounded-xl border border-gray-100">
+                  <MapPinIcon class="w-5 h-5 text-foret" />
+                </div>
+                <h3 class="font-display font-bold text-lg">Infos de livraison</h3>
               </div>
               <button 
                 v-if="!chargementInfos && !estEnEdition" 
                 @click="activerEdition"
-                class="cursor-pointer text-sm text-foret hover:underline font-medium focus:outline-none"
+                class="cursor-pointer text-sm text-foret hover:text-savane font-semibold focus:outline-none transition-colors flex items-center gap-1"
               >
-                {{ clientInfos.telephone ? 'Modifier' : 'Ajouter' }}
+                <Edit3Icon class="w-3.5 h-3.5" />
+                <span>{{ clientInfos.telephone ? 'Modifier' : 'Ajouter' }}</span>
               </button>
             </div>
 
-            <!-- Mode Chargement -->
-            <div v-if="chargementInfos" class="animate-pulse space-y-2">
-              <div class="h-4 bg-creme2 rounded w-1/3"></div>
-              <div class="h-4 bg-creme2 rounded w-3/4"></div>
-              <div class="h-4 bg-creme2 rounded w-1/2"></div>
+            <!-- Squelette de chargement épuré -->
+            <div v-if="chargementInfos" class="animate-pulse space-y-3 py-2">
+              <div class="h-5 bg-gray-100 rounded-lg w-1/3"></div>
+              <div class="h-4 bg-gray-100 rounded-lg w-3/4"></div>
+              <div class="h-4 bg-gray-100 rounded-lg w-1/2"></div>
             </div>
 
-            <!-- Mode Affichage des infos -->
-            <div v-else-if="!estEnEdition">
-              <div v-if="clientInfos.telephone || clientInfos.quartier">
-                <p class="font-semibold text-foret mb-1">{{ clientInfos.quartier }}</p>
-                <p class="text-gris text-sm leading-relaxed mb-2">{{ clientInfos.adresse }}</p>
-                <p class="text-noir text-sm font-medium flex items-center gap-1">
-                  <span>📞</span> {{ clientInfos.telephone }}
-                </p>
+            <!-- Mode lecture standard -->
+            <div v-else-if="!estEnEdition" class="space-y-4 py-2">
+              <div v-if="clientInfos.telephone || clientInfos.quartier" class="bg-gray-50/50 p-4 rounded-xl border border-gray-100/50">
+                <p class="font-bold text-foret text-base mb-1">{{ clientInfos.quartier }}</p>
+                <p class="text-gris text-sm leading-relaxed mb-3 font-medium">{{ clientInfos.adresse }}</p>
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-sm font-semibold shadow-2xl">
+                  <PhoneIcon class="w-4 h-4 text-foret opacity-80" />
+                  <span>{{ clientInfos.telephone }}</span>
+                </div>
               </div>
-              <div v-else class="text-sm text-gris italic py-2">
-                Aucune information enregistrée pour la livraison.
+              <div v-else class="text-sm text-gris italic py-4 flex flex-col items-center gap-2 border border-dashed border-gray-200 rounded-xl bg-gray-50/30">
+                <p>Aucune information enregistrée pour la livraison.</p>
               </div>
             </div>
 
-            <!-- Mode Formulaire d'Édition -->
-            <form v-else @submit.prevent="sauvegarderInfos" class="space-y-10 mt-2">
-              <!-- Téléphone -->
+            <!-- Mode Formulaire épuré avec focus moderne -->
+            <form v-else @submit.prevent="sauvegarderInfos" class="space-y-4 animate-fadeIn">
               <div>
-                <label class="block text-xs font-semibold text-noir mb-1">Téléphone (WhatsApp de préférence)</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Téléphone (WhatsApp)</label>
                 <input 
                   v-model="formFormulaire.telephone" 
                   type="tel" 
                   placeholder="Ex: 97000000" 
                   required
-                  class="w-full px-3 py-2 border border-creme2 rounded-xl text-sm focus:outline-none focus:border-foret text-noir"
+                  class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium"
                 />
               </div>
 
-              <!-- Quartier / Ville -->
               <div>
-                <label class="block text-xs font-semibold text-noir mb-1">Quartier / Ville</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Quartier / Ville</label>
                 <input 
                   v-model="formFormulaire.quartier" 
                   type="text" 
                   placeholder="Ex: Akassato, Calavi" 
                   required
-                  class="w-full px-3 py-2 border border-creme2 rounded-xl text-sm focus:outline-none focus:border-foret text-noir"
+                  class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium"
                 />
               </div>
 
-              <!-- Précisions adresse -->
               <div>
-                <label class="block text-xs font-semibold text-noir mb-1">Précisions (Maison, repère...)</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Précisions (Maison, repère...)</label>
                 <textarea 
                   v-model="formFormulaire.adresse" 
                   rows="2"
                   placeholder="Ex: Maison verte en face de la pharmacie..." 
                   required
-                  class="w-full px-3 py-2 border border-creme2 rounded-xl text-sm focus:outline-none focus:border-foret text-noir resize-none"
+                  class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium resize-none"
                 ></textarea>
               </div>
 
-              <!-- Boutons d'action -->
-              <div class="flex items-center gap-2 pt-2">
+              <div class="flex items-center gap-3 pt-2">
                 <button 
                   type="submit" 
                   :disabled="enCoursDeSauvegarde"
-                  class="cursor-pointer flex-1 bg-foret text-white text-xs font-bold px-4 py-3 rounded-xl hover:bg-opacity-90 transitiondisabled:opacity-50"
+                  class="cursor-pointer flex-1 bg-foret text-white text-sm font-bold px-4 py-3 rounded-xl hover:bg-opacity-95 transition-all shadow-sm active:scale-[0.99] disabled:opacity-50"
                 >
-                  {{ enCoursDeSauvegarde ? 'Enregistrement...' : 'Enregistrer' }}
+                  {{ enCoursDeSauvegarde ? 'Enregistrement...' : 'Enregistrer les détails' }}
                 </button>
                 <button 
                   type="button" 
                   @click="estEnEdition = false"
-                  class="cursor-pointer px-4 py-3 border border-creme2 rounded-xl text-xs hover:bg-gray-50 text-noir"
+                  class="cursor-pointer px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
                 >
                   Annuler
                 </button>
@@ -373,112 +426,195 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="md:cols-2 bg-white rounded-2xl p-6 shadow-sm border border-creme2 flex flex-col justify-between h-full">
+        <!-- BLOC 2 : COMMANDER RAPIDEMENT (FORMULES) -->
+        <div class="bg-white rounded-2xl p-6 border border-creme2 flex flex-col justify-between shadow-sm transition-all duration-300 hover:shadow-md">
           <div>
             <div class="flex items-center justify-between mb-4">
-              <div>
-                <div class="flex items-center gap-2 mb-4">
-                  <span class="text-xl">💬</span>
-                  <h3 class="font-display font-bold text-lg text-noir">Commander rapidement</h3>
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-gray-50 rounded-xl border border-gray-100">
+                  <ShoppingBagIcon class="w-5 h-5 text-foret" />
                 </div>
-                <p class="text-gris text-sm leading-relaxed mb-5">
-                  Faites le choix du pack qui vous convient et lancez la commande — votre livreur connaît déjà votre adresse et vos préférences.
-                </p>
+                <h3 class="font-display font-bold text-lg">Commander rapidement</h3>
               </div>
-              <!-- Petit indicateur de sauvegarde si nécessaire -->
-              <span v-if="sauvegardeEnCours" class="text-xs text-savane animate-pulse">Mise à jour...</span>
+              <span v-if="sauvegardeEnCours" class="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full font-semibold animate-pulse border border-amber-100">Mise à jour...</span>
+            </div>
+            
+            <p class="text-gris text-sm leading-relaxed mb-6 font-medium">
+              Faites le choix du pack qui vous convient et lancez la commande en un clic.
+            </p>
+
+            <div v-if="chargementInfos" class="space-y-3 mb-4 animate-pulse">
+              <div class="h-14 bg-gray-100 rounded-xl w-full"></div>
+              <div class="h-14 bg-gray-100 rounded-xl w-full"></div>
             </div>
 
-            <!-- Mode Chargement -->
-            <div v-if="chargementInfos" class="animate-pulse space-y-3 mb-4">
-              <div class="h-10 bg-creme2 rounded-xl w-full"></div>
-              <div class="h-10 bg-creme2 rounded-xl w-full"></div>
-              <div class="h-10 bg-creme2 rounded-xl w-full"></div>
-            </div>
-
-            <!-- Choix des formules -->
+            <!-- CARTES DE FORMULES INTELLIGENTES -->
             <div v-else class="space-y-3 mb-6">
-              <label 
+              <div 
                 v-for="formule in formulesApi" 
                 :key="formule._id"
                 :class="[
-                  'flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all duration-200 select-none',
+                  'flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all duration-200 select-none transform hover:-translate-y-0.5',
                   clientInfos.formuleHabituelle === formule.nom 
-                    ? 'border-foret bg-foret/5 ring-1 ring-foret' 
-                    : 'border-creme2 hover:border-gray-300 bg-white'
+                    ? 'border-foret bg-foret/[0.02] shadow-sm ring-2 ring-foret/20' 
+                    : 'border-gray-100 hover:border-gray-300 hover:shadow-sm bg-white'
                 ]"
                 @click="changerFormule(formule)"
               >
-                <div class="flex items-center gap-3">
-                  <span class="text-xl">{{ formule.emoji }}</span>
+                <div class="flex items-center gap-4">
+                  <span class="text-2xl filter drop-shadow-sm select-none">{{ formule.emoji }}</span>
                   <div>
-                    <p class="font-semibold text-sm text-noir">{{ formule.nom }}</p>
-                    <p class="text-xs text-gris">{{ formule.prixActuel }} FCFA · {{ formule.cible.split('·')[0] }}</p>
+                    <p class="font-bold text-sm" :class="clientInfos.formuleHabituelle === formule.nom ? 'text-foret' : 'text-noir'">{{ formule.nom }}</p>
+                    <p class="text-xs text-gris font-medium mt-0.5">{{ formule.prixActuel }} FCFA · {{ formule.cible.split('·')[0] }}</p>
                   </div>
                 </div>
-                <!-- Bouton Radio personnalisé -->
+                
+                <!-- Radio moderne -->
                 <div 
                   :class="[
-                    'w-4 h-4 rounded-full border flex items-center justify-center transition-colors',
+                    'w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-200',
                     clientInfos.formuleHabituelle === formule.nom ? 'border-foret bg-foret' : 'border-gray-300'
                   ]"
                 >
-                  <div v-if="clientInfos.formuleHabituelle === formule.nom" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                  <div v-if="clientInfos.formuleHabituelle === formule.nom" class="w-2 h-2 rounded-full bg-white scale-100 transition-transform"></div>
                 </div>
-              </label>
+              </div>
             </div>
           </div>
 
-          <!-- Bouton d'action dynamique -->
           <button 
             @click="lancerCommande" 
-            class="cursor-pointer inline-flex items-center justify-center w-full px-4 py-3 bg-foret text-white font-medium rounded-xl hover:bg-savane transition-colors duration-200 text-sm text-center"
+            class="cursor-pointer inline-flex items-center justify-center gap-2 w-full px-5 py-3.5 bg-foret text-white font-bold rounded-xl hover:bg-savane shadow-sm hover:shadow transition-all duration-200 text-sm active:scale-[0.99]"
           >
-            Commander maintenant →
+            <span>Confirmer et commander</span>
+            <ArrowRightIcon class="w-4 h-4" />
           </button>
         </div>        
       </div>
 
-      <div class="bg-white rounded-2xl p-6 shadow-sm border border-creme2">
-        <h2 class="font-display font-bold text-xl text-noir mb-6">Historique de mes commandes</h2>
+      <!-- HISTORIQUE DES COMMANDES RESPONSIVE -->
+      <div class="bg-white rounded-2xl p-6 border border-creme2 shadow-sm transition-all duration-300 hover:shadow-md">
+        <div class="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+          <div class="p-2 bg-gray-50 rounded-xl border border-gray-100">
+            <HistoryIcon class="w-5 h-5 text-foret" />
+          </div>
+          <h2 class="font-display font-bold text-xl">Historique de mes commandes</h2>
+        </div>
         
-        <div v-if="chargementCommandes" class="flex flex-col items-center py-12 gap-3">
-          <div class="w-8 h-8 border-4 border-foret border-t-transparent rounded-full animate-spin"></div>
-          <p class="text-gris text-sm">Chargement de vos commandes...</p>
+        <div v-if="chargementCommandes" class="flex flex-col items-center py-16 gap-3">
+          <div class="w-10 h-10 border-[3px] border-foret border-t-transparent rounded-full animate-spin"></div>
+          <p class="text-gris text-sm font-medium">Chargement des données...</p>
         </div>
 
-        <div v-else-if="commandes.length === 0" class="text-center py-12 text-gris">
-          Vous n'avez pas encore passé de commande.
+        <div v-else-if="commandes.length === 0" class="text-center py-16 text-gris font-medium border border-dashed border-gray-200 rounded-xl bg-gray-50/20">
+          Vous n'avez pas encore passé de commande active.
         </div>
 
-        <div v-else class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="border-b border-creme2 text-gris text-xs uppercase tracking-wider">
-                <th class="pb-3 font-semibold">N° Commande</th>
-                <th class="pb-3 font-semibold">Pack Commandé</th>
-                <th class="pb-3 font-semibold">Date</th>
-                <th class="pb-3 font-semibold">Total</th>
-                <th class="pb-3 font-semibold">Statut</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-creme2 text-sm text-noir">
-              <tr v-for="commande in commandes" :key="commande._id" class="hover:bg-creme/50 transition-colors">
-                <td class="py-4 font-medium text-foret">{{ commande._id }}</td>
-                <td class="py-4 font-medium text-foret">{{ commande.formule }}</td>
-                <td class="py-4 text-gris">{{ commande.date }}</td>
-                <td class="py-4 font-medium">{{ commande.total }}</td>
-                <td class="py-4">
-                  <span :class="`px-2.5 py-1 rounded-full text-xs font-medium ${commande.statut === 'Livré' ? 'bg-green-100 text-green-800' : commande.statut === 'En attente' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}`">
-                    {{ commande.statut }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-else>
+          <!-- VUE DE DESKTOP (Cache sur mobile) -->
+          <div class="hidden md:block overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="text-gray-400 text-xs font-bold uppercase tracking-wider border-b border-gray-100 pb-3">
+                  <th class="pb-3 font-bold">N° Commande</th>
+                  <th class="pb-3 font-bold">Pack Commandé</th>
+                  <th class="pb-3 font-bold">Date</th>
+                  <th class="pb-3 font-bold">Total</th>
+                  <th class="pb-3 font-bold">Statut</th>
+                  <th class="pb-3 font-bold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50 text-sm font-medium">
+                <tr v-for="commande in commandes" :key="commande._id" class="hover:bg-gray-50/50 transition-colors group">
+                  <td class="py-4 font-bold text-foret">
+                    {{ `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}
+                  </td>
+                  <td class="py-4 text-gray-700">{{ commande.formule }}</td>
+                  <td class="py-4 text-gris font-normal">{{ commande.date }}</td>
+                  <td class="py-4 font-bold">{{ commande.total }} FCFA</td>
+                  <td class="py-4">
+                    <span :class="[
+                      'px-3 py-1 rounded-full text-xs font-bold tracking-wide inline-block shadow-sm',
+                      commande.statut === 'Livré' ? 'bg-green-50 text-green-700 border border-green-100' :
+                      commande.statut === 'En attente' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
+                      'bg-red-50 text-red-700 border border-red-100'
+                    ]">
+                      {{ commande.statut }}
+                    </span>
+                  </td>
+                  <td class="py-4 text-right">
+                    <div v-if='commande.statut === "En attente"' class="opacity-80 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        @click="annulerCommande(commande._id)" 
+                        title="Annuler la commande"
+                        class="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center justify-center border border-red-100/50"
+                      >
+                        <XIcon class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- VUE RESPONSIVE MOBILE (Cartes fluides verticales) -->
+          <div class="block md:hidden space-y-4">
+            <div v-for="commande in commandes" :key="commande._id" class="bg-gray-50/60 rounded-xl p-4 border border-gray-100 flex flex-col gap-3 relative">
+              <div class="flex justify-between items-start">
+                <div>
+                  <span class="text-xs text-gray-400 font-bold uppercase block">ID Unique</span>
+                  <span class="font-bold text-foret">{{ `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}</span>
+                </div>
+                <span :class="[
+                  'px-3 py-1 rounded-full text-xs font-bold tracking-wide shadow-sm',
+                  commande.statut === 'Livré' ? 'bg-green-50 text-green-700 border border-green-100' :
+                  commande.statut === 'En attente' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
+                  'bg-red-50 text-red-700 border border-red-100'
+                ]">
+                  {{ commande.statut }}
+                </span>
+              </div>
+              
+              <div class="grid grid-cols-2 gap-2 border-t border-b border-gray-100/80 py-2.5 my-0.5 text-sm">
+                <div>
+                  <span class="text-[11px] text-gray-400 font-bold uppercase block">Formule</span>
+                  <span class="font-semibold text-gray-800">{{ commande.formule }}</span>
+                </div>
+                <div>
+                  <span class="text-[11px] text-gray-400 font-bold uppercase block">Prix payé</span>
+                  <span class="font-bold text-noir">{{ commande.total }} FCFA</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between text-xs pt-1">
+                <span class="text-gris font-medium">{{ commande.date }}</span>
+                <button 
+                  v-if='commande.statut === "En attente"'
+                  @click="annulerCommande(commande._id)"
+                  class="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all active:scale-95"
+                >
+                  <XIcon class="w-3.5 h-3.5" />
+                  <span>Annuler</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
 
   </div>
 </template>
+
+<style scoped>
+/* Un petit effet de fade-in pour adoucir le rendu au chargement */
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

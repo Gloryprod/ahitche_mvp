@@ -9,6 +9,8 @@ import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
 import VueTelInput from 'vue-tel-input';
 import 'vue-tel-input/vue-tel-input.css';
+import { VueQueryPlugin } from '@tanstack/vue-query'
+
 
 axios.defaults.withCredentials = true;
 
@@ -22,5 +24,7 @@ app.use(Toast, {
   timeout: 3000,
   closeOnClick: true
 })
+
+app.use(VueQueryPlugin)
 
 app.mount('#app')

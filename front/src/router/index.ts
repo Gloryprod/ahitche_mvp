@@ -3,6 +3,13 @@ import HomeView from '../views/HomeView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import LoginView from '@/views/LoginView.vue'
 import ProfileView from '@/views/dashboard/user/ProfileView.vue'
+import ProfileViewAdmin from '@/views/dashboard/admin/ProfileView.vue'
+import ClientComponents from '@/components/admin/ClientComponents.vue';
+import CommandeComponent from '@/components/admin/CommandeComponent.vue';
+import CategoryManagement from '@/components/admin/bases/categories/CategoryManagement.vue'
+import CompositionRuleManagement from '@/components/admin/bases/compositionrules/CompositionRuleManagement.vue'
+import ProductManagement from '@/components/admin/bases/produits/ProductManagement.vue'
+import FormulaManagement from '@/components/admin/bases/formules/FormulaManagement.vue'
 import { useAuthStore } from '../stores/auth';
 
 const router = createRouter({
@@ -34,10 +41,47 @@ const router = createRouter({
     {
       path: '/dashboard/admin',
       name: 'admin-dashboard',
-      component: ProfileView,
-      meta: { hideNavigation: true, requiresAuth: true, roles: ['admin'] }
+      component: ProfileViewAdmin,
+      meta: { hideNavigation: true, requiresAuth: true, roles: ['admin'] },
+      children: [
+        // {
+        //   path: '', // Chemin par défaut (/dashboard/admin)
+        //   name: 'admin-dashboard',
+        //   component: DashboardHome
+        // },
+        {
+          path: 'clients',
+          name: 'client-page',
+          component: ClientComponents
+        },
+        {
+          path: 'commandes', // (/dashboard/admin/commandes)
+          name: 'commandes-page',
+          component: CommandeComponent
+        },
+        // Données de base
+        {
+          path: 'categories', 
+          name: 'categories-page',
+          component: CategoryManagement
+        },
+        {
+          path: 'regles', 
+          name: 'regles-page',
+          component: CompositionRuleManagement
+        },
+        {
+          path: 'products',
+          name: 'products-page',
+          component: ProductManagement
+        },
+        {
+          path: 'formulas',
+          name: 'formulas-page',
+          component: FormulaManagement
+        },
+      ]
     },
-    
   ],
 })
 

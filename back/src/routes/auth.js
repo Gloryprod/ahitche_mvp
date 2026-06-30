@@ -22,9 +22,10 @@ router.post('/user/delivery-info', verifyToken, userC.saveUserDetails);
 router.get('/formules', formuleC.index);
 router.put('/user/preference-formule', verifyToken, userC.updateFormulePreference);
 
-// Commandes
+// Commandes 
 router.post('/save/orders', verifyToken, orderC.saveOrder);
 router.get('/my-orders', verifyToken, orderC.index);
+router.delete('/delete/order/:id', verifyToken, orderC.deleteOrder);
 
 module.exports = router;
         

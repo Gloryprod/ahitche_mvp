@@ -47,9 +47,9 @@ export function useAuthStore() {
     try {
       // Le serveur Express va injecter le cookie HttpOnly ici
       const response = await axios.post('/api/auth/login', credentials);
-      user.value = response.data.user; 
-      toast.success("Connexion réussie !");
-    } catch (error: any) {
+      user.value = response.data.user ; 
+      return response.data;
+    } catch (error: any ) {
       toast.error(error.response?.data?.message || "Une erreur est survenue.");
       throw error;
     }

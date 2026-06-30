@@ -78,9 +78,18 @@ const toast = useToast()
 const handleLogin = async () => {
   isLoading.value = true
   try {
-    await authStore.login(formLogin.value) // On utilise la méthode de connexion pour enregistrer l'utilisateur
-    // formLogin.value = { email: '', password: '' }
-    router.push('/dashboard/user') // Redirige vers le tableau de bord utilisateur
+    const data = await authStore.login(formLogin.value) 
+    const userRole = data.user.role;
+
+    toast.success(data.message);
+
+    if(userRole === "admin"){
+      router.push('/dashboard/admin') // Redirige vers le tableau de bord utilisateur
+    }
+    else{
+      router.push('/dashboard/user') // Redirige vers le tableau de bord utilisateur
+    }
+
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
   } finally {

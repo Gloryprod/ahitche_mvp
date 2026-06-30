@@ -7,6 +7,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 const authRoutes = require('./src/routes/auth');
+const adminRoutes = require('./src/routes/admin');
 
 // Middlewares
 const allowedOrigins = [
@@ -38,6 +39,7 @@ app.use(express.json());
 app.use(cookieParser());
 // Route exemple
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Connexion à MongoDB
 mongoose.connect(process.env.MONGO_URI)

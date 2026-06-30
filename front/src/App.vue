@@ -13,7 +13,7 @@ const route = useRoute()
     <NavBar v-if="!route.meta.hideNavigation" />
 
     <!-- Le contenu change dynamiquement ici en fonction de l'URL -->
-    <div class="flex-grow">
+    <div class="grow">
       <RouterView />
     </div>
 
