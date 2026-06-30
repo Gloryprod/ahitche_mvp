@@ -123,7 +123,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <aside class="bg-white rounded-3xl p-6 border border-creme2 shadow-sm flex flex-col items-center w-full sticky top-6">
+  <aside class="bg-white rounded-3xl p-6 md:border md:border-creme2 md:shadow-sm flex flex-col items-center w-full sticky top-6">
     
     <div class="flex flex-col items-center border-b border-gray-100 w-full pb-6 mb-4 text-center">
       <div class="w-20 h-20 bg-foret/10 text-foret font-display text-2xl font-bold rounded-full flex items-center justify-center border-2 border-white shadow-md relative group">
