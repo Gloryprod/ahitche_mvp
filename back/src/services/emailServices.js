@@ -8,6 +8,12 @@ const transporter = nodemailer.createTransport({
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
+    dnsTimeout: 5000,
+    connectionTimeout: 5000,
+    tls: {
+        // IPv4
+        family: 4 
+    }
 });
 
 /**

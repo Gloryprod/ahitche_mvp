@@ -21,7 +21,7 @@ async function register(req, res) {
         await newUser.save();
 
         // Appel de la fonction
-        emailService.sendWelcomeEmail(email, username);
+        await emailService.sendWelcomeEmail(email, username);
 
         res.status(201).json({ message: "Utilisateur créé avec succès !" });
     } catch (error) {
@@ -103,7 +103,7 @@ async function forgotPassword(req, res) {
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
 
-    emailService.sendForgotPasswordMail(user, resetUrl);
+    await emailService.sendForgotPasswordMail(user, resetUrl);
 
     return res.status(200).json({ 
       message: "Si ce mail existe, un lien de réinitialisation vous a été envoyé. Veuillez vérifier votre boîte mail !" 
