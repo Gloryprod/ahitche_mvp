@@ -116,15 +116,9 @@ const handleOrderSuccess = () => {
   <div class="space-y-6">
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <h1 class="font-display font-bold text-xl text-noir">Commandes & Clients</h1>
-      <!-- <RouterLink 
-        to="/dashboard/admin/saveCmd"
-        class="px-4 py-2 bg-foret text-white text-xs font-bold rounded-lg hover:bg-opacity-95 transition-all shadow-sm flex items-center gap-1"
-      >
-        <span>+</span> Nouvelle commande
-      </RouterLink> -->
 
       <button @click="isModalOpen = true" class="cursor-pointer px-4 py-2 bg-foret text-white text-xs font-bold rounded-lg hover:bg-opacity-95 transition-all shadow-sm flex items-center gap-1">
-        + Créer une commande
+        + Nouvelle commande
       </button>
     </div>
 

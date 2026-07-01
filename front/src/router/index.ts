@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import LoginView from '@/views/LoginView.vue'
+import ResetPassword from '../views/ResetPassword.vue'
 import ProfileView from '@/views/dashboard/user/ProfileView.vue'
 import ProfileViewAdmin from '@/views/dashboard/admin/ProfileView.vue'
 import ClientComponents from '@/components/admin/ClientComponents.vue';
@@ -30,6 +31,12 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView,
+      meta: { hideNavigation: true }
+    },
+    {
+      path: '/reset-password',
+      name: 'ResetPassword',
+      component: ResetPassword,
       meta: { hideNavigation: true }
     },
     {

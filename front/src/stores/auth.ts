@@ -64,5 +64,24 @@ export function useAuthStore() {
     }
   }
 
-  return { user, isInitialized, isAuthenticated, isAdmin, login, logout, checkSession };
+  async function forgotPassword(payload: { email: string }) {
+    try {
+      const response = await axios.post('/api/auth/forgot-password', payload);
+      return response.data;
+    } catch (error: any) {
+      // On propage l'erreur pour la gérer directement dans le composant avec le toast rouge
+      throw error;
+    }
+  }
+
+  async function resetPassword(payload: { token: string; password: string }) {
+    try {
+      const response = await axios.post('/api/auth/reset-password', payload);
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
+  return { user, isInitialized, isAuthenticated, isAdmin, login, logout, checkSession, forgotPassword, resetPassword };
 }

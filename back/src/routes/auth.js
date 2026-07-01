@@ -13,6 +13,8 @@ const orderC = require('../controllers/OrderController');
 router.post('/register', authC.register);
 router.post('/login', authC.login);
 router.post('/logout', authC.logout);
+router.post('/forgot-password', authC.forgotPassword);
+router.post('/reset-password', authC.resetPassword);
 
 // Profil
 router.get('/me', verifyToken, authC.getUser);

@@ -1,6 +1,6 @@
 <template>
     <div class="min-h-screen flex md:flex-row">
-        <div class="hidden md:block md:w-1/2 relative bg-foret min-h-[450px]">
+        <div class="hidden md:block md:w-1/2 relative bg-foret min-h-112.5">
             <img 
                 src="/beautiful-couple-looking-their-laptop.jpg" 
                 alt="Plat Ahitché" 
@@ -52,33 +52,13 @@
             />
             </div>
 
-            <!-- <div>
+            <div>
                 <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Numéro WhatsApp / Mobile Money <span class="required">*</span></label>
                 <div class="">
-                  <vue-tel-input class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all" v-model="formRegister.phone"></vue-tel-input>
+                  <vue-tel-input class="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all" v-model="formRegister.telephone"></vue-tel-input>
                 </div>
                 <p class="text-xs text-gray-500 mt-1">Ce numéro sera utilisé pour vos commandes et livraisons.</p>
             </div>
-
-            <div >
-                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1" >Quartier <span class="required">*</span></label>
-                <select class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all">
-                <option value="">-- Choisissez votre quartier --</option>
-                <option value="Calavi Kpota">Calavi Kpota</option>
-                <option value="Godomey">Godomey</option>
-                <option value="Godomey-Togoudo">Godomey-Togoudo</option>
-                <option value="Calavi centre">Calavi centre</option>
-                <option value="Agori">Agori</option>
-                <option value="Cotonou">Cotonou</option>
-                <option value="Autre">Autre</option>
-                </select>
-            </div>
-
-            <div >
-                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Adresse / Point de repère <span class="required">*</span></label>
-                <textarea class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all" rows="3" placeholder="Ex : Près de l'école primaire de Kpota, maison bleue 2ème rue à droite"></textarea>
-                <p class="field-hint">Soyez précis — c'est ce que verra votre livreur.</p>
-            </div> -->
 
             <div>
             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Mot de passe</label>
@@ -117,7 +97,7 @@ import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 
-const formRegister = ref({ username: '', email: '', password: '' })
+const formRegister = ref({ username: '', email: '', password: '', telephone:'' })
 const isLoading = ref(false)
 const router = useRouter()
 const toast = useToast()
@@ -127,7 +107,7 @@ const handleRegister = async () => {
   try {
     const response = await axios.post('api/auth/register', formRegister.value)
     toast.success(response.data.message || "Inscription réussie !")
-    formRegister.value = { username: '', email: '', password: '' } // Reset
+    formRegister.value = { username: '', email: '', password: '', telephone:'' } // Reset
     router.push('/login') // Redirige vers la page de connexion
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Une erreur est survenue lors de l'inscription.")

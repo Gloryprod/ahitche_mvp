@@ -1,10 +1,5 @@
 const nodemailer = require('nodemailer');
 
-console.log("VÉRIFICATION SMTP :", {
-    host: process.env.EMAIL_HOST,
-    user: process.env.EMAIL_USER ? "Reçu (OK)" : "Vide (Erreur)"
-});
-
 // Configuration du transporteur de mail avec les variables d'environnement
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
@@ -23,7 +18,7 @@ const transporter = nodemailer.createTransport({
 
 function sendWelcomeEmail (to, username) {
     const mailOptions = {
-        from: '"L\'équipe Ahitche" <no-reply@ahitche.bj>', // Nom et mail d'expéditeur
+        from: '"L\'équipe Ahitche" <contact@ahitchebj.com>', // Nom et mail d'expéditeur
         to: to,
         subject: 'Bienvenue sur Ahitche ! ✨',
         // Version HTML stylisée (tu peux y injecter du CSS basique)
@@ -34,7 +29,7 @@ function sendWelcomeEmail (to, username) {
                     Votre compte a été créé avec succès. Vous pouvez dès à présent vous connecter et explorer toutes nos fonctionnalités.
                 </p>
                 <div style="margin: 30px 0; text-align: center;">
-                    <a href="https://votre-site-front.vercel.app" style="background-color: #1e3a1f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                    <a href="https://ahitchebj.com/login" style="background-color: #1e3a1f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
                         Accéder à mon espace
                     </a>
                 </div>
@@ -54,4 +49,38 @@ function sendWelcomeEmail (to, username) {
     }
 };
 
-module.exports = { sendWelcomeEmail };
+/**
+ * Envoie un e-mail de reinitialisation de mot de passe
+ * @param {string} user - L'utilisateur concerné
+ * @param {string} resetUrl - Lien de réinitialisation
+ */
+
+function sendForgotPasswordMail (user, resetUrl) {
+    const mailOptions = {
+        from: '"L\'équipe Ahitche" <contact@ahitchebj.com>', // Nom et mail d'expéditeur
+        to: user.email,
+        subject: 'Ahitché - Réinitialisation de votre mot de passe',
+        // Version HTML stylisée (tu peux y injecter du CSS basique)
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee;">
+                <h2 style="color: #0d5e42; text-align: center;">Réinitialisation de votre mot de passe</h2>
+                <p>Bonjour <strong>${user.username}</strong>,</p>
+                <p>Vous avez demandé la réinitialisation de votre mot de passe sur Ahitché. Cliquez sur le bouton ci-dessous pour en configurer un nouveau :</p>
+                <div style="text-align: center; margin: 30px 0;">
+                <a href="${resetUrl}" style="background-color: #0d5e42; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Réinitialiser mon mot de passe</a>
+                </div>
+                <p style="color: #777; font-size: 12px;">Ce lien est valable pendant 1 heure. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail en toute sécurité.</p>
+            </div>
+        `
+    };
+
+    try {
+        transporter.sendMail(mailOptions);
+        console.log(`📧 E-mail de réinitialisation envoyé avec succès à ${user.email}`);
+    } catch (error) {
+        console.error("❌ Erreur lors de l'envoi de l'e-mail :", error);
+        // On ne bloque pas l'inscription de l'utilisateur si le mail échoue, mais on log l'erreur
+    }
+};
+
+module.exports = { sendWelcomeEmail, sendForgotPasswordMail };
