@@ -3,16 +3,16 @@ const nodemailer = require('nodemailer');
 // Configuration du transporteur de mail avec les variables d'environnement
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
+    // port: process.env.EMAIL_PORT,
+    port: 587,            
+    secure: false,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
-    dnsTimeout: 5000,
-    connectionTimeout: 5000,
     tls: {
-        // IPv4
-        family: 4 
+        family: 4,            
+        rejectUnauthorized: false // Évite les rejets liés aux certificats auto-signés en production
     }
 });
 
