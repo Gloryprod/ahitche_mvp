@@ -357,10 +357,10 @@ onMounted(async () => {
             </div>
 
             <!-- Mode lecture standard -->
-            <div v-else-if="!estEnEdition" class="space-y-4 py-2">
-              <div v-if="clientInfos.telephone || clientInfos.quartier" class="bg-gray-50/50 p-4 rounded-xl border border-gray-100/50">
-                <p class="font-bold text-foret text-base mb-1">{{ clientInfos.quartier }}</p>
-                <p class="text-gris text-sm leading-relaxed mb-3 font-medium">{{ clientInfos.adresse }}</p>
+            <div v-else-if="!estEnEdition" class="">
+              <div v-if="clientInfos.telephone || clientInfos.quartier" class="p-4 rounded-xl border border-gray-100/50">
+                <p class="font-bold text-foret text-base mb-1">{{ clientInfos.quartier || "" }}</p>
+                <p class="text-gris text-sm leading-relaxed mb-3 font-medium">{{ clientInfos.adresse || "" }}</p>
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-sm font-semibold shadow-2xl">
                   <PhoneIcon class="w-4 h-4 text-foret opacity-80" />
                   <span>{{ clientInfos.telephone }}</span>

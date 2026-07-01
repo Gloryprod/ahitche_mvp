@@ -35,7 +35,7 @@
                     <button 
                       type="submit" 
                       :disabled="isLoading"
-                      class="w-full bg-foret hover:bg-foret/90 text-white font-bold py-3.5 px-4 rounded-xl text-sm mt-2 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                      class="cursor-pointer w-full bg-foret hover:bg-foret/90 text-white font-bold py-3.5 px-4 rounded-xl text-sm mt-2 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {{ isLoading ? 'Envoi...' : 'Envoyer le lien' }}
                     </button>
@@ -89,7 +89,7 @@
                     <button 
                       type="submit" 
                       :disabled="isLoading"
-                      class="w-full bg-foret hover:bg-foret/90 text-white font-bold py-3.5 px-4 rounded-xl text-sm mt-2 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                      class="cursor-pointer w-full bg-foret hover:bg-foret/90 text-white font-bold py-3.5 px-4 rounded-xl text-sm mt-2 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {{ isLoading ? 'Connexion...' : 'Se connecter' }}
                     </button>
