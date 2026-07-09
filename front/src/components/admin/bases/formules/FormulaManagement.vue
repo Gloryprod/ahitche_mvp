@@ -215,7 +215,7 @@ const getPeriodText = computed(() => {
       </div>
       
       <!-- Sélecteur d'onglets mis à jour avec les 5 choix -->
-      <div class="flex flex-wrap bg-[#f9f9fb] p-1 rounded-xl border border-gray-200 self-start xl:self-center gap-1">
+      <div class="flex flex-wrap bg-[#f9f9fb] rounded-xl border border-gray-200 self-start xl:self-center">
         <button 
           @click="activePack = 'essentiel'"
           :class="[activePack === 'essentiel' ? 'bg-white text-noir shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"

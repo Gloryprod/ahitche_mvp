@@ -103,7 +103,6 @@ const formatPrixCFA = (valeur: number) => {
     <!-- BARRE D'ENTÊTE -->
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <h1 class="font-display font-bold text-xl text-noir flex items-center gap-2">
-        <FileText class="w-5 h-5 text-foret stroke-[2.5]" />
         Bons de Commande
       </h1>
       <button @click="showCreatePanel = true" class="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-foret hover:bg-foret/90 text-white rounded-xl font-bold tracking-wide shadow-sm transition-all self-end sm:self-auto">

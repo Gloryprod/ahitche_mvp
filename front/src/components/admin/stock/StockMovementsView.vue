@@ -76,7 +76,6 @@ const formatDateHeure = (dateStr: string) => {
     <!-- BARRE D'ENTÊTE & FILTRES -->
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <h1 class="font-display font-bold text-xl text-noir flex items-center gap-2">
-        <Layers class="w-5 h-5 text-foret stroke-[2.5]" />
         Historique des Flux & Mouvements
       </h1>
       

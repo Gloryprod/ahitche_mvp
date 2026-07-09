@@ -266,7 +266,7 @@ const showNotification = (text: string, type: string) => {
           Erreur : {{ error?.message || "Impossible de charger les lots physiques." }}
         </div>
 
-        <div v-else class="p-4">
+        <div v-else class="p-4 overflow-x-auto">
             <table class="w-full text-left border-collapse">
             <thead>
                 <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
