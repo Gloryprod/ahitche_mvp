@@ -64,7 +64,7 @@
           Ce projet est développé avec le soutien financier du Programme de Formation Professionnelle et d'Entrepreneuriat des jeunes (FP2E), à travers le programme Next Impact mis en œuvre par l'Agence de Développement de Sèmè City, et financé par la Banque mondiale.
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gris-lt">
-          <p>© 2026 Ahitché · Convention NEXT IMPACT N°171</p>
+          <p>© 2026 Ahitché · Touts droits réservés</p>
         </div>
       </div>
 
