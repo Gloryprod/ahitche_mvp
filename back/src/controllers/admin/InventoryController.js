@@ -1,5 +1,5 @@
 const { LotStockFifo, MouvementStock } = require('../../models/stock');
-const PurchaseOrder = require('../../models/PurchaseOrder');
+const PurchaseOrder = require('../../models/purchaseOrder');
 const Product = require('../../models/product');
 
 /**
