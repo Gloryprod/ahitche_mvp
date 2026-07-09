@@ -77,10 +77,17 @@ async function getOrders(req, res) {
     }
 
     let orders = await Order.find(query)
-    .populate({
-    path: 'userId', // Assure-toi que c'est bien le nom du champ dans ton OrderSchema
-    select: 'username telephone'
-    })
+    .populate(
+     [
+      {
+        path: 'userId',
+        select: 'username telephone'
+      },
+      {
+        path: 'productsSnapshot'
+      }
+    ]
+    )
     .sort({ createdAt: -1 });
 
     // Filtrage côté serveur si une recherche textuelle est soumise sur le nom du client
@@ -105,13 +112,17 @@ async function getOrders(req, res) {
 
       return {
         id: order._id,
+        userId: order.userId ? order.userId._id : null,
         clientName: order.userId ? order.userId.username : 'Client supprimé',
         whatsapp: order.userId ? order.userId.telephone : 'N/A',
         formule: order.formule,
         total: order.total,
         date: dateFormatee,
+        formuleSlug: order.formuleSlug,
         modePaiement: order.modePaiement,
+        notes: order.notes,
         statut: order.statut,
+        productsSnapshot: order.productsSnapshot || [],
         deletedAt: order.deletedAt
       };
     });

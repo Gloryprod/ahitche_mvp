@@ -21,7 +21,7 @@ router.get('/me', verifyToken, authC.getUser);
 router.post('/user/delivery-info', verifyToken, userC.saveUserDetails);
 
 // Formules
-router.get('/formules', formuleC.index);
+router.get('/formules', verifyToken, formuleC.index);
 router.put('/user/preference-formule', verifyToken, userC.updateFormulePreference);
 
 // Commandes 

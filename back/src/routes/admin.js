@@ -8,6 +8,8 @@ const compositionRuleC = require('../controllers/admin/CompositionRuleController
 const productC = require('../controllers/admin/ProductController');
 const formulaC = require('../controllers/admin/FormulaController');
 const orderC = require('../controllers/admin/OrderController');
+const stockC = require('../controllers/admin/StockController');
+const invC = require('../controllers/admin/InventoryController');
 const { verifyToken } = require('../middlewares/auth');
 
 router.use(verifyToken);
@@ -18,7 +20,9 @@ router.get('/users', userC.index);
 // Commandes
 router.get('/commandes', userC.getOrders)
 router.post('/orders', orderC.createAdminOrder);
-router.get('/orders', orderC.getAllOrders);
+router.put('/orders/:id', orderC.updateAdminOrder);
+router.patch('/orders/:id/status', orderC.updateOrderStatus);
+router.delete('/orders/:id', orderC.deleteAdminOrder);
 
 // Category
 router.route('/categories')
@@ -50,6 +54,22 @@ router.route('/products/:id')
 // --- Formules / Packs ---
 router.get('/formulas/:packType', formulaC.getPackDetails);
 
+// Stocks
+router.route('/stock/lots')
+  .get(stockC.obtenirLotsStock)
+  .post(stockC.enregistrerEntreeStock);
+
+router.route('/stock/lots/:id')
+  .put(stockC.modifierLotStock)
+  .delete(stockC.supprimerLotStock);
+
+// État et Historique
+router.get('/inventory/global', invC.obtenirInventaireGlobal);
+router.get('/mouvements', invC.obtenirHistoriqueMouvements);
+
+// Bons de commande fournisseurs
+router.post('/bons-commande', invC.creerBonCommande);
+router.get('/bons-commande', invC.obtenirBonsCommande);
 
 module.exports = router;
         

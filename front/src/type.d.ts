@@ -10,13 +10,17 @@ export interface Client {
 
 interface Commande {
   id: string
+  userId: string | null
   clientName: string
   whatsapp: string
   formule: 'AHI ESSENTIEL' | 'AHI EQUILIBRE' | 'AHI CONFORT' | 'AHI RESERVE' | 'AHI FRAÎCHEUR'
   total: number
   date: string
+  formuleSlug: string
   modePaiement: string
+  notes: string
   statut: 'En attente' | 'Livré'
+  productsSnapshot: ProductSnapshot[]
   deletedAt: Date
 }   
 
@@ -79,4 +83,15 @@ export interface ProductItem {
   appliedMultiplier: number;
   quantity: number;
   totalPrice: number;
+}
+
+export interface ProductSnapshot {
+  orderId: string;
+  productId: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+  isExtra: boolean; 
 }

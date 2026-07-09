@@ -11,6 +11,10 @@ import CategoryManagement from '@/components/admin/bases/categories/CategoryMana
 import CompositionRuleManagement from '@/components/admin/bases/compositionrules/CompositionRuleManagement.vue'
 import ProductManagement from '@/components/admin/bases/produits/ProductManagement.vue'
 import FormulaManagement from '@/components/admin/bases/formules/FormulaManagement.vue'
+import AjouterEntreeStock from '@/components/admin/AjouterEntreeStock.vue'
+import VueGlobalInventory from '@/components/admin/stock/VueGlobalInventory.vue'
+import StockMovementsView from '@/components/admin/stock/StockMovementsView.vue'
+import PurchaseOrdersView from '@/components/admin/stock/PurchaseOrdersView.vue'
 import { useAuthStore } from '../stores/auth';
 
 const router = createRouter({
@@ -59,7 +63,7 @@ const router = createRouter({
         {
           path: 'clients',
           name: 'client-page',
-          component: ClientComponents
+          component: ClientComponents,
         },
         {
           path: 'commandes', // (/dashboard/admin/commandes)
@@ -87,14 +91,41 @@ const router = createRouter({
           name: 'formulas-page',
           component: FormulaManagement
         },
+        // Gestion de stock
+        {
+          path: 'saveStock',
+          name: 'saveStock-page',
+          component: AjouterEntreeStock
+        },
+        {
+          path: 'inventaire',
+          name: 'inventaire-page',
+          component: VueGlobalInventory
+        },
+        {
+          path: 'mouvement-stock',
+          name: 'mouvement-stock-page',
+          component: StockMovementsView
+        },
+        {
+          path: 'bon-commande',
+          name: 'bon-commande-page',
+          component: PurchaseOrdersView
+        },
       ]
     },
   ],
 })
 
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore();
+
+  // Si l'application vient d'être rechargée, on attend impérativement
+  // que le serveur valide ou rejette la session avant d'aller plus loin.
+  if (!authStore.isInitialized) {
+    await authStore.checkSession();
+  }
   
   // Vérification de l'authentification requise
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {

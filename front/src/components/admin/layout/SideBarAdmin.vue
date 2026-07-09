@@ -41,14 +41,17 @@ const menuGroups = [
     title: 'Principal',
     items: [
       { id: 'dashboard', name: 'Tableau de bord', icon: LayoutDashboard, hasBadge: false, path: '/dashboard/admin' },
-      { id: 'commandes', name: 'Commandes', icon: ShoppingBag, hasBadge: true, path: '/dashboard/admin/commandes' },
+      { id: 'commandes', name: 'Commandes', icon: ShoppingBag, hasBadge: false, path: '/dashboard/admin/commandes' },
       { id: 'clients', name: 'Liste des clients', icon: Users, hasChevron: true, path: '/dashboard/admin/clients' },
     ]
   },
   {
-    title: 'Catalogue',
+    title: 'Stock',
     items: [
-      { id: 'stock', name: 'Gestion de stock', icon: Package, hasChevron: true, path: '/dashboard/admin/stock' },
+      { id: 'saveStock', name: 'Entrée en stock', icon: Settings, hasChevron: true, path: '/dashboard/admin/saveStock' },
+      { id: 'inventaire', name: 'Inventaire de stock', icon: Package, hasChevron: true, path: '/dashboard/admin/inventaire' },
+      { id: 'mouvement-stock', name: 'Mouvements de stock', icon: Package, hasChevron: true, path: '/dashboard/admin/mouvement-stock' },
+      { id: 'bon-commande', name: 'Bons de commande', icon: Package, hasChevron: true, path: '/dashboard/admin/bon-commande' },
     ]
   },
   {
@@ -93,7 +96,8 @@ const handleLogout = async () => {
     isLoading.value = true;
     try {
       await authStore.logout();      
-      router.push('/');
+      router.push('/login');
+      toast.success("À bientôt ! Déconnexion réussie.");
     } catch (error) {
       Swal.fire({
         title: 'Erreur',
@@ -107,24 +111,23 @@ const handleLogout = async () => {
   }
 };
 
-onMounted(async () => {
-  await authStore.checkSession();
+// onMounted(async () => {  
+//   await authStore.checkSession();
   
-  if (!authStore.isAuthenticated) {
-    // 💡 Toast d'avertissement si l'utilisateur tente de forcer l'accès
-    toast.error("Accès refusé. Veuillez vous connecter.");
-    router.push('/');
-    return;
-  }
+//   if (!authStore.isAuthenticated) {
+//     // 💡 Toast d'avertissement si l'utilisateur tente de forcer l'accès
+//     toast.error("Accès refusé. Veuillez vous connecter.");
+//     router.push('/login');
+//     return;
+//   }
   
-  // Si tout est bon, on affiche un toast de bienvenue chaleureux
-  // toast.info(`Ravi de vous revoir, ${authStore.user?.value?.username} ! ✨`);
-});
+//   // Si tout est bon, on affiche un toast de bienvenue chaleureux
+//   toast.info(`Ravi de vous revoir, ${authStore.user?.value?.username} ! ✨`);
+// });
 </script>
 
 <template>
-  <aside class="bg-white rounded-3xl p-6 md:border md:border-creme2 md:shadow-sm flex flex-col items-center w-full sticky top-6">
-    
+  <aside class="bg-white rounded-3xl p-6 md:border md:border-creme2 md:shadow-sm  flex flex-col items-center w-full sticky top-6">  
     <div class="flex flex-col items-center border-b border-gray-100 w-full pb-6 mb-4 text-center">
       <div class="w-20 h-20 bg-foret/10 text-foret font-display text-2xl font-bold rounded-full flex items-center justify-center border-2 border-white shadow-md relative group">
         <span>{{ avatarInitiale }}</span>
@@ -168,13 +171,6 @@ onMounted(async () => {
               />
               <span>{{ item.name }}</span>
             </div>
-
-            <span 
-              v-if="item.hasBadge && commandesEnAttenteCount && commandesEnAttenteCount > 0" 
-              class="bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full animate-pulse"
-            >
-              {{ commandesEnAttenteCount }}
-            </span>
 
             <ChevronRight 
               v-slot:default

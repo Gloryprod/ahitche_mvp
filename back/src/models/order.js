@@ -40,6 +40,11 @@ const orderSchema = new mongoose.Schema({
   facture_url: {
     type: String
   },
+  // 🔗 Référence vers le modèle OrderProductSnapshot
+  productsSnapshot: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'OrderProductSnapshot' 
+  }],
   deletedAt: { type: Date, default: null }
 }, {
   timestamps: true // Génère automatiquement createdAt (qui servira de date) et updatedAt

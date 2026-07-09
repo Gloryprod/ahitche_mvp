@@ -1,8 +1,10 @@
 import { ref, computed } from 'vue';
 import axios from 'axios';
 import { useToast } from 'vue-toastification'; 
+import { useRouter } from 'vue-router';
 
 const toast = useToast();
+const router = useRouter();
 
 // On configure Axios pour qu'il envoie automatiquement les cookies aux requêtes Cross-Origin
 const API_URL = import.meta.env.PROD 
@@ -60,7 +62,6 @@ export function useAuthStore() {
       await axios.post('/api/auth/logout');
     } finally {
       user.value = null;
-      toast.success("À bientôt ! Déconnexion réussie.");
     }
   }
 

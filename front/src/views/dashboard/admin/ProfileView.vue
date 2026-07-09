@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import SideBarAdmin from '@/components/admin/layout/SideBarAdmin.vue';
-import { RouterView, useRoute } from 'vue-router'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 import { Menu, X } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth';
+import { useToast } from 'vue-toastification';
 
 const route = useRoute()
-const commandesEnAttenteCount = ref(1);
+const router = useRouter()
+const authStore = useAuthStore()
+const toast = useToast()
 
 // État pour contrôler l'ouverture du menu mobile
 const isMobileMenuOpen = ref(false);
@@ -14,6 +18,21 @@ const isMobileMenuOpen = ref(false);
 watch(() => route.path, () => {
   isMobileMenuOpen.value = false
 })
+
+onMounted(async () => {
+  await authStore.checkSession();
+  
+  if (!authStore.isAuthenticated) {
+    // 💡 Toast d'avertissement si l'utilisateur tente de forcer l'accès
+    toast.error("Accès refusé. Veuillez vous connecter.");
+    authStore.logout();
+    router.push('/login');
+    return;
+  }
+  
+  // Si tout est bon, on affiche un toast de bienvenue chaleureux
+  // toast.info(`Ravi de vous revoir, ${authStore.user?.value?.username} ! ✨`);
+});
 </script>
 
 <template>
@@ -57,7 +76,7 @@ watch(() => route.path, () => {
           </div>
           
           <div class="overflow-y-auto lg:overflow-visible flex-1 p-4 lg:p-0">
-            <SideBarAdmin :commandes-en-attente-count="commandesEnAttenteCount"/>
+            <SideBarAdmin />
           </div>
         </div>
       </div>

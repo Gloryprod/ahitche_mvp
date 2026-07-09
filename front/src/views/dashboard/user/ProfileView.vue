@@ -120,7 +120,8 @@ const handleLogout = async () => {
     isLoading.value = true;
     try {
       await authStore.logout();      
-      router.push('/');
+      router.push('/login');
+      toast.success("À bientôt ! Déconnexion réussie.");
     } catch (error) {
       // 💡 Alerte SweetAlert2 en cas d'erreur serveur
       Swal.fire({
