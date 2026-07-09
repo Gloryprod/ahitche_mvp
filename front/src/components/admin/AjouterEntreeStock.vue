@@ -220,7 +220,7 @@ const showNotification = (text: string, type: string) => {
     <!-- BARRE D'ENTÊTE DE STYLE AHITCHÉ -->
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <h1 class="font-display font-bold text-xl text-noir flex items-center gap-2">
-        Enregistrement & Entrées de Stock
+        Entrées de Stock
       </h1>
       <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
         <div class="relative w-full sm:w-60">
