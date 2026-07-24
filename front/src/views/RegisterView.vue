@@ -96,6 +96,14 @@ import { ref } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
+import { useHead } from '@unhead/vue'
+
+useHead({
+  title: 'Inscription | Ahitché',
+  meta: [
+    { name: 'description', content: 'Inscrivez-vous pour accéder à votre espace personnel et gérer vos commandes.' }
+  ]
+})
 
 const formRegister = ref({ username: '', email: '', password: '', telephone:'' })
 const isLoading = ref(false)

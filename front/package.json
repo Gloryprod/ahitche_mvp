@@ -19,6 +19,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/vue-query": "^5.101.2",
+    "@unhead/vue": "^3.2.3",
     "axios": "^1.16.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
