@@ -111,14 +111,14 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
-import { useHead } from '@unhead/vue'
+// import { useHead } from '@unhead/vue'
 
-useHead({
-  title: 'Connexion | Ahitché',
-  meta: [
-    { name: 'description', content: 'Connectez-vous à votre compte Ahitché pour accéder à votre espace personnel et gérer vos commandes.' }
-  ]
-})
+// useHead({
+//   title: 'Connexion | Ahitché',
+//   meta: [
+//     { name: 'description', content: 'Connectez-vous à votre compte Ahitché pour accéder à votre espace personnel et gérer vos commandes.' }
+//   ]
+// })
 
 const formLogin = ref({ email: '', password: '' })
 const forgotEmail = ref('')
