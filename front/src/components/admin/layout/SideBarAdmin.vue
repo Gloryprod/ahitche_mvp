@@ -111,19 +111,6 @@ const handleLogout = async () => {
   }
 };
 
-// onMounted(async () => {  
-//   await authStore.checkSession();
-  
-//   if (!authStore.isAuthenticated) {
-//     // 💡 Toast d'avertissement si l'utilisateur tente de forcer l'accès
-//     toast.error("Accès refusé. Veuillez vous connecter.");
-//     router.push('/login');
-//     return;
-//   }
-  
-//   // Si tout est bon, on affiche un toast de bienvenue chaleureux
-//   toast.info(`Ravi de vous revoir, ${authStore.user?.value?.username} ! ✨`);
-// });
 </script>
 
 <template>

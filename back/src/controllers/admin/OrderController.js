@@ -183,6 +183,7 @@ async function updateOrderStatus(req, res) {
 
     // 2. Mettre à jour le statut de la commande
     order.statut = statut;
+    order.dateLivraison = new Date();
     const updatedOrder = await order.save({ session });
 
     // 3. Déclencher l'algorithme FIFO si le nouveau statut est 'Livré' et qu'elle ne l'était pas avant

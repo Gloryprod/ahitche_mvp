@@ -45,6 +45,7 @@ const orderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'OrderProductSnapshot' 
   }],
+  dateLivraison: { type: Date, default: null},
   deletedAt: { type: Date, default: null }
 }, {
   timestamps: true // Génère automatiquement createdAt (qui servira de date) et updatedAt

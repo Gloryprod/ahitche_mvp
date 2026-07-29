@@ -22,6 +22,7 @@ interface Commande {
   statut: 'En attente' | 'Livré'
   productsSnapshot: ProductSnapshot[]
   deletedAt: Date
+  dateLivraison: Date
 }   
 
 export interface Category {

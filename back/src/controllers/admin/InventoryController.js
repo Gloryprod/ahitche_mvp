@@ -102,17 +102,86 @@ async function creerBonCommande(req, res) {
   }
 }
 
+async function modifierBonCommande(req, res) {
+  try {
+    const { fournisseur, items } = req.body;
+    const bon = await PurchaseOrder.findByIdAndUpdate(
+      req.params.id,
+      { fournisseur, items },
+      { new: true }
+    ).populate('items.productId', 'name unit');
+
+    if (!bon) return res.status(404).json({ message: "Bon introuvable." });
+
+    return res.status(200).json({ message: "Bon mis à jour avec succès", bon });
+  } catch (error) {
+    return res.status(500).json({ message: "Erreur lors de la mise à jour." });
+  }
+}
+
+// 3. SUPPRESSION D'UN BON
+async function supprimerBonCommande(req, res) {
+  try {
+    const { id } = req.params;
+    
+    const bon = await PurchaseOrder.findByIdAndUpdate(
+      id,
+      { deletedAt: new Date() },
+      { new: true }
+    );
+
+    if (!bon) {
+      return res.status(404).json({ message: "Bon de commande introuvable." });
+    }
+
+    return res.status(200).json({ message: "Bon de commande supprimé." });
+  } catch (error) {
+    return res.status(500).json({ message: "Erreur lors de la suppression." });
+  }
+}
+
 /**
  * 4. OBTENIR LES BONS DE COMMANDE (GET /api/stock/bons-commande)
  */
 async function obtenirBonsCommande(req, res) {
   try {
-    const bons = await PurchaseOrder.find()
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+
+    // Construction du filtre de recherche (insensible à la casse)
+    const query = {
+      $or: [
+        { deletedAt: { $exists: false } },
+        { deletedAt: null }
+      ]
+    };
+    
+    if (search) {
+      query.$or = [
+        { numeroBon: { $regex: search, $options: 'i' } },
+        { fournisseur: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Calcul du total des documents correspondants
+    const total = await PurchaseOrder.countDocuments(query);
+
+    // Récupération des données paginées
+    const bonsCommande = await PurchaseOrder.find(query)
       .populate('items.productId', 'name unit')
-      .sort({ dateEmission: -1 });
-    return res.status(200).json(bons);
+      .sort({ dateEmission: -1, createdAt: -1 }) // Tri par date récente
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    return res.status(200).json({
+      bonsCommande,
+      total,
+      hasMore: page * limit < total
+    });
   } catch (error) {
-    return res.status(500).json({ message: "Erreur de récupération." });
+    console.error("Erreur lors de la récupération des bons de commande :", error);
+    return res.status(500).json({ message: "Erreur lors de la récupération des bons de commande." });
   }
 }
 
@@ -120,5 +189,7 @@ module.exports = {
   obtenirInventaireGlobal,
   obtenirHistoriqueMouvements,
   creerBonCommande,
-  obtenirBonsCommande
+  obtenirBonsCommande,
+  modifierBonCommande,
+  supprimerBonCommande
 };

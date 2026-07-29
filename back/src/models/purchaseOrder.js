@@ -17,7 +17,8 @@ const purchaseOrderSchema = new mongoose.Schema({
     enum: ['En attente', 'Reçu partiellement', 'Reçu', 'Annulé'], 
     default: 'En attente' 
   },
-  dateEmission: { type: Date, default: Date.now }
+  dateEmission: { type: Date, default: Date.now },
+  deletedAt: { type: Date, default: null}
 }, { timestamps: true });   
 
 module.exports = mongoose.model('PurchaseOrder', purchaseOrderSchema);

@@ -70,6 +70,8 @@ router.get('/mouvements', invC.obtenirHistoriqueMouvements);
 // Bons de commande fournisseurs
 router.post('/bons-commande', invC.creerBonCommande);
 router.get('/bons-commande', invC.obtenirBonsCommande);
+router.put('/bons-commande/:id', invC.modifierBonCommande);
+router.delete('/bons-commande/:id', invC.supprimerBonCommande);
 
 module.exports = router;
         

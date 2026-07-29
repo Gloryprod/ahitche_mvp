@@ -123,7 +123,8 @@ async function getOrders(req, res) {
         notes: order.notes,
         statut: order.statut,
         productsSnapshot: order.productsSnapshot || [],
-        deletedAt: order.deletedAt
+        deletedAt: order.deletedAt,
+        dateLivraison: order.dateLivraison
       };
     });
 

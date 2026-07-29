@@ -7,6 +7,7 @@ import ProfileView from '@/views/dashboard/user/ProfileView.vue'
 import ProfileViewAdmin from '@/views/dashboard/admin/ProfileView.vue'
 import ClientComponents from '@/components/admin/ClientComponents.vue';
 import CommandeComponent from '@/components/admin/CommandeComponent.vue';
+import DashboardHome from '@/components/admin/DashboardHome.vue';
 import CategoryManagement from '@/components/admin/bases/categories/CategoryManagement.vue'
 import CompositionRuleManagement from '@/components/admin/bases/compositionrules/CompositionRuleManagement.vue'
 import ProductManagement from '@/components/admin/bases/produits/ProductManagement.vue'
@@ -55,11 +56,11 @@ const router = createRouter({
       component: ProfileViewAdmin,
       meta: { hideNavigation: true, requiresAuth: true, roles: ['admin'] },
       children: [
-        // {
-        //   path: '', // Chemin par défaut (/dashboard/admin)
-        //   name: 'admin-dashboard',
-        //   component: DashboardHome
-        // },
+        {
+          path: '',
+          name: 'admin-dashboard-page',
+          component: DashboardHome
+        },
         {
           path: 'clients',
           name: 'client-page',
