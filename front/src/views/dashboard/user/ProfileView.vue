@@ -8,8 +8,9 @@ import api from '@/stores/api';
 import { 
   MapPinIcon, Edit3Icon, PhoneIcon, MailIcon, 
   ShoppingBagIcon, ArrowRightIcon, HistoryIcon, 
-  LogOutIcon, XIcon 
+  LogOutIcon, XIcon, DownloadIcon 
 } from 'lucide-vue-next';
+import { genererRecuPDF } from '@/services/pdfRecuCommande';
 
 interface Commande {
   id: string;
@@ -273,6 +274,26 @@ const changerFormule = async (formule : Formule) => {
   }
 };
 
+const telechargerRecu = (commande: Commande) => {
+  try {
+    genererRecuPDF({
+      commandeId: commande._id,
+      formule: commande.formule,
+      date: commande.date,
+      total: commande.total,
+      clientNom: authStore.user?.value?.username || 'Client',
+      clientEmail: authStore.user?.value?.email || '',
+      clientPhone: clientInfos.value.telephone,
+      clientQuartier: clientInfos.value.quartier,
+      clientAdresse: clientInfos.value.adresse
+    });
+    toast.success("Reçu téléchargé avec succès !");
+  } catch (error) {
+    console.error("Erreur génération PDF:", error);
+    toast.error("Impossible de générer le reçu pour le moment.");
+  }
+};
+
 onMounted(async () => {
   await authStore.checkSession();
   
@@ -532,7 +553,7 @@ onMounted(async () => {
                   </td>
                   <td class="py-4 text-gray-700">{{ commande.formule }}</td>
                   <td class="py-4 text-gris font-normal">{{ commande.date }}</td>
-                  <td class="py-4 font-bold">{{ commande.total }} FCFA</td>
+                  <td class="py-4 font-bold">{{ commande.total }}</td>
                   <td class="py-4">
                     <span :class="[
                       'px-3 py-1 rounded-full text-xs font-bold tracking-wide inline-block shadow-sm',
@@ -551,6 +572,16 @@ onMounted(async () => {
                         class="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center justify-center border border-red-100/50"
                       >
                         <XIcon class="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div v-if="commande.statut === 'Livré'" class="opacity-80 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        @click="telechargerRecu(commande)" 
+                        class="p-2.5 bg-green-50 text-green-700 rounded-xl hover:bg-green-600 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center justify-center border border-green-100/50 text-xs font-bold gap-1.5"
+                      >
+                        <DownloadIcon class="w-4 h-4" />
+                        <span>Télécharger le reçu</span>
                       </button>
                     </div>
                   </td>
@@ -597,6 +628,14 @@ onMounted(async () => {
                 >
                   <XIcon class="w-3.5 h-3.5" />
                   <span>Annuler</span>
+                </button>
+                <button 
+                  v-else-if="commande.statut === 'Livré'"
+                  @click="telechargerRecu(commande)"
+                  class="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-xl font-bold hover:bg-green-600 hover:text-white transition-all active:scale-95"
+                >
+                  <DownloadIcon class="w-3.5 h-3.5" />
+                  <span>Reçu PDF</span>
                 </button>
               </div>
             </div>
