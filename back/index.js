@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
+const dns = require('node:dns')
+dns.setDefaultResultOrder('ipv4first');
+
 require('dotenv').config();
 
 const app = express();

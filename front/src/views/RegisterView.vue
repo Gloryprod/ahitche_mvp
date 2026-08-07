@@ -15,12 +15,12 @@
         <!-- Partie droite : Formulaire d'inscription -->
         <div class="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
 
-        <nav class="fixed top-0 left-0 right-0 z-100 padding py-3.5 transition-all duration-250">
-            <div class="flex items-center justify-between">
-                <a href="/" class="nav-logo">
+        <nav class="top-0 left-0 right-0 z-100 pb-4 padding transition-all duration-250">
+            <div class="flex items-center">
+                <!-- <a href="/" class="nav-logo">
                     <span class="logo-mark">Ahi</span><span class="logo-accent">tché</span>
-                </a>
-                <a href="/" class="btn-retour">← Retour au site</a>
+                </a> -->
+                <a href="/" class="btn-retour ">← Retour à l'accueil</a>
             </div>
         </nav>
 
@@ -96,14 +96,6 @@ import { ref } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
-// import { useHead } from '@unhead/vue'
-
-// useHead({
-//   title: 'Inscription | Ahitché',
-//   meta: [
-//     { name: 'description', content: 'Inscrivez-vous pour accéder à votre espace personnel et gérer vos commandes.' }
-//   ]
-// })
 
 const formRegister = ref({ username: '', email: '', password: '', telephone:'' })
 const isLoading = ref(false)
