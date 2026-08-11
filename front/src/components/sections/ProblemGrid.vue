@@ -15,7 +15,7 @@ const problemes = [
   {
     emoji: "🍳",
     titre: "La charge mentale des repas",
-    description: "Rentrer fatigué du travail à 19h et devoir encore réfléchir à la composition d'un repas équilibré."
+    description: "Rentrer fatigué du travail à 19h, sans quelqu'un pour suivre ça avec vous, l'équilibre alimentaire finit par lâcher."
   }
 ]
 </script>
@@ -53,11 +53,10 @@ const problemes = [
         <div class="relative z-1 max-w-[750px]">
           <span class="text-or text-xs font-extrabold uppercase tracking-widest block mb-3">La Réponse Ahitché</span>
           <h3 class="font-display text-2xl sm:text-3xl font-bold mb-5 leading-tight">
-            Nous transformons votre logistique alimentaire en un abonnement fluide.
+            Nous assurons le suivi alimentaire de votre foyer, semaine après semaine.
           </h3>
           <p class="text-sm sm:text-base text-white/80 leading-relaxed mb-6">
-            Ahitché sélectionne le meilleur des marchés locaux, calibre les portions selon vos besoins réels et livre le tout chez vous sous forme de paniers prêts à cuisiner ou à consommer. Pas de surplus, pas de manque, juste l'essentiel pour votre semaine.
-          </p>
+            Ahitché sélectionne le meilleur des produits locaux auprès des producteurs et ajuste votre ravitaillement à vos besoins réels — pour vous éviter les allers-retours au marché et à la boutique, et garder une alimentation équilibrée.</p>
           <div class="inline-flex items-center gap-2 text-or text-sm font-bold">
             <span>Découvrez nos offres ci-dessous</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>

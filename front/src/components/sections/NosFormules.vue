@@ -34,7 +34,7 @@ const produitsInclus = ref([
                 <p class="text-sm text-gris">1 personne · par semaine</p>
               </div>
             </div>
-            <p class="text-sm italic text-gris mb-6">« Les bases de votre semaine déjà organisées. »</p>
+            <p class="text-sm italic text-gris mb-6">« Un suivi alimentaire simple, pour commencer. »</p>
             
             <div class="grid grid-cols-2 gap-4 border-y border-creme2 py-4 mb-6">
               <div>
@@ -115,7 +115,7 @@ const produitsInclus = ref([
                 <p class="text-sm text-gris">Famille 4–6 · par semaine</p>
               </div>
             </div>
-            <p class="text-sm italic text-gris mb-6">« Votre cuisine organisée sans stress. »</p>
+            <p class="text-sm italic text-gris mb-6">« Un ravitaillement complet, pensé pour toute la famille. »</p>
             
             <div class="grid grid-cols-2 gap-4 border-y border-creme2 py-4 mb-6">
               <div>
@@ -148,7 +148,7 @@ const produitsInclus = ref([
       </div>
 
       <div class="bg-white rounded-3xl p-8 border border-creme2 text-center max-w-4xl mx-auto shadow-xs">
-        <p class="text-foret font-bold mb-6 font-body">Les 16 produits garantis dans chaque formule</p>
+        <p class="text-foret font-bold mb-6 font-body">Composition adaptée à vos besoins, plus de 16 produits garantis</p>
         <div class="flex flex-wrap justify-center gap-2">
           <span 
             v-for="produit in produitsInclus" 

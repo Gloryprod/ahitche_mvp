@@ -39,8 +39,9 @@ export const genererRecuPDF = (data: RecuData) => {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...grisTexte);
-  doc.text('Service Client & Livraison Premium', 14, 25);
-  doc.text('Cotonou, Bénin | WhatsApp: +229 98 13 66 35', 14, 30);
+  doc.text('Le marché suivi et organisé pour vous.', 14, 25);
+  doc.text("Parce que votre santé n'a pas de prix.", 14, 30);
+  doc.text('Cotonou, Bénin | WhatsApp: +229 98 13 66 35', 14, 35);
 
   // --- BADGE REÇU / STATUT ---
   doc.setFontSize(16);

@@ -42,7 +42,7 @@ const temoignages = [
           <div class="bg-white rounded-3xl p-8 md:p-10 border border-creme2 text-center shadow-xs">
             <span class="text-4xl block mb-4" aria-hidden="true">🏠</span>
             <p class="text-lg text-foret font-body mb-2">
-              Soyez parmi nos <strong>premiers clients fondateurs</strong> à Calavi Kpota.
+              Soyez parmi nos <strong>premiers clients fondateurs</strong> à Cotonou et Abomey-Calavi.
             </p>
             <p class="text-gris text-sm mb-6 max-w-md mx-auto">
               Commandez dès maintenant et bénéficiez du prix de lancement bloqué pendant 3 mois.
