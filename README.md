@@ -1,24 +1,22 @@
-# 🚀 Horyzion - Plateforme Multi-Tenant
+🌿 Ahitché - MVP
+Ahitché est une plateforme web assurant le suivi alimentaire personnalisé et le ravitaillement régulier à domicile des foyers au Bénin (Cotonou, Calavi et environs).
 
-**Horyzion** est une plateforme web multi-tenant centralisée, conçue pour vitriner et gérer les projets et sous-entités (ONG EDEN Bénin, Agritropic, BBS-WBB, etc.) via des sous-domaines dédiés.
+🚀 Fonctionnalités Principales
+🛒 Abonnements & Formules : Souscription aux formules alimentaires adaptées (AHI Essentiel, AHI Équilibré, AHI Confort).
 
----
+🔐 Authentification Sécurisée : Connexion et inscription avec vérification des utilisateurs.
 
-## 🛠️ Stack Technique
+📧 Notifications E-mail : E-mails de bienvenue et réinitialisation de mot de passe propulsés par Resend.
 
-* **Frontend / Framework :** Next.js (App Router), TypeScript, Tailwind CSS
-* **CMS Headless :** Sanity.io
-* **Services Email :** Resend API, Webmail LWS
-* **Déploiement :** Vercel
+📄 Génération de Reçus PDF : Téléchargement de reçus imprimables via jsPDF et autoTable.
 
----
+🛠️ Stack Technique
+Frontend : Vue.js / Tailwind CSS / PrimeVue
 
-## 🔑 Fonctionnalités Clés
+Backend : Node.js / Express.js
 
-* 🌐 **Routage Multi-Tenant :** Gestion dynamique des sous-domaines (`*.horyzion.com`).
-* 🏷️ **SEO & Métadonnées Dynamiques :** Données structurées (JSON-LD), OpenGraph et favicons personnalisés par sous-domaine.
-* 📩 **Formulaire de Contact & Notifications :** Envoi d'e-mails via Resend et réception centralisée.
-* 🌍 **Bilinguisme (À venir) :** Internationalisation dynamique (FR/EN) intégrée.
-* 🔔 **Automatisation (À venir) :** Notifications instantanées Telegram via n8n.
+Base de données : MongoDB Atlas (Mongoose)
 
----
+Services Tiers :
+
+Resend API (Gestion des e-mails transactionnels)
