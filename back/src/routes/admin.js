@@ -10,7 +10,11 @@ const formulaC = require('../controllers/admin/FormulaController');
 const orderC = require('../controllers/admin/OrderController');
 const stockC = require('../controllers/admin/StockController');
 const invC = require('../controllers/admin/InventoryController');
+const postC = require('../controllers/admin/PostController');
 const { verifyToken } = require('../middlewares/auth');
+const uploadC  = require('../controllers/admin/UploadController');
+// Importation du middleware Multer/Cloudinary
+const upload = require('../config/cloudinary');
 
 router.use(verifyToken);
 
@@ -53,6 +57,15 @@ router.route('/products/:id')
 
 // --- Formules / Packs ---
 router.get('/formulas/:packType', formulaC.getPackDetails);
+router.patch('/formulas/:packType/price', formulaC.updateFormulaPrice);
+
+// --- Posts / Contenus ---
+router.get('/posts', postC.getPosts);
+router.post('/posts', postC.createPost);
+router.put('/posts/:id', postC.updatePost);
+router.delete('/posts/:id', postC.deletePost);
+// Route d'upload : attend un champ nommé 'image'
+router.post('/upload', upload.single('image'), uploadC.uploadImage);
 
 // Stocks
 router.route('/stock/lots')

@@ -43,6 +43,10 @@ const formuleSchema = new mongoose.Schema({
     type: Number, // Ex: 10800
     required: true 
   },
+  prixCommercial: { 
+    type: Number, // Ex: 10800
+    required: false // Peut être null si pas de prix personnalisé
+  },
   // Gestion d'affichage
   estRecommandee: { 
     type: Boolean, 

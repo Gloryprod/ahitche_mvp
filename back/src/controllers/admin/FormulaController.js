@@ -201,6 +201,39 @@ async function getPackDetails(req, res) {
   }
 }
 
+async function updateFormulaPrice(req, res) {
+  try {
+    const { packType } = req.params;
+    const { prixFixe } = req.body;
+
+    const type = packType.toLowerCase();
+
+    if (prixFixe === undefined || prixFixe < 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Le prix proposé est invalide' 
+      });
+    }
+
+    // Mise à jour de la formule en BDD MongoDB
+    const updatedFormula = await Formule.findOne(
+      { slug: `ahi-${type}`, statut: 'actif' },      
+    );
+
+    updatedFormula.prixCommercial = prixFixe;
+    await updatedFormula.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Prix commercial mis à jour avec succès',
+      data: updatedFormula
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 module.exports = {
-  getPackDetails
+  getPackDetails,
+  updateFormulaPrice
 };

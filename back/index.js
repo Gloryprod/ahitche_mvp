@@ -11,6 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const authRoutes = require('./src/routes/auth');
 const adminRoutes = require('./src/routes/admin');
+const publicRoutes = require('./src/routes/public');
 
 // Middlewares
 const allowedOrigins = [
@@ -43,6 +44,7 @@ app.use(cookieParser());
 // Route exemple
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/public', publicRoutes);
 
 // Connexion à MongoDB
 mongoose.connect(process.env.MONGO_URI)
