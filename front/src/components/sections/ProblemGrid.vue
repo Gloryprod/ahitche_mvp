@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import BaseBadge from '../ui/BaseBadge.vue'
+import { motion } from "motion-v"
+
 
 const problemes = [
   {
@@ -34,7 +36,13 @@ const problemes = [
 
       <!-- Grille des 3 Problèmes -->
       <div class="grid md:grid-cols-3 gap-7 mb-20">
-        <div 
+        <motion.div 
+          :initial="{ opacity: 0, scale: 0 }"
+          :animate="{ opacity: 1, scale: 1 }"
+          :transition="{
+            duration: 1,
+            scale: { type: 'spring', visualDuration: 0.4, bounce: 0.2 },
+          }"
           v-for="(p, idx) in problemes" 
           :key="idx"
           class="bg-creme/60 border border-foret/5 rounded-2xl p-8 transition-all duration-250 hover:shadow-md hover:border-foret/15"
@@ -42,7 +50,7 @@ const problemes = [
           <div class="text-3xl mb-4.5 select-none">{{ p.emoji }}</div>
           <h3 class="text-lg font-bold text-noir mb-2.5">{{ p.titre }}</h3>
           <p class="text-sm text-gris leading-relaxed">{{ p.description }}</p>
-        </div>
+        </motion.div>
       </div>
 
       <!-- Le Bloc Solution (L'alignement Ahitché) -->

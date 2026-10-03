@@ -68,6 +68,7 @@ export interface Formule {
   };
   ancienPrix: number;  // Prix barré dynamique recalculé par le backend
   prixActuel: number;  // Valeur réelle calculée à la volée en fonction du catalogue
+  prixCommercial: number | null;  // Valeur personnalisée définie par l'admin
   estRecommandee: boolean;
   statut: 'actif' | 'inactif';
   lienWhatsApp: string;

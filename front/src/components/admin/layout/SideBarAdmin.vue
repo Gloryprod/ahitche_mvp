@@ -71,6 +71,7 @@ const menuGroups = [
       { id: 'regles', name: 'Règles de composition', icon: Settings, hasChevron: true, path: '/dashboard/admin/regles' },
       { id: 'produits', name: 'Produits', icon: Settings, hasChevron: true, path: '/dashboard/admin/products' },
       { id: 'formules', name: 'Formules', icon: Settings, hasChevron: true, path: '/dashboard/admin/formulas' },
+      { id: 'post', name: 'Contenus & Médias', icon: Settings, hasChevron: true, path: '/dashboard/admin/posts' },
     ]
   }
 ]

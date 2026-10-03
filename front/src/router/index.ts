@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import LoginView from '@/views/LoginView.vue'
+import PublicContentList from '@/views/PublicContentList.vue'
 import ResetPassword from '../views/ResetPassword.vue'
 import ProfileView from '@/views/dashboard/user/ProfileView.vue'
 import ProfileViewAdmin from '@/views/dashboard/admin/ProfileView.vue'
@@ -12,6 +13,7 @@ import CategoryManagement from '@/components/admin/bases/categories/CategoryMana
 import CompositionRuleManagement from '@/components/admin/bases/compositionrules/CompositionRuleManagement.vue'
 import ProductManagement from '@/components/admin/bases/produits/ProductManagement.vue'
 import FormulaManagement from '@/components/admin/bases/formules/FormulaManagement.vue'
+import PostManagement from '@/components/admin/bases/posts/PostManagement.vue'
 import AjouterEntreeStock from '@/components/admin/AjouterEntreeStock.vue'
 import VueGlobalInventory from '@/components/admin/stock/VueGlobalInventory.vue'
 import StockMovementsView from '@/components/admin/stock/StockMovementsView.vue'
@@ -36,6 +38,12 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView,
+      meta: { hideNavigation: true }
+    },
+    {
+      path: '/blog',
+      name: 'blog',
+      component: PublicContentList,
       meta: { hideNavigation: true }
     },
     {
@@ -113,6 +121,11 @@ const router = createRouter({
           name: 'bon-commande-page',
           component: PurchaseOrdersView
         },
+        {
+          path: 'posts',
+          name: 'posts-page',
+          component: PostManagement
+        }
       ]
     },
   ],

@@ -31,6 +31,37 @@
   50% { opacity: 1; transform: scaleY(.5); transform-origin: top; }
 }
 
+@keyframes kenburns {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes fadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+
+@keyframes frameIn {
+  0% { opacity: 0; transform: translateY(50px) scale(0.75) rotate(calc(var(--rotate) - 6deg)); }
+  70% { opacity: 1; transform: translateY(-6px) scale(1.04) rotate(calc(var(--rotate) + 1deg)); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(var(--rotate)); }
+}
+
 /* Base resets & smooth behaviors */
 html {
   scroll-behavior: smooth;

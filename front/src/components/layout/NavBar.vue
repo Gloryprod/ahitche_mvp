@@ -125,7 +125,8 @@ onUnmounted(() => {
             { href: '#probleme', text: 'Pourquoi Ahitché ?' },
             { href: '#formules', text: 'Formules' },
             { href: '#comment', text: 'Comment ça marche' },
-            { href: '#variables', text: 'Cette semaine' }
+            { href: '#variables', text: 'Cette semaine' },
+            { href: '/blog', text: 'Blog / Actualités' }
           ]" 
           :key="idx"
           :href="link.href"
