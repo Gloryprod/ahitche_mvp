@@ -4,9 +4,19 @@ const jwt = require('jsonwebtoken');
 const emailService = require('../services/emailServices');
 const crypto = require('crypto');
 
+// Vérifie que chaque valeur est une chaîne non vide.
+// Bloque les injections d'opérateurs MongoDB envoyées en JSON (ex : { "$ne": null }).
+function sontDesChaines(...valeurs) {
+    return valeurs.every(v => typeof v === 'string' && v.length > 0);
+}
+
 async function register(req, res) {
     try {
         const { username, email, password, telephone } = req.body;
+
+        if (!sontDesChaines(username, email, password) || (telephone !== undefined && typeof telephone !== 'string')) {
+            return res.status(400).json({ message: "Données d'inscription invalides." });
+        }
 
         // Vérifier si l'utilisateur existe déjà
         const userExists = await User.findOne({ email });
@@ -32,6 +42,10 @@ async function register(req, res) {
 async function login(req, res) {
     try {
         const { email, password } = req.body;
+
+        if (!sontDesChaines(email, password)) {
+            return res.status(400).json({ message: "Identifiants incorrects." });
+        }
 
         const user = await User.findOne({ email });
         if (!user) return res.status(400).json({ message: "Identifiants incorrects." });
@@ -82,6 +96,10 @@ async function forgotPassword(req, res) {
     try {
     const { email } = req.body;
 
+    if (!sontDesChaines(email)) {
+      return res.status(400).json({ message: "Adresse e-mail invalide." });
+    }
+
     // 1. Vérifier si l'utilisateur existe
     const user = await User.findOne({ email });
     if (!user) {
@@ -118,6 +136,12 @@ async function forgotPassword(req, res) {
 async function resetPassword(req, res) {
     try {
         const { token, password } = req.body;
+
+        if (!sontDesChaines(token, password)) {
+            return res.status(400).json({
+                message: "Le lien de réinitialisation est invalide ou a expiré."
+            });
+        }
 
         // 1. Chercher l'utilisateur avec le jeton valide ET non expiré
         // $gt: Date.now() vérifie que la date d'expiration est supérieure à l'heure actuelle
