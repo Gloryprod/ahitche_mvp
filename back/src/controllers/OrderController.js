@@ -43,9 +43,10 @@ async function saveOrder(req, res){
 
 async function deleteOrder(req, res) {
     try {
-        const order = await Order.findByIdAndUpdate(
-            req.params.id,
-            { 
+        // On ne cible que les commandes actives appartenant à l'utilisateur connecté
+        const order = await Order.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user.id, deletedAt: null },
+            {
                 $set: { deletedAt: new Date() } 
             },
             { new: true } 
