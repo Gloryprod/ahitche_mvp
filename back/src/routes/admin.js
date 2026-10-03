@@ -11,12 +11,13 @@ const orderC = require('../controllers/admin/OrderController');
 const stockC = require('../controllers/admin/StockController');
 const invC = require('../controllers/admin/InventoryController');
 const postC = require('../controllers/admin/PostController');
-const { verifyToken } = require('../middlewares/auth');
+const { verifyToken, checkRole } = require('../middlewares/auth');
 const uploadC  = require('../controllers/admin/UploadController');
 // Importation du middleware Multer/Cloudinary
 const upload = require('../config/cloudinary');
 
-router.use(verifyToken);
+// Toutes les routes admin exigent une session valide ET le rôle admin
+router.use(verifyToken, checkRole(['admin']));
 
 // Users
 router.get('/users', userC.index);

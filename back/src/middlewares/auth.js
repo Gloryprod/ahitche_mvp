@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/user');
 
 // Vérifie si l'utilisateur est connecté
 exports.verifyToken = (req, res, next) => {
@@ -19,11 +20,22 @@ exports.verifyToken = (req, res, next) => {
 };
 
 
+// Vérifie le rôle de l'utilisateur connecté (à placer après verifyToken)
+// Le rôle est relu en base : le JWT ne contient que l'id, et un changement de rôle s'applique immédiatement
 exports.checkRole = (roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'Action non autorisée pour votre rôle' });
+  return async (req, res, next) => {
+    try {
+      const user = await User.findById(req.user.id).select('role');
+
+      if (!user || !roles.includes(user.role)) {
+        return res.status(403).json({ message: 'Action non autorisée pour votre rôle' });
+      }
+
+      req.user.role = user.role;
+      next();
+    } catch (error) {
+      console.error("Erreur checkRole:", error);
+      return res.status(500).json({ message: "Erreur serveur lors de la vérification des droits." });
     }
-    next();
   };
 };
