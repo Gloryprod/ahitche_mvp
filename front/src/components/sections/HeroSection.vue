@@ -134,7 +134,7 @@ onUnmounted(() => {
     <!-- Contenu -->
     <div class="relative z-2 max-w-175 mx-auto text-center">
       <div class="inline-flex items-center gap-2 bg-white/12 backdrop-blur-md border border-white/20 text-white/92 text-xs font-semibold px-4 py-1.5 rounded-full mb-7">
-        <span class="w-1.75 h-1.75 bg-[#4ade80] rounded-full shrink-0 shadow-[0_0_0_3px_rgba(74,222,128,0.3)] animate-[pulse_2s_infinite]"></span>
+        <span class="w-1.75 h-1.75 bg-[#4ade80] rounded-full shrink-0 shadow-[0_0_0_3px_rgba(74,222,128,0.3)] animate-[pulseHalo_2s_infinite]"></span>
         Livraisons actives à Cotonou & Abomey-Calavi.
       </div>
 
