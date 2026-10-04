@@ -27,6 +27,8 @@ interface User {
 const user = ref<User | null>(null);
 const isInitialized = ref(false); // Permet de savoir si on a vérifié la session
 let verificationEnCours: Promise<void> | null = null; // Une seule requête si plusieurs vérifications se croisent
+// Minutes sans activité avant la déconnexion automatique (équipe sauf admin principal) ; null : pas de limite
+const inactivite = ref<number | null>(null);
 
 export function useAuthStore() {
   const isAuthenticated = computed(() => !!user.value);
@@ -39,8 +41,14 @@ export function useAuthStore() {
   // Les appels simultanés (accueil + garde du routeur) partagent la même requête.
   function checkSession() {
     verificationEnCours ??= axios.get('/api/auth/session')
-      .then(response => { user.value = response.data.user; })
-      .catch(() => { user.value = null; })
+      .then(response => {
+        user.value = response.data.user;
+        inactivite.value = response.data.inactivite ?? null;
+      })
+      .catch(() => {
+        user.value = null;
+        inactivite.value = null;
+      })
       .finally(() => {
         isInitialized.value = true;
         verificationEnCours = null;
@@ -52,6 +60,7 @@ export function useAuthStore() {
     // Le serveur Express va injecter le cookie HttpOnly ici.
     // En cas d'erreur, c'est le composant appelant qui affiche le message (un seul toast).
     const response = await axios.post('/api/auth/login', credentials);
+    inactivite.value = response.data.inactivite ?? null;
     user.value = response.data.user ; 
     return response.data;
   }
@@ -59,6 +68,7 @@ export function useAuthStore() {
   // Oublie la session côté navigateur, sans appel au serveur (session déjà refusée par le serveur : 401)
   function effacerSessionLocale() {
     user.value = null;
+    inactivite.value = null;
   }
 
   // Déconnexion volontaire : la session locale n'est effacée qu'une fois le cookie supprimé par le serveur.
@@ -88,5 +98,5 @@ export function useAuthStore() {
     }
   }
 
-  return { user, isInitialized, isAuthenticated, isAdmin, role, isEquipe, login, logout, effacerSessionLocale, checkSession, forgotPassword, resetPassword };
+  return { user, inactivite, isInitialized, isAuthenticated, isAdmin, role, isEquipe, login, logout, effacerSessionLocale, checkSession, forgotPassword, resetPassword };
 }

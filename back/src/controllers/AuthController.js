@@ -3,24 +3,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const emailService = require('../services/emailServices');
 const crypto = require('crypto');
-
-// Vérifie que chaque valeur est une chaîne non vide.
-// Bloque les injections d'opérateurs MongoDB envoyées en JSON (ex : { "$ne": null }).
-// Options communes du cookie de session.
-// SameSite=Lax suffit : le site (ahitchebj.com) et l'API (api.ahitchebj.com) sont sur le même site.
-// Secure uniquement en production : en local (http), un cookie Secure serait refusé par le navigateur.
-const OPTIONS_COOKIE = {
-    httpOnly: true,                                 // Invisible en JS (protège contre le vol par XSS)
-    secure: process.env.NODE_ENV === 'production',  // HTTPS requis en production
-    sameSite: 'lax',                                // Pas envoyé depuis un autre site (protection CSRF)
-    path: '/'
-};
+const { OPTIONS_COOKIE, ouvrirSession, actualiserSession } = require('../services/sessionService');
 
 // Les jetons de réinitialisation sont stockés hachés : une fuite de la base ne permet pas de les réutiliser
 function hacherJeton(jeton) {
     return crypto.createHash('sha256').update(jeton).digest('hex');
 }
 
+// Vérifie que chaque valeur est une chaîne non vide.
+// Bloque les injections d'opérateurs MongoDB envoyées en JSON (ex : { "$ne": null }).
 function sontDesChaines(...valeurs) {
     return valeurs.every(v => typeof v === 'string' && v.length > 0);
 }
@@ -68,19 +59,14 @@ async function login(req, res) {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: "Identifiants incorrects." });
 
-        // Générer le jeton JWT (on utilise user._id au lieu de user._index qui n'existe pas par défaut)
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-
-        // 💡 ENVOI DU TOKEN DANS UN COOKIE HTTPONLY
-        res.cookie('token', token, {
-            ...OPTIONS_COOKIE,
-            maxAge: 24 * 60 * 60 * 1000            // Expire au bout de 1 jour (comme le JWT)
-        });
+        // Jeton JWT dans un cookie HttpOnly : 1 jour, ou 1 h glissante pour l'équipe (sauf l'admin principal)
+        const inactivite = ouvrirSession(res, user);
 
         // On renvoie l'utilisateur au front, MAIS SANS LE TOKEN textuel
         res.json({
             user: { id: user._id, username: user.username, email: user.email, role: user.role || 'user' },
-            message: "Connexion réussie !"
+            message: "Connexion réussie !",
+            inactivite // Minutes d'inactivité avant déconnexion automatique (null : pas de limite)
         });
     } catch (error) {
         res.status(500).json({ message: "Erreur serveur lors de la connexion." });
@@ -116,7 +102,9 @@ async function session(req, res) {
             res.clearCookie('token', OPTIONS_COOKIE);
             return sansSession();
         }
-        return res.status(200).json({ user });
+        // Session glissante prolongée, ou réémise si la politique du compte a changé (rôle, admin principal)
+        const inactivite = actualiserSession(res, decoded, user);
+        return res.status(200).json({ user, inactivite });
     } catch (error) {
         console.error("Erreur session:", error);
         return res.status(500).json({ message: "Erreur serveur lors de la vérification de la session." });

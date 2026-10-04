@@ -127,12 +127,29 @@ async function migrerTaux() {
   console.log(`  ✔ Taux de la convention enregistré : 1 USD = ${TAUX_CONVENTION} FCFA`);
 }
 
+// Étape 6 : un admin principal, seul compte de l'équipe sans déconnexion après 1 h d'inactivité
+async function migrerAdminPrincipal() {
+  const principal = await User.findOne({ role: 'admin', adminPrincipal: true });
+  if (principal) {
+    console.log(`  ✔ Admin principal déjà désigné : ${principal.email}`);
+    return;
+  }
+  const admin = await User.findOne({ role: 'admin' }).sort({ createdAt: 1 });
+  if (!admin) {
+    console.log('  ⚠ Aucun compte admin : admin principal non désigné');
+    return;
+  }
+  await User.updateOne({ _id: admin._id }, { $set: { adminPrincipal: true } });
+  console.log(`  ✔ Admin principal désigné (plus ancien compte admin) : ${admin.email}`);
+}
+
 const ETAPES = [
   ['Index du téléphone', migrerIndexTelephone],
   ['Fournisseurs vers Prestataires', migrerFournisseurs],
   ['Zones de livraison', migrerZones],
   ['Statuts des commandes', migrerStatutsCommandes],
   ['Taux USD/FCFA', migrerTaux],
+  ['Admin principal', migrerAdminPrincipal],
 ];
 
 async function migrer() {

@@ -17,8 +17,11 @@
                 <LienAccueil />
             </div>
 
-            <!-- Pourquoi l'utilisateur arrive ici : session expirée ou page protégée demandée -->
-            <p v-if="sessionExpiree" role="status" class="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+            <!-- Pourquoi l'utilisateur arrive ici : inactivité, session expirée ou page protégée demandée -->
+            <p v-if="sessionInactivite" role="status" class="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                Par sécurité, vous avez été déconnecté après une période d'inactivité. Reconnectez-vous pour reprendre là où vous en étiez.
+            </p>
+            <p v-else-if="sessionExpiree" role="status" class="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
                 Votre session a expiré. Reconnectez-vous pour reprendre là où vous en étiez.
             </p>
             <p v-else-if="pageDemandee" role="status" class="mb-5 p-3 rounded-xl bg-creme border border-creme2 text-noir text-sm">
@@ -141,6 +144,7 @@ const pageDemandee = computed(() => {
   return typeof cible === 'string' && /^\/(?![\/\\])/.test(cible) && !cible.includes('://') ? cible : null
 })
 const sessionExpiree = computed(() => route.query.session === 'expiree')
+const sessionInactivite = computed(() => route.query.session === 'inactivite')
 
 const handleLogin = async () => {
   isLoading.value = true

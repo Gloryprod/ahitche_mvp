@@ -173,13 +173,14 @@ Sources :
 
 ### 5.1 Étapes de déploiement (dans cet ordre)
 
-1. **Back** : `npm install` (ajout de `helmet`), puis vérifier les variables d'environnement : `NODE_ENV=production` (cookie `Secure`), `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL` et `CLOUDINARY_*` (aussi utilisées pour les justificatifs des Finances).
+1. **Back** : `npm install` (ajout de `helmet`), puis vérifier les variables d'environnement : `NODE_ENV=production` (cookie `Secure`), `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL` et `CLOUDINARY_*` (aussi utilisées pour les justificatifs des Finances). `INACTIVITE_MINUTES` est facultative (60 par défaut) : durée sans activité avant la déconnexion des comptes de l'équipe, sauf l'admin principal. Les sessions ouvertes avant la mise en production passent à cette règle dès leur prochaine action dans le back-office.
 2. **Migration des données**, à lancer une fois, et relançable sans risque : `node src/scripts/migrerDonnees.js`. Elle :
    - remplace l'index unique du téléphone (les comptes sans téléphone ne se bloquent plus) ;
    - crée les fiches des 3 fournisseurs et y relie les lots et bons de commande ;
    - crée les 22 zones et rattache les clients dont le quartier est reconnu ;
    - convertit « Livré » en « Livrée » et les commandes supprimées en « Annulée » ;
-   - enregistre le taux USD/FCFA 571.
+   - enregistre le taux USD/FCFA 571 ;
+   - désigne l'admin principal (le plus ancien compte admin) s'il n'y en a pas : c'est le seul compte de l'équipe qui n'est pas déconnecté après 1 h d'inactivité. Pour en changer, passer `adminPrincipal` à `true` sur le nouveau compte et à `false` sur l'ancien, en base.
 3. **Référentiel des formules** : `node src/scripts/createFormules.js`. Il restaure les prix officiels, l'état « Bientôt » de Réserve et Fraîcheur, le cycle de relance (14 ou 30 jours) et l'affichage « par mois ».
 4. **Comptes de l'équipe** : `STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <gestionnaire|comptable|nutritionniste|admin>`.
 5. **Front** : déployer après le back (le front envoie désormais `fournisseurId`, `zone`, etc.).

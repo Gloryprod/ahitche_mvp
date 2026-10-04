@@ -12,6 +12,9 @@ const userSchema = new mongoose.Schema({
     zone: { type: String, default: null }, // Code de la zone de livraison (null : « Autre quartier »)
     lienLocalisation: { type: String, default: '' }, // Lien Google Maps ou position WhatsApp, facultatif
     formuleHabituelle: { type: String, required: false },
+    // Admin principal : seul compte de l'équipe sans déconnexion après 1 h d'inactivité (services/sessionService.js).
+    // Posé par scripts/createAdmin.js, ou par scripts/migrerDonnees.js sur le plus ancien admin.
+    adminPrincipal: { type: Boolean, default: false },
     resetPasswordToken: {
         type: String,
         default: null

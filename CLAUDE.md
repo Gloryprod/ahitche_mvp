@@ -29,11 +29,11 @@ npm run dev          # nodemon index.js
 npm start
 node src/scripts/createAdmin.js     # crée l'admin (ADMIN_PASSWORD dans .env)
 node src/scripts/createFormules.js  # upsert des formules (prix, « Bientôt », cycle de relance)
-node src/scripts/migrerDonnees.js   # migration idempotente (téléphone, fournisseurs, zones, statuts, taux)
+node src/scripts/migrerDonnees.js   # migration idempotente (téléphone, fournisseurs, zones, statuts, taux, admin principal)
 STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <role>  # compte de l'équipe
 ```
 Les transactions MongoDB (livraison + sortie de stock FIFO) exigent un replica set : c'est le cas sur Atlas ; en local, utiliser `MongoMemoryReplSet` ou un replica set à un nœud.
-Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL`, `CLOUDINARY_*`, `ADMIN_PASSWORD`, `NODE_ENV`, `PORT`.
+Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL`, `CLOUDINARY_*`, `ADMIN_PASSWORD`, `NODE_ENV`, `PORT`, et `INACTIVITE_MINUTES` (facultative, 60 par défaut : déconnexion de l'équipe après inactivité).
 
 ## Structure
 - `front/src/views/` : pages (accueil, login, register, reset, blog, dashboards user et admin).
@@ -60,3 +60,4 @@ Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`,
 - Nutrition : aucune donnée de santé ni conviction religieuse sans autorisation préalable de l'APDP (Code du numérique, art. 394).
 - Écrans admin : vérifier l'affichage à 375 px ; la Logistique est conçue d'abord pour le téléphone.
 - Navigation et session : la déconnexion passe par `useDeconnexion` (retour à l'accueil, cache vidé, session gardée si le serveur ne confirme pas). Toute page affichée sans le menu du site (`hideNavigation`) propose `LienAccueil`. Une page protégée renvoie vers `/login?redirect=…` (et `&session=expiree` sur un 401) ; seuls les chemins internes sont acceptés comme `redirect`.
+- Session : `GET /api/auth/session` (toujours 200, `user: null` pour un visiteur) sert à l'affichage (« Mon espace » dans le menu du site). Cookie et jeton passent par `back/src/services/sessionService.js` : 1 jour pour les clients et l'admin principal (`User.adminPrincipal`), 1 h glissante pour le reste de l'équipe, avec déconnexion côté navigateur après 1 h sans activité (`useDeconnexionInactivite`, avertissement 2 min avant, `/login?session=inactivite`).

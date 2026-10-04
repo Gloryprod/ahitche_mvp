@@ -5,6 +5,7 @@ import NavBar from './components/layout/NavBar.vue'
 import AppFooter from './components/layout/AppFooter.vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import { useDeconnexionInactivite } from './composables/useDeconnexionInactivite'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -13,6 +14,9 @@ const authStore = useAuthStore()
 onMounted(() => {
   if (!authStore.isInitialized.value) authStore.checkSession()
 })
+
+// Comptes de l'équipe (sauf admin principal) : déconnexion après 1 h sans activité, sur toutes les pages
+useDeconnexionInactivite()
 </script>
 
 <template>
