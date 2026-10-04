@@ -13,7 +13,8 @@ import {
   Sliders,
   FolderTree,
   Scale,
-  LogOut
+  LogOut,
+  Globe
 } from 'lucide-vue-next'
 import { computed } from 'vue';
 import { useDeconnexion } from '@/composables/useDeconnexion';
@@ -118,6 +119,14 @@ const { seDeconnecter, deconnexionEnCours } = useDeconnexion()
           <LogOut class="w-4 h-4 stroke-2" />
         </button>
       </div>
+      <!-- Consulter le site sans se déconnecter : « Mon espace », dans le menu du site, ramène ici -->
+      <RouterLink
+        to="/"
+        class="mt-2 min-h-11 inline-flex items-center gap-2 px-4 rounded-xl text-xs font-semibold text-foret hover:bg-foret/5 transition-colors"
+      >
+        <Globe class="w-4 h-4 stroke-2" />
+        Voir le site
+      </RouterLink>
     </div>
 
     <div class="w-full space-y-6">

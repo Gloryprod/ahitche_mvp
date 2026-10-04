@@ -7,7 +7,7 @@ import api from '@/stores/api';
 import { 
   MapPinIcon, Edit3Icon, PhoneIcon, MailIcon, 
   ShoppingBagIcon, ArrowRightIcon, HistoryIcon, 
-  LogOutIcon, XIcon, DownloadIcon 
+  LogOutIcon, XIcon, DownloadIcon, GlobeIcon
 } from 'lucide-vue-next';
 import { genererRecuPDF } from '@/services/pdfRecuCommande';
 import { ANNULABLES_PAR_CLIENT, classeStatut, type StatutCommande } from '@/config/commandes';
@@ -374,14 +374,24 @@ onMounted(async () => {
             </p>
           </div>
         </div>
-        <button 
-          @click="seDeconnecter" 
-          :disabled="deconnexionEnCours"
-          class="cursor-pointer w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-200 text-gris hover:text-red-600 hover:bg-red-50 hover:border-red-100 font-semibold transition-all duration-200 text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          <LogOutIcon class="w-4 h-4" />
-          <span>{{ deconnexionEnCours ? 'Déconnexion...' : 'Déconnexion' }}</span>
-        </button>
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <!-- Consulter le site sans se déconnecter : « Mon espace », dans le menu du site, ramène ici -->
+          <RouterLink
+            to="/"
+            class="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-foret/20 text-foret hover:bg-foret/5 font-semibold transition-all duration-200 text-sm flex items-center justify-center gap-2"
+          >
+            <GlobeIcon class="w-4 h-4" />
+            <span>Voir le site</span>
+          </RouterLink>
+          <button 
+            @click="seDeconnecter" 
+            :disabled="deconnexionEnCours"
+            class="cursor-pointer w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-200 text-gris hover:text-red-600 hover:bg-red-50 hover:border-red-100 font-semibold transition-all duration-200 text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <LogOutIcon class="w-4 h-4" />
+            <span>{{ deconnexionEnCours ? 'Déconnexion...' : 'Déconnexion' }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- SECTIONS ACTIONS INTERACTIVES -->
