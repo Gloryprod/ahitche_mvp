@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from 'vue-toastification'
@@ -11,6 +11,9 @@ const isMenuOpen = ref(false)
 const scrollProgress = ref(0)
 const authStore = useAuthStore()
 const toast = useToast()
+
+// Utilisateur connecté : lien direct vers son espace (sinon, bouton « Connexion »)
+const monEspace = computed(() => authStore.isAuthenticated.value ? espaceParDefaut(authStore.role.value) : null)
 
 const isLoginModalOpen = ref(false)
 const isLoading = ref(false)
@@ -141,8 +144,17 @@ onUnmounted(() => {
       <!-- Actions de droite (WhatsApp + Commander) -->
       <div class="flex items-center gap-3">
 
-        <!-- NOUVEAU BOUTON COMMANDER -->
-        <button 
+        <!-- Connecté : accès direct à son espace ; visiteur : fenêtre de connexion -->
+        <RouterLink
+          v-if="monEspace"
+          :to="monEspace"
+          class="cursor-pointer flex items-center bg-or text-foret px-5 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all duration-250 hover:bg-or-deep hover:-translate-y-px shadow-md"
+        >
+          Mon espace
+        </RouterLink>
+        <button
+          v-else
+          type="button"
           @click="openLoginModal"
           class="cursor-pointer flex items-center bg-or text-foret px-5 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all duration-250 hover:bg-or-deep hover:-translate-y-px shadow-md"
         >

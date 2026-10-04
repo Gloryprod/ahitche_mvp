@@ -26,6 +26,7 @@ interface User {
 // Les variables restent en mémoire globale (très sécurisé)
 const user = ref<User | null>(null);
 const isInitialized = ref(false); // Permet de savoir si on a vérifié la session
+let verificationEnCours: Promise<void> | null = null; // Une seule requête si plusieurs vérifications se croisent
 
 export function useAuthStore() {
   const isAuthenticated = computed(() => !!user.value);
@@ -33,16 +34,18 @@ export function useAuthStore() {
   const role = computed<Role | undefined>(() => user.value?.role);
   const isEquipe = computed(() => !!user.value && EQUIPE.includes(user.value.role));
 
-  // 💡 Fonction pour récupérer l'utilisateur connecté au chargement du site
-  async function checkSession() {
-    try {
-      const response = await axios.get('/api/auth/me');
-      user.value = response.data.user;
-    } catch {
-      user.value = null;
-    } finally {
-      isInitialized.value = true;
-    } 
+  // Récupère l'utilisateur connecté (au chargement du site, à l'entrée d'un espace protégé).
+  // /api/auth/session répond toujours 200 (user: null pour un visiteur) : pas d'erreur dans la console.
+  // Les appels simultanés (accueil + garde du routeur) partagent la même requête.
+  function checkSession() {
+    verificationEnCours ??= axios.get('/api/auth/session')
+      .then(response => { user.value = response.data.user; })
+      .catch(() => { user.value = null; })
+      .finally(() => {
+        isInitialized.value = true;
+        verificationEnCours = null;
+      });
+    return verificationEnCours;
   }
 
   async function login(credentials: { email?: string; password?: string }) {

@@ -93,6 +93,36 @@ async function logout(req, res) {
     res.json({ message: "Déconnexion réussie !" });
 }
 
+// GET /api/auth/session : état de la session pour l'affichage (menu « Mon espace »…).
+// Répond toujours 200, avec user: null pour un visiteur : aucune erreur dans la console des pages publiques.
+async function session(req, res) {
+    res.set('Cache-Control', 'no-store'); // Données personnelles : aucun cache (navigateur ni proxy d'opérateur)
+    const sansSession = () => res.status(200).json({ user: null });
+    const token = req.cookies?.token;
+    if (!token) return sansSession();
+
+    let decoded;
+    try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+        // Jeton expiré ou invalide : on le retire du navigateur
+        res.clearCookie('token', OPTIONS_COOKIE);
+        return sansSession();
+    }
+
+    try {
+        const user = await User.findById(decoded.id).select('-password -resetPasswordToken -resetPasswordExpires');
+        if (!user) {
+            res.clearCookie('token', OPTIONS_COOKIE);
+            return sansSession();
+        }
+        return res.status(200).json({ user });
+    } catch (error) {
+        console.error("Erreur session:", error);
+        return res.status(500).json({ message: "Erreur serveur lors de la vérification de la session." });
+    }
+}
+
 async function getUser(req, res) {
     try {
         // req.user.id vient du middleware verifyToken juste au-dessus
@@ -190,4 +220,4 @@ async function resetPassword(req, res) {
     }
 }
 
-module.exports = { register, login, logout, getUser, forgotPassword, resetPassword };
+module.exports = { register, login, logout, session, getUser, forgotPassword, resetPassword };

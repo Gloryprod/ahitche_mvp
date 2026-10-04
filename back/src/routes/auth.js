@@ -15,6 +15,7 @@ router.post('/forgot-password', authC.forgotPassword);
 router.post('/reset-password', authC.resetPassword);
 
 // Profil
+router.get('/session', authC.session); // Toujours 200 (visiteur : user null)
 router.get('/me', verifyToken, authC.getUser);
 router.post('/user/delivery-info', verifyToken, userC.saveUserDetails);
 
