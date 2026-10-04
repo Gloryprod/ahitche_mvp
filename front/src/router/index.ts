@@ -31,6 +31,12 @@ const router = createRouter({
       meta: { hideNavigation: true }
     },
     {
+      path: '/mentions-legales',
+      name: 'mentions-legales',
+      component: () => import('@/views/MentionsLegalesView.vue'),
+      meta: { hideNavigation: true }
+    },
+    {
       path: '/reset-password',
       name: 'ResetPassword',
       component: () => import('../views/ResetPassword.vue'),

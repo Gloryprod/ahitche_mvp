@@ -74,7 +74,10 @@ const annee = new Date().getFullYear()
           Ce projet est développé avec le soutien financier du Programme de Formation Professionnelle et d'Entrepreneuriat des jeunes (FP2E), à travers le programme Next Impact mis en œuvre par l'Agence de Développement de Sèmè City, et financé par la Banque mondiale.
         </p>
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <p class="text-xs text-gris">© {{ annee }} Ahitché · Tous droits réservés</p>
+          <p class="text-xs text-gris">
+            © {{ annee }} Ahitché · Tous droits réservés ·
+            <RouterLink to="/mentions-legales" class="underline underline-offset-4 hover:text-foret">Mentions légales</RouterLink>
+          </p>
           <a href="#accueil" class="inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-foret hover:text-savane transition-colors">
             Haut de page
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
