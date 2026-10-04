@@ -11,6 +11,7 @@ import {
   LogOutIcon, XIcon, DownloadIcon 
 } from 'lucide-vue-next';
 import { genererRecuPDF } from '@/services/pdfRecuCommande';
+import { ANNULABLES_PAR_CLIENT, classeStatut, type StatutCommande } from '@/config/commandes';
 
 interface Commande {
   id: string;
@@ -19,7 +20,7 @@ interface Commande {
   formule: string
   date: string;
   total: string;
-  statut: "En attente" | "Livré" ;
+  statut: StatutCommande;
   facture_url?: string;
   createdAt: Date
 }
@@ -309,7 +310,6 @@ const lancerCommande = async () => {
 };
 
 const annulerCommande = async (commande_id : string) => {
-  console.log(commande_id);
   const commande = commandes.value.find(c => c._id === commande_id);
 
   if (!commande) {
@@ -318,12 +318,12 @@ const annulerCommande = async (commande_id : string) => {
   }
   
   try {
-    await api.delete(`/api/auth/delete/order/${commande_id}`);
-    console.error("Commande supprimée avec succès !");
-  } catch (error) {
-    console.error("Impossible de supprimer la commande", error);
-    toast.error("Impossible de supprimer la commande")
-  } finally {  
+    const response = await api.delete(`/api/auth/delete/order/${commande_id}`);
+    toast.success(response.data.message);
+  } catch (error: any) {
+    console.error("Impossible d'annuler la commande", error);
+    toast.error(error.response?.data?.message || "Impossible d'annuler la commande")
+  } finally {
     window.open(genererLienAnnulation(commande), '_blank');
     await fetchDashboardData();   
   }
@@ -668,17 +668,12 @@ onMounted(async () => {
                   <td class="py-4 text-gris font-normal">{{ commande.date }}</td>
                   <td class="py-4 font-bold">{{ commande.total }}</td>
                   <td class="py-4">
-                    <span :class="[
-                      'px-3 py-1 rounded-full text-xs font-bold tracking-wide inline-block shadow-sm',
-                      commande.statut === 'Livré' ? 'bg-green-50 text-green-700 border border-green-100' :
-                      commande.statut === 'En attente' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
-                      'bg-red-50 text-red-700 border border-red-100'
-                    ]">
+                    <span :class="['px-3 py-1 rounded-full text-xs font-bold tracking-wide inline-block whitespace-nowrap', classeStatut(commande.statut)]">
                       {{ commande.statut }}
                     </span>
                   </td>
                   <td class="py-4 text-right">
-                    <div v-if='commande.statut === "En attente"' class="opacity-80 group-hover:opacity-100 transition-opacity">
+                    <div v-if='ANNULABLES_PAR_CLIENT.includes(commande.statut)' class="opacity-80 group-hover:opacity-100 transition-opacity">
                       <button 
                         @click="annulerCommande(commande._id)" 
                         title="Annuler la commande"
@@ -688,7 +683,7 @@ onMounted(async () => {
                       </button>
                     </div>
 
-                    <div v-if="commande.statut === 'Livré'" class="opacity-80 group-hover:opacity-100 transition-opacity">
+                    <div v-if="commande.statut === 'Livrée'" class="opacity-80 group-hover:opacity-100 transition-opacity">
                       <button 
                         @click="telechargerRecu(commande)" 
                         class="p-2.5 bg-green-50 text-green-700 rounded-xl hover:bg-green-600 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center justify-center border border-green-100/50 text-xs font-bold gap-1.5"
@@ -711,12 +706,7 @@ onMounted(async () => {
                   <span class="text-xs text-gray-400 font-bold uppercase block">ID Unique</span>
                   <span class="font-bold text-foret">{{ commande.reference || `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}</span>
                 </div>
-                <span :class="[
-                  'px-3 py-1 rounded-full text-xs font-bold tracking-wide shadow-sm',
-                  commande.statut === 'Livré' ? 'bg-green-50 text-green-700 border border-green-100' :
-                  commande.statut === 'En attente' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
-                  'bg-red-50 text-red-700 border border-red-100'
-                ]">
+                <span :class="['px-3 py-1 rounded-full text-xs font-bold tracking-wide whitespace-nowrap', classeStatut(commande.statut)]">
                   {{ commande.statut }}
                 </span>
               </div>
@@ -728,14 +718,14 @@ onMounted(async () => {
                 </div>
                 <div>
                   <span class="text-[11px] text-gray-400 font-bold uppercase block">Prix payé</span>
-                  <span class="font-bold text-noir">{{ commande.total }} FCFA</span>
+                  <span class="font-bold text-noir">{{ commande.total }}</span>
                 </div>
               </div>
 
               <div class="flex items-center justify-between text-xs pt-1">
                 <span class="text-gris font-medium">{{ commande.date }}</span>
                 <button 
-                  v-if='commande.statut === "En attente"'
+                  v-if='ANNULABLES_PAR_CLIENT.includes(commande.statut)'
                   @click="annulerCommande(commande._id)"
                   class="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all active:scale-95"
                 >
@@ -743,7 +733,7 @@ onMounted(async () => {
                   <span>Annuler</span>
                 </button>
                 <button 
-                  v-else-if="commande.statut === 'Livré'"
+                  v-else-if="commande.statut === 'Livrée'"
                   @click="telechargerRecu(commande)"
                   class="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-xl font-bold hover:bg-green-600 hover:text-white transition-all active:scale-95"
                 >

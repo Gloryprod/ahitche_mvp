@@ -1,5 +1,7 @@
 const User = require("../../models/user")
 const Order = require("../../models/order")
+const { STATUTS } = require("../../models/order")
+const { echapperRegex } = require("../../utils/texte")
 
 async function index(req, res) {
     try {
@@ -15,9 +17,9 @@ async function index(req, res) {
         // Si une recherche est tapée, on applique un filtre textuel (Insensible à la casse 'i')
         if (search) {
             query.$or = [
-                { username: { $regex: search, $options: 'i' } },
-                { telephone: { $regex: search, $options: 'i' } },
-                { quartier: { $regex: search, $options: 'i' } }
+                { username: { $regex: echapperRegex(search), $options: 'i' } },
+                { telephone: { $regex: echapperRegex(search), $options: 'i' } },
+                { quartier: { $regex: echapperRegex(search), $options: 'i' } }
             ];
         }
 
@@ -62,16 +64,15 @@ async function getOrders(req, res) {
     // 1. Filtre de base
     let query = {};
 
-    if (statutFiltre === 'Annulé') {
-      // Une commande est annulée si 'deletedAt' contient une date (n'est pas égal à null)
+    if (statutFiltre === 'Annulée' || statutFiltre === 'Annulé') {
+      // Une commande est annulée (ou archivée) si 'deletedAt' contient une date
       query.deletedAt = { $ne: null };
     } else {
-      // Pour tous les autres onglets (Toutes, En attente, Livré), 
-      // on ne veut STRICTEMENT QUE les commandes actives !
+      // Pour tous les autres onglets, on ne veut STRICTEMENT QUE les commandes actives !
       query.deletedAt = null;
 
-      // Si on est sur un onglet spécifique ('En attente' ou 'Livré')
-      if (statutFiltre !== 'Toutes') {
+      // Si on est sur un onglet de statut précis
+      if (statutFiltre !== 'Toutes' && STATUTS.includes(statutFiltre)) {
         query.statut = statutFiltre;
       }
     }
@@ -124,7 +125,15 @@ async function getOrders(req, res) {
         statut: order.statut,
         productsSnapshot: order.productsSnapshot || [],
         deletedAt: order.deletedAt,
-        dateLivraison: order.dateLivraison
+        dateLivraison: order.dateLivraison,
+        reference: order.reference,
+        zone: order.zone,
+        creneau: order.creneau,
+        livreurId: order.livreurId,
+        paiement: order.paiement,
+        enRetard: order.enRetard,
+        compensation: order.compensation,
+        compensationRecue: order.compensationRecue
       };
     });
 

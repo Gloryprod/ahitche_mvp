@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useQuery, keepPreviousData, useQueries } from '@tanstack/vue-query'
 import api from '@/stores/api'
+import { classeStatut } from '@/config/commandes'
 import type { Commande } from '@/type'
 import { 
   AlertTriangle, 
@@ -81,7 +82,7 @@ const upcomingRenewals = computed(() => {
   const now = new Date()
   
   return ordersList.value
-    .filter(order => order.statut === 'Livré' && order.dateLivraison)
+    .filter(order => order.statut === 'Livrée' && order.dateLivraison)
     .map(order => {
       const deliveryDate = new Date(order.dateLivraison)
       // Échéance de l'abonnement à +30 jours
@@ -235,13 +236,6 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
   window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank')
 }
 
-const getStatutClass = (statut: Commande['statut']) => {
-  switch (statut) {
-    case 'En attente': return 'bg-amber-100 text-amber-800'
-    case 'Livré': return 'bg-green-100 text-green-700'
-    default: return 'bg-gray-100 text-gray-700'
-  }
-}
 </script>
 
 <template>
@@ -512,7 +506,7 @@ const getStatutClass = (statut: Commande['statut']) => {
                     </span>
                   </td>
                   <td class="py-2.5 text-right">
-                    <span :class="[getStatutClass(cmd.statut), 'px-2 py-0.5 rounded text-[10px] font-bold']">
+                    <span :class="[classeStatut(cmd.statut), 'px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap']">
                       {{ cmd.statut }}
                     </span>
                   </td>

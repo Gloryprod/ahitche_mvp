@@ -17,13 +17,21 @@ interface Commande {
   total: number
   date: string
   formuleSlug: string
-  modePaiement: string
+  modePaiement: 'Mobile Money' | 'Espèces' | 'Acompte'
   notes: string
-  statut: 'En attente' | 'Livré'
+  statut: import('@/config/commandes').StatutCommande
   productsSnapshot: ProductSnapshot[]
   deletedAt: Date
   dateLivraison: Date
-}   
+  reference: string
+  zone: string | null
+  creneau: { date: string | null; periode: 'Matin' | 'Après-midi' | null }
+  livreurId: string | null
+  paiement: { statut: 'En attente' | 'Payé'; reference: string; note: string; date: string | null }
+  enRetard: boolean
+  compensation: { statut: 'Aucune' | 'À appliquer' | 'Appliquée'; motif: string }
+  compensationRecue: { reference: string; motif: string }
+}
 
 export interface Category {
   _id: string

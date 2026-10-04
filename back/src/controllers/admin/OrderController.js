@@ -4,6 +4,10 @@ const OrderProductSnapshot = require('../../models/orderProductSnapshot');
 const mongoose = require('mongoose');
 const { consommerStockFIFO } = require('../../services/stockService');
 const { genererReferenceCommande } = require('../../services/orderReferenceService');
+const { STATUTS } = require('../../models/order');
+const User = require('../../models/user');
+const Zone = require('../../models/zone');
+const { TRANSITIONS, estEnRetard, appliquerCompensationEnAttente, libererCompensation, genererCompositionSiAbsente } = require('../../services/commandeService');
 
 
 async function createAdminOrder(req, res) {
@@ -57,9 +61,12 @@ async function createAdminOrder(req, res) {
       modePaiement: modePaiement,
       notes: notes,
       productsSnapshot: snapshotIds, // 🔗 Stockage des IDs référencés
-      statut: 'En attente'
+      statut: 'En attente',
+      historique: [{ statut: 'En attente', date: new Date(), par: req.user.id }]
     });
 
+    // Compensation d'une livraison en retard : remise avec cette commande
+    await appliquerCompensationEnAttente(newOrder);
     await newOrder.save();
 
     return res.status(201).json({
@@ -154,79 +161,110 @@ async function getAllOrders(req, res) {
   }
 }
 
+// Erreur métier : message affiché tel quel à l'équipe (400)
+class ErreurStatut extends Error {}
+
 async function updateOrderStatus(req, res) {
-  // Initialisation de la session pour la transaction ACID
+  const { statut, referencePaiement, notePaiement } = req.body;
+
+  if (!STATUTS.includes(statut)) {
+    return res.status(400).json({ message: "Statut inconnu." });
+  }
+
+  // Transaction : changement de statut, sortie de stock FIFO et compensation réussissent ou échouent ensemble
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const { id } = req.params;
-    const { statut } = req.body; // Récupère 'Livré', 'Annulé', etc.
+    const order = await Order.findById(req.params.id).session(session);
+    if (!order) throw Object.assign(new ErreurStatut("Commande introuvable."), { code: 404 });
 
-    if (!statut) {
-      return res.status(400).json({ message: "Le statut est requis." });
+    if (!(TRANSITIONS[order.statut] || []).includes(statut)) {
+      throw new ErreurStatut(`Passage de « ${order.statut} » à « ${statut} » impossible.`);
     }
 
-    // 1. Récupérer la commande avant modification pour vérifier son état actuel
-    const order = await Order.findById(id).session(session);
-    if (!order) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({ message: "Commande introuvable." });
+    if (statut === 'Confirmée') {
+      // Zone de livraison du client, et composition du pack pour les commandes passées par le client
+      if (!order.zone) {
+        const client = await User.findById(order.userId).select('zone').session(session);
+        order.zone = client?.zone || null;
+      }
+      await genererCompositionSiAbsente(order, session);
     }
 
-    // Sécurité : Éviter de déduire le stock plusieurs fois si la commande est déjà 'Livré'
-    const etaitDejaLivre = order.statut === 'Livré';
+    if (statut === 'En livraison' && (!order.creneau?.date || !order.livreurId)) {
+      throw new ErreurStatut("Planifiez d'abord le créneau et le livreur (section Logistique).");
+    }
 
-    // 2. Mettre à jour le statut de la commande
+    if (statut === 'Livrée') {
+      // Paiement à la livraison : référence Mobile Money, ou note pour les cas particuliers
+      const reference = typeof referencePaiement === 'string' ? referencePaiement.trim() : '';
+      const note = typeof notePaiement === 'string' ? notePaiement.trim() : '';
+      if (order.modePaiement === 'Mobile Money' && !reference) {
+        throw new ErreurStatut("La référence de la transaction Mobile Money est obligatoire.");
+      }
+      if (order.modePaiement !== 'Mobile Money' && !note) {
+        throw new ErreurStatut(`Paiement « ${order.modePaiement} » : une note expliquant le cas est obligatoire.`);
+      }
+
+      const maintenant = new Date();
+      order.paiement = { statut: 'Payé', reference, note, date: maintenant };
+      order.dateLivraison = maintenant;
+
+      const zone = order.zone ? await Zone.findOne({ code: order.zone }).session(session) : null;
+      order.coutLivraison = zone?.tarifCourse || 0;
+
+      // Garantie : plus de 24 h de retard sur le créneau confirmé -> compensation à la commande suivante
+      if (estEnRetard(order.creneau, maintenant)) {
+        order.enRetard = true;
+        order.compensation = {
+          statut: 'À appliquer',
+          motif: `Livrée le ${maintenant.toLocaleDateString('fr-FR', { timeZone: 'Africa/Porto-Novo' })}, plus de 24 h après le créneau prévu.`,
+          appliqueeSurCommande: null
+        };
+      }
+
+      // Sortie de stock FIFO de tous les produits (fixes et extras) de la commande
+      const orderProducts = await OrderProductSnapshot.find({ orderId: order._id }).session(session);
+      if (!orderProducts.length) {
+        throw new ErreurStatut("Impossible de valider une commande sans produits associés.");
+      }
+      for (const item of orderProducts) {
+        await consommerStockFIFO(item.productId, item.quantity, `Livraison de la commande ${order.reference}`, session);
+      }
+    }
+
+    if (statut === 'Annulée') {
+      order.deletedAt = new Date();
+      await libererCompensation(order, session);
+    }
+
     order.statut = statut;
-    order.dateLivraison = new Date();
+    order.historique.push({ statut, date: new Date(), par: req.user.id });
     const updatedOrder = await order.save({ session });
 
-    // 3. Déclencher l'algorithme FIFO si le nouveau statut est 'Livré' et qu'elle ne l'était pas avant
-    if (statut === 'Livré' && !etaitDejaLivre) {
-      // Récupérer tous les produits (fixes et extras) liés à cette commande via le Snapshot
-      const orderProducts = await OrderProductSnapshot.find({ orderId: id }).session(session);
-
-      if (!orderProducts || orderProducts.length === 0) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({ message: "Impossible de valider une commande sans produits associés." });
-      }
-
-      // Appliquer le FIFO produit par produit
-      for (const item of orderProducts) {
-        await consommerStockFIFO(
-          item.productId,
-          item.quantity,
-          `Déduction automatique - Livraison de la commande #${id}`,
-          session
-        );
-      }
-    }
-
-    // Si tout s'est bien passé (y compris le FIFO), on valide la transaction
     await session.commitTransaction();
-    session.endSession();
-
     return res.status(200).json({
-      message: `Commande marquée comme '${statut}' avec succès !`,
+      message: `Commande ${order.reference} : ${statut}.`,
       order: updatedOrder
     });
 
   } catch (error) {
     // En cas d'erreur ou de stock insuffisant, on annule tous les changements (Rollback)
     await session.abortTransaction();
-    session.endSession();
 
-    console.error("Erreur updateOrderStatus avec FIFO:", error);
-    
-    // Si l'erreur provient de notre service FIFO (Rupture de stock)
-    if (error.message.includes("Stock insuffisant")) {
+    if (error instanceof ErreurStatut) {
+      return res.status(error.code || 400).json({ message: error.message });
+    }
+    // Rupture de stock signalée par le service FIFO
+    if (error.message?.includes("Stock insuffisant")) {
       return res.status(400).json({ message: error.message });
     }
 
+    console.error("Erreur updateOrderStatus:", error);
     return res.status(500).json({ message: "Erreur interne lors de la mise à jour du statut." });
+  } finally {
+    session.endSession();
   }
 }
 
@@ -244,6 +282,10 @@ async function deleteAdminOrder(req, res) {
     if (!deletedOrder) {
       return res.status(404).json({ message: "Commande introuvable." });
     }
+
+    // Une compensation portée par cette commande revient au client pour sa prochaine commande
+    await libererCompensation(deletedOrder);
+    await deletedOrder.save();
 
     return res.status(200).json({
       message: "Commande supprimée avec succès (archivée) !"

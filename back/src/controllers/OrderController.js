@@ -1,6 +1,7 @@
 const Order = require('../models/order');
 const Formule = require('../models/formules');
 const { genererReferenceCommande } = require('../services/orderReferenceService');
+const { ANNULABLES_PAR_CLIENT, appliquerCompensationEnAttente, libererCompensation } = require('../services/commandeService');
 
 async function index(req, res){
 
@@ -50,9 +51,12 @@ async function saveOrder(req, res){
             formule: formuleInfo.nom,
             formuleSlug: formuleInfo.slug,
             total,
-            statut: 'En attente'
+            statut: 'En attente',
+            historique: [{ statut: 'En attente', date: new Date(), par: userId }]
         });
 
+        // Compensation d'une livraison en retard : remise avec cette commande
+        await appliquerCompensationEnAttente(nouvelleCommande);
         await nouvelleCommande.save();
 
         return res.status(201).json({
@@ -69,19 +73,24 @@ async function saveOrder(req, res){
 async function deleteOrder(req, res) {
     try {
         // On ne cible que les commandes actives appartenant à l'utilisateur connecté
-        const order = await Order.findOneAndUpdate(
-            { _id: req.params.id, userId: req.user.id, deletedAt: null },
-            {
-                $set: { deletedAt: new Date() } 
-            },
-            { new: true } 
-        );
-        
+        const order = await Order.findOne({ _id: req.params.id, userId: req.user.id, deletedAt: null });
+
         if (!order) {
             return res.status(404).json({ message: "Commande non trouvée." });
         }
-        
-        res.status(200).json({ message: 'Commande supprimée avec succès !' });
+
+        // Une fois la préparation commencée, l'annulation passe par l'équipe (WhatsApp)
+        if (!ANNULABLES_PAR_CLIENT.includes(order.statut)) {
+            return res.status(409).json({ message: `Commande ${order.statut.toLowerCase()} : contactez-nous sur WhatsApp pour l'annuler.` });
+        }
+
+        order.statut = 'Annulée';
+        order.deletedAt = new Date();
+        await libererCompensation(order);
+        order.historique.push({ statut: 'Annulée', date: new Date(), par: req.user.id });
+        await order.save();
+
+        res.status(200).json({ message: 'Commande annulée.' });
     } catch (error) {
         console.error("Erreur deleteOrder:", error);
         res.status(500).json({ message: "Erreur serveur lors de la suppression de la commande." });

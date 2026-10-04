@@ -8,6 +8,7 @@ const Partner = require('../models/partner');
 const PurchaseOrder = require('../models/purchaseOrder');
 const { LotStockFifo } = require('../models/stock');
 const Zone = require('../models/zone');
+const Order = require('../models/order');
 const { normaliser } = require('../utils/texte');
 
 dotenv.config();
@@ -93,10 +94,27 @@ async function migrerZones() {
   if (ambigus || inconnus) console.log('  ⚠ Ces clients restent en « Autre quartier » : leur zone se choisit à la prochaine mise à jour de leur adresse');
 }
 
+// Étape 4 : anciens statuts de commande -> nouveaux statuts (passage par la collection : l'ancienne
+// valeur « Livré » n'est plus acceptée par le modèle)
+async function migrerStatutsCommandes() {
+  const commandes = Order.collection;
+  // Avant ce suivi, une commande livrée était considérée comme payée : la référence n'était pas saisie
+  const livrees = await commandes.updateMany(
+    { statut: 'Livré' },
+    { $set: { statut: 'Livrée', 'paiement.statut': 'Payé', 'paiement.note': 'Livrée avant le suivi des paiements (référence non saisie).' } }
+  );
+  const annulees = await commandes.updateMany(
+    { deletedAt: { $ne: null }, statut: { $nin: ['Annulée', 'Livrée'] } },
+    { $set: { statut: 'Annulée' } }
+  );
+  console.log(`  ✔ ${livrees.modifiedCount} commande(s) « Livré » -> « Livrée », ${annulees.modifiedCount} commande(s) supprimée(s) -> « Annulée »`);
+}
+
 const ETAPES = [
   ['Index du téléphone', migrerIndexTelephone],
   ['Fournisseurs vers Prestataires', migrerFournisseurs],
   ['Zones de livraison', migrerZones],
+  ['Statuts des commandes', migrerStatutsCommandes],
 ];
 
 async function migrer() {
