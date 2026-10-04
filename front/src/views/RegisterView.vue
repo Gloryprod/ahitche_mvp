@@ -54,9 +54,14 @@
 
             <div>
                 <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Numéro WhatsApp / Mobile Money <span class="required">*</span></label>
-                <div class="">
-                  <vue-tel-input class="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all" v-model="formRegister.telephone"></vue-tel-input>
-                </div>
+                <vue-tel-input
+                  class="champ-telephone w-full text-sm"
+                  v-model="formRegister.telephone"
+                  default-country="BJ"
+                  mode="international"
+                  :input-options="{ placeholder: 'Ex : 01 97 00 00 00', type: 'tel' }"
+                  :dropdown-options="{ showFlags: true, showSearchBox: true, searchBoxPlaceholder: 'Rechercher un pays' }"
+                ></vue-tel-input>
                 <p class="text-xs text-gray-500 mt-1">Ce numéro sera utilisé pour vos commandes et livraisons.</p>
             </div>
 
@@ -120,3 +125,27 @@ const login = () => {
   router.push('/login')
 }
 </script>
+<style scoped>
+/* Aligne vue-tel-input sur les autres champs du formulaire (charte Ahitché) */
+.champ-telephone {
+  border: 1px solid #e5e7eb; /* gray-200, comme les autres champs */
+  border-radius: 0.75rem;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.champ-telephone:focus-within {
+  border-color: var(--color-foret);
+  box-shadow: 0 0 0 1px var(--color-foret);
+}
+.champ-telephone :deep(.vti__dropdown) {
+  padding: 0 0.5rem 0 0.75rem;
+  border-radius: 0.75rem 0 0 0.75rem;
+}
+.champ-telephone :deep(.vti__input) {
+  padding: 0.75rem 1rem 0.75rem 0.5rem;
+  border-radius: 0 0.75rem 0.75rem 0;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: transparent;
+}
+</style>
