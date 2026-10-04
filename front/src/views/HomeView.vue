@@ -8,6 +8,7 @@ import NosFormules from '../components/sections/NosFormules.vue'
 import CommentCaMarche from '../components/sections/CommentCaMarche.vue'
 import ProduitsSemaine from '../components/sections/ProduitsSemaine.vue'
 import TemoignagesAndGarantie from '../components/sections/TemoignagesAndGarantie.vue'
+import ActionsFlottantes from '../components/layout/ActionsFlottantes.vue'
 </script>
 
 <!-- Ordre validé pour la refonte : comprendre, être rassuré, voir la chaîne, choisir, commander -->
@@ -22,4 +23,6 @@ import TemoignagesAndGarantie from '../components/sections/TemoignagesAndGaranti
     <ProduitsSemaine />
     <TemoignagesAndGarantie />
   </main>
+  <!-- Commande WhatsApp collante (mobile) et retour en haut de page -->
+  <ActionsFlottantes />
 </template>
