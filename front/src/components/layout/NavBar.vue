@@ -7,10 +7,11 @@ import { useToast } from 'vue-toastification'
 import { espaceParDefaut } from '@/config/roles'
 import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
 
-// Liens du menu (la FAQ s'ajoutera avec sa section)
+// Liens du menu
 const LIENS = [
   { href: '#formules', texte: 'Formules' },
   { href: '#comment', texte: 'Comment ça marche' },
+  { href: '#faq', texte: 'FAQ' },
 ]
 
 const router = useRouter()

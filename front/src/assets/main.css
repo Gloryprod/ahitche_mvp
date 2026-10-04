@@ -45,6 +45,11 @@ body {
   @apply bg-creme text-noir font-body antialiased overflow-x-hidden;
 }
 
+/* Ancres du menu (#formules, #faq…) : le titre de la section ne passe pas sous le menu fixe */
+section[id] {
+  scroll-margin-top: 5rem;
+}
+
 
 /* Apparition au défilement (directive v-apparition) : la classe n'est posée que si les animations sont autorisées */
 .apparition {
