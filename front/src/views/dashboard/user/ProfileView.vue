@@ -15,6 +15,7 @@ import { genererRecuPDF } from '@/services/pdfRecuCommande';
 interface Commande {
   id: string;
   _id: string;
+  reference?: string;
   formule: string
   date: string;
   total: string;
@@ -25,11 +26,17 @@ interface Commande {
 
 interface Formule {
   _id: string;
+  slug: string;
   nom: string;
   emoji: string;
-  prixActuel: string;
+  prixActuel: number;
+  prixCommercial?: number | null;
   cible: string;
 }
+
+// Prix de vente affiché et facturé : prix commercial fixé par l'admin, sinon prix officiel
+const prixDeVente = (formule: Formule) => formule.prixCommercial ?? formule.prixActuel;
+const formaterFCFA = (montant: number) => `${montant.toLocaleString('fr-FR')} FCFA`;
 
 // 1. Authentification et Routage
 const authStore = useAuthStore();
@@ -81,9 +88,10 @@ const fetchDashboardData = async () => {
     // 2. Assignation de l'historique des commandes
     commandes.value = commandesRes.data.map((cmd : Commande) => ({
       _id: cmd._id,
+      reference: cmd.reference,
       formule: cmd.formule,
       date: new Date(cmd.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }),
-      total: `${cmd.total.toLocaleString()} FCFA`,
+      total: formaterFCFA(Number(cmd.total)),
       statut: cmd.statut,
     }));
     chargementCommandes.value = false;
@@ -174,16 +182,20 @@ const sauvegarderInfos = async () => {
   }
 };
 
-// Fonction pour générer le lien Whatsapp de commande avec le message dynamique contenant les infos de livraison
-const genererLienWhatsApp = computed(() => {
+// Génère le lien WhatsApp de commande avec les infos de livraison.
+// Le montant et la référence proviennent de la commande enregistrée par le serveur quand elle existe.
+const genererLienWhatsApp = (commande?: { reference: string; total: number }) => {
   const numeroWhatsApp = "22998136635";
-  
+
   // On cherche les infos de la formule actuellement sélectionnée dans notre liste API
-  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle) || { prixActuel: '22 500' };
+  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle);
+  const montant = commande?.total ?? (formuleChoisie ? prixDeVente(formuleChoisie) : null);
 
   // Construction du texte personnalisé
   let message = `Bonjour Ahitché ! 👋\n\n`;
-  message += `Je souhaite commander la formule *${clientInfos.value.formuleHabituelle}* (${formuleChoisie.prixActuel} FCFA).\n\n`;
+  message += `Je souhaite commander la formule *${clientInfos.value.formuleHabituelle}*`;
+  message += montant ? ` (${formaterFCFA(montant)}).\n` : `.\n`;
+  message += commande ? `Référence de commande : *${commande.reference}*\n\n` : `\n`;
   
   // Si les infos de livraison sont remplies, on les greffe proprement au message
   if (clientInfos.value.quartier || clientInfos.value.telephone) {
@@ -197,7 +209,7 @@ const genererLienWhatsApp = computed(() => {
 
   // Encodage strict au format URL
   return `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(message)}`;
-});
+};
 
 // Fonction pour générer le lien WhatsApp d'annulation pour une commande spécifique
 const genererLienAnnulation = (commande: Commande) => {
@@ -205,7 +217,7 @@ const genererLienAnnulation = (commande: Commande) => {
   
   // Construction du texte d'annulation clair et précis
   let message = `Bonjour Ahitché ! ❌\n\n`;
-  message += `Je souhaite annuler ma commande *${commande._id}*.\n\n`;
+  message += `Je souhaite annuler ma commande *${commande.reference || commande._id}*.\n\n`;
   message += `📍 *Détails de la commande à annuler :*\n`;
   message += `- *Formule :* ${commande.formule || clientInfos.value.formuleHabituelle}\n`;
   message += `- *Montant :* ${commande.total}\n`;
@@ -216,25 +228,42 @@ const genererLienAnnulation = (commande: Commande) => {
   return `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(message)}`;
 };
 
-const lancerCommande = async () => {
-  // 1. Trouver les détails de la formule choisie dans formulesApi
-  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle);
-  
-  const payload = {
-    formule: clientInfos.value.formuleHabituelle,
-    total: formuleChoisie ? formuleChoisie.prixActuel : 22500
-  };
+const commandeEnCours = ref(false);
 
+const lancerCommande = async () => {
+  if (commandeEnCours.value) return;
+
+  // 1. Formule choisie : on envoie son slug, le serveur fixe lui-même le prix
+  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle);
+  const payload = { formule: formuleChoisie?.slug || clientInfos.value.formuleHabituelle };
+
+  // 2. On ouvre l'onglet WhatsApp tout de suite, pendant le clic : ouvert après l'appel API,
+  //    il serait bloqué par les navigateurs mobiles
+  const fenetreWhatsApp = window.open('', '_blank');
+  if (fenetreWhatsApp) fenetreWhatsApp.opener = null;
+
+  commandeEnCours.value = true;
+  let lien: string;
   try {
-    // 2. Enregistrement silencieux dans ta base de données locale
-    await api.post('/api/auth/save/orders', payload);
-    console.log("Commande enregistrée!");
-  } catch (error) {
-    console.error("Impossible d'enregistrer la commande", error);
-  } finally {  
-    window.open(genererLienWhatsApp.value, '_blank');
-    await fetchDashboardData();   
+    // 3. Enregistrement de la commande en base
+    const response = await api.post('/api/auth/save/orders', payload);
+    const { reference, total } = response.data.commande;
+    toast.success(`Commande ${reference} enregistrée. Finalisez-la sur WhatsApp.`);
+    lien = genererLienWhatsApp({ reference, total });
+  } catch (error: any) {
+    // La commande reste possible sur WhatsApp, mais le client sait qu'elle n'est pas dans son historique
+    toast.error(error.response?.data?.message || "Votre commande n'a pas pu être enregistrée. Vous pouvez la finaliser directement sur WhatsApp.");
+    lien = genererLienWhatsApp();
+  } finally {
+    commandeEnCours.value = false;
   }
+
+  if (fenetreWhatsApp) {
+    fenetreWhatsApp.location.href = lien;
+  } else {
+    window.location.href = lien; // Popup refusée : on bascule dans l'onglet courant
+  }
+  await fetchDashboardData();
 };
 
 const annulerCommande = async (commande_id : string) => {
@@ -487,7 +516,7 @@ onMounted(async () => {
                   <span class="text-2xl filter drop-shadow-sm select-none">{{ formule.emoji }}</span>
                   <div>
                     <p class="font-bold text-sm" :class="clientInfos.formuleHabituelle === formule.nom ? 'text-foret' : 'text-noir'">{{ formule.nom }}</p>
-                    <p class="text-xs text-gris font-medium mt-0.5">{{ formule.prixActuel }} FCFA · {{ formule.cible.split('·')[0] }}</p>
+                    <p class="text-xs text-gris font-medium mt-0.5">{{ formaterFCFA(prixDeVente(formule)) }} · {{ formule.cible.split('·')[0] }}</p>
                   </div>
                 </div>
                 
@@ -505,10 +534,11 @@ onMounted(async () => {
           </div>
 
           <button 
-            @click="lancerCommande" 
-            class="cursor-pointer inline-flex items-center justify-center gap-2 w-full px-5 py-3.5 bg-foret text-white font-bold rounded-xl hover:bg-savane shadow-sm hover:shadow transition-all duration-200 text-sm active:scale-[0.99]"
+            @click="lancerCommande"
+            :disabled="commandeEnCours"
+            class="cursor-pointer inline-flex items-center justify-center gap-2 w-full px-5 py-3.5 bg-foret text-white font-bold rounded-xl hover:bg-savane shadow-sm hover:shadow transition-all duration-200 text-sm active:scale-[0.99] disabled:opacity-50"
           >
-            <span>Confirmer et commander</span>
+            <span>{{ commandeEnCours ? 'Enregistrement...' : 'Confirmer et commander' }}</span>
             <ArrowRightIcon class="w-4 h-4" />
           </button>
         </div>        
@@ -549,7 +579,7 @@ onMounted(async () => {
               <tbody class="divide-y divide-gray-50 text-sm font-medium">
                 <tr v-for="commande in commandes" :key="commande._id" class="hover:bg-gray-50/50 transition-colors group">
                   <td class="py-4 font-bold text-foret">
-                    {{ `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}
+                    {{ commande.reference || `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}
                   </td>
                   <td class="py-4 text-gray-700">{{ commande.formule }}</td>
                   <td class="py-4 text-gris font-normal">{{ commande.date }}</td>
@@ -596,7 +626,7 @@ onMounted(async () => {
               <div class="flex justify-between items-start">
                 <div>
                   <span class="text-xs text-gray-400 font-bold uppercase block">ID Unique</span>
-                  <span class="font-bold text-foret">{{ `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}</span>
+                  <span class="font-bold text-foret">{{ commande.reference || `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}</span>
                 </div>
                 <span :class="[
                   'px-3 py-1 rounded-full text-xs font-bold tracking-wide shadow-sm',

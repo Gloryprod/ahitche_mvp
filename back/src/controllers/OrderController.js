@@ -1,4 +1,6 @@
 const Order = require('../models/order');
+const Formule = require('../models/formules');
+const { genererReferenceCommande } = require('../services/orderReferenceService');
 
 async function index(req, res){
 
@@ -14,16 +16,35 @@ async function index(req, res){
 async function saveOrder(req, res){
 
     try {
-        const { formule, total } = req.body;
+        // Le client n'envoie que la formule (slug ou nom) : le prix est toujours lu en base
+        const { formule } = req.body;
         const userId = req.user.id; // Récupéré via le middleware verifyToken
 
-        if (!formule || !total) {
-            return res.status(400).json({ message: "La formule et le total sont requis." });
+        if (typeof formule !== 'string' || formule.length === 0) {
+            return res.status(400).json({ message: "La formule est requise." });
+        }
+
+        const formuleInfo = await Formule.findOne({
+            $or: [{ slug: formule }, { nom: formule }],
+            statut: 'actif'
+        });
+
+        if (!formuleInfo) {
+            return res.status(404).json({ message: "Cette formule n'est pas disponible à la commande." });
+        }
+
+        // Prix de vente : prix commercial fixé par l'admin, sinon prix officiel
+        const total = formuleInfo.prixCommercial ?? formuleInfo.prixActuel;
+
+        if (!total || total <= 0) {
+            return res.status(409).json({ message: "Le prix de cette formule n'est pas encore défini. Contactez-nous sur WhatsApp." });
         }
 
         const nouvelleCommande = new Order({
             userId,
-            formule,
+            reference: await genererReferenceCommande(),
+            formule: formuleInfo.nom,
+            formuleSlug: formuleInfo.slug,
             total,
             statut: 'En attente'
         });

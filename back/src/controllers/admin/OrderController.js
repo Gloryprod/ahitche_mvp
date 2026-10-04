@@ -3,6 +3,7 @@ const Formule = require('../../models/formules');
 const OrderProductSnapshot = require('../../models/orderProductSnapshot');
 const mongoose = require('mongoose');
 const { consommerStockFIFO } = require('../../services/stockService');
+const { genererReferenceCommande } = require('../../services/orderReferenceService');
 
 
 async function createAdminOrder(req, res) {
@@ -22,9 +23,7 @@ async function createAdminOrder(req, res) {
     }
 
     // 3. Générer la référence incrémentale automatique (ex: CMD-001)
-    const totalOrdersCount = await Order.countDocuments();
-    const nextId = totalOrdersCount + 1;
-    const orderReference = `CMD-${String(nextId).padStart(3, '0')}`;
+    const orderReference = await genererReferenceCommande();
 
     // 💡 Création anticipée de l'ID de la commande pour lier les snapshots
     const orderId = new mongoose.Types.ObjectId();
@@ -97,9 +96,7 @@ async function updateAdminOrder(req, res) {
     }
 
     // 3. Générer la référence incrémentale automatique (ex: CMD-001)
-    const totalOrdersCount = await Order.countDocuments();
-    const nextId = totalOrdersCount + 1;
-    const orderReference = `CMD-${String(nextId).padStart(3, '0')}`;
+    const orderReference = await genererReferenceCommande();
 
     // 4. Nettoyer les anciens snapshots associés à cette commande
     await OrderProductSnapshot.deleteMany({ orderId: id });
