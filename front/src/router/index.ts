@@ -153,6 +153,12 @@ const router = createRouter({
           component: () => import('@/components/admin/finances/FinancesView.vue')
         },
         {
+          path: 'simulateurs',
+          name: 'simulateurs-page',
+          meta: { roles: ACCES.simulateurs.lecture },
+          component: () => import('@/components/admin/simulateurs/SimulateursView.vue')
+        },
+        {
           path: 'posts',
           name: 'posts-page',
           meta: { roles: ACCES.contenus.lecture },

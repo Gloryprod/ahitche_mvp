@@ -13,6 +13,7 @@ const partnerC = require('../controllers/admin/PartnerController');
 const zoneC = require('../controllers/ZoneController');
 const logistiqueC = require('../controllers/admin/LogistiqueController');
 const financeC = require('../controllers/admin/FinanceController');
+const simulateurC = require('../controllers/admin/SimulateurController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -31,6 +32,7 @@ router.use(['/stock', '/inventory', '/mouvements', '/bons-commande'], acces(ACCE
 router.use('/prestataires', acces(ACCES.prestataires));
 router.use(['/zones', '/logistique'], acces(ACCES.logistique));
 router.use('/finances', acces(ACCES.finances));
+router.use('/simulateurs', acces(ACCES.simulateurs));
 
 // Users
 router.get('/users', userC.index);
@@ -140,6 +142,10 @@ router.route('/finances/depenses/:id')
 router.patch('/finances/depenses/:id/effectuer', financeC.effectuerDepense);
 router.patch('/finances/depenses/:id/audit', financeC.changerValiditeAudit);
 router.post('/finances/justificatifs', upload.uploadJustificatif.single('fichier'), financeC.televerserJustificatif);
+
+// Simulateurs (lecture seule : aucun enregistrement, aucun prix modifié)
+router.get('/simulateurs/pack/:type', simulateurC.simulerPack);
+router.post('/simulateurs/achats', simulateurC.simulerAchats);
 
 module.exports = router;
         
