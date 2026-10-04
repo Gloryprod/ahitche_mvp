@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import BaseButton from '../ui/BaseButton.vue'
+import FormuleCard, { type FormuleVitrine } from '../ui/FormuleCard.vue'
+
+// Formules ouvertes au lancement (prix de vente en FCFA, identiques au référentiel createFormules.js)
+const formules: FormuleVitrine[] = [
+  { emoji: '🌿', nom: 'AHI ESSENTIEL', cible: '1 personne · par semaine', accroche: 'Un suivi alimentaire simple, pour commencer.', repas: '20–30', heures: '2–4h', ancienPrix: 24000, prix: 10800 },
+  { emoji: '🌾', nom: 'AHI ÉQUILIBRÉ', cible: '2–3 personnes · par semaine', accroche: 'Mieux manger sans compliquer votre quotidien.', repas: '35–50', heures: '4–6h', ancienPrix: 50000, prix: 22500, recommandee: true },
+  { emoji: '👑', nom: 'AHI CONFORT', cible: 'Famille 4–6 · par semaine', accroche: 'Un ravitaillement complet, pensé pour toute la famille.', repas: '60–90', heures: '6–10h', ancienPrix: 110000, prix: 50300 },
+]
 
 // 17 produits de base ; les quantités varient selon la formule et ne sont pas affichées
 const produitsInclus = ref([
@@ -28,127 +35,7 @@ const exclusEssentiel = ["Huile de palme"]
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch mb-16">
-        
-        <div class="flex flex-col justify-between bg-white rounded-3xl p-8 border border-creme2 shadow-sm transition-all duration-300 hover:shadow-md">
-          <div>
-            <div class="flex items-center gap-4 mb-4">
-              <span class="text-3xl" aria-hidden="true">🌿</span>
-              <div>
-                <h3 class="text-xl font-bold text-foret font-body tracking-tight">AHI ESSENTIEL</h3>
-                <p class="text-sm text-gris">1 personne · par semaine</p>
-              </div>
-            </div>
-            <p class="text-sm italic text-gris mb-6">« Un suivi alimentaire simple, pour commencer. »</p>
-            
-            <div class="grid grid-cols-2 gap-4 border-y border-creme2 py-4 mb-6">
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">20–30</span>
-                <span class="text-xs text-gris">repas possibles</span>
-              </div>
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">2–4h</span>
-                <span class="text-xs text-gris">économisées</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="mb-6">
-              <span class="block text-sm text-gris-lt line-through">24 000 FCFA</span>
-              <span class="text-3xl font-bold text-foret font-body">10 800 <small class="text-sm font-semibold">FCFA</small></span>
-            </div>
-            <BaseButton 
-              href="https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20ESSENTIEL%20(10%20800%20FCFA).%20Pouvez-vous%20me%20confirmer%20les%20d%C3%A9tails%20%3F"
-              variant="secondary"
-              external
-              class="w-full"
-            >
-              Commander — WhatsApp
-            </BaseButton>
-          </div>
-        </div>
-
-        <div class="relative flex flex-col justify-between bg-white rounded-3xl p-8 border-2 border-or shadow-xl transition-all duration-300 hover:shadow-2xl md:-translate-y-4">
-          <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-or text-foret text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
-            <span aria-hidden="true">⭐</span> Le plus choisi
-          </div>
-          <div>
-            <div class="flex items-center gap-4 mb-4 mt-2">
-              <span class="text-3xl" aria-hidden="true">🌾</span>
-              <div>
-                <h3 class="text-xl font-bold text-foret font-body tracking-tight">AHI ÉQUILIBRÉ</h3>
-                <p class="text-sm text-gris">2–3 personnes · par semaine</p>
-              </div>
-            </div>
-            <p class="text-sm italic text-gris mb-6">« Mieux manger sans compliquer votre quotidien. »</p>
-            
-            <div class="grid grid-cols-2 gap-4 border-y border-creme2 py-4 mb-6">
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">35–50</span>
-                <span class="text-xs text-gris">repas possibles</span>
-              </div>
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">4–6h</span>
-                <span class="text-xs text-gris">économisées</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="mb-6">
-              <span class="block text-sm text-gris-lt line-through">50 000 FCFA</span>
-              <span class="text-3xl font-bold text-foret font-body">22 500 <small class="text-sm font-semibold">FCFA</small></span>
-            </div>
-            <BaseButton 
-              href="https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20%C3%89QUILIBR%C3%89%20(22%20500%20FCFA).%20Pouvez-vous%20me%20confirmer%20les%20d%C3%A9tails%20%3F"
-              variant="primary"
-              external
-              class="w-full"
-            >
-              Commander — WhatsApp
-            </BaseButton>
-          </div>
-        </div>
-
-        <div class="flex flex-col justify-between bg-white rounded-3xl p-8 border border-creme2 shadow-sm transition-all duration-300 hover:shadow-md">
-          <div>
-            <div class="flex items-center gap-4 mb-4">
-              <span class="text-3xl" aria-hidden="true">👑</span>
-              <div>
-                <h3 class="text-xl font-bold text-foret font-body tracking-tight">AHI CONFORT</h3>
-                <p class="text-sm text-gris">Famille 4–6 · par semaine</p>
-              </div>
-            </div>
-            <p class="text-sm italic text-gris mb-6">« Un ravitaillement complet, pensé pour toute la famille. »</p>
-            
-            <div class="grid grid-cols-2 gap-4 border-y border-creme2 py-4 mb-6">
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">60–90</span>
-                <span class="text-xs text-gris">repas possibles</span>
-              </div>
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">6–10h</span>
-                <span class="text-xs text-gris">économisées</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="mb-6">
-              <span class="block text-sm text-gris-lt line-through">110 000 FCFA</span>
-              <span class="text-3xl font-bold text-foret font-body">50 300 <small class="text-sm font-semibold">FCFA</small></span>
-            </div>
-            <BaseButton 
-              href="https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20CONFORT%20(50%20300%20FCFA).%20Pouvez-vous%20me%20confirmer%20les%20d%C3%A9tails%20%3F"
-              variant="secondary"
-              external
-              class="w-full"
-            >
-              Commander — WhatsApp
-            </BaseButton>
-          </div>
-        </div>
-
+        <FormuleCard v-for="formule in formules" :key="formule.nom" :formule="formule" />
       </div>
 
       <div class="bg-white rounded-3xl p-8 border border-creme2 text-center max-w-4xl mx-auto shadow-xs">
