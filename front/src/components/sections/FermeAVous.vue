@@ -18,7 +18,7 @@ const etapes = [
   <section id="ferme" class="py-20 bg-creme">
     <div class="max-w-[1160px] mx-auto px-6">
       <div class="text-center max-w-2xl mx-auto mb-12">
-        <span class="text-xs font-bold tracking-wider text-savane uppercase bg-savane/10 px-3 py-1 rounded-full">Notre engagement</span>
+        <span class="text-xs font-bold tracking-wider text-foret uppercase bg-savane/10 px-3 py-1 rounded-full">Notre engagement</span>
         <h2 class="mt-4 text-3xl sm:text-4xl md:text-5xl font-display font-bold text-foret leading-tight">
           De la ferme <em class="text-savane">à votre porte</em>
         </h2>

@@ -27,7 +27,7 @@ const etapes = [
   <section id="comment" class="py-20 bg-white">
     <div class="max-w-6xl mx-auto px-4">
       <div class="text-center mb-12">
-        <span class="text-xs font-bold tracking-wider text-savane uppercase bg-savane/10 px-3 py-1 rounded-full">
+        <span class="text-xs font-bold tracking-wider text-foret uppercase bg-savane/10 px-3 py-1 rounded-full">
           Simple &amp; rapide
         </span>
         <h2 class="mt-4 text-4xl md:text-5xl font-display font-bold text-foret leading-tight">

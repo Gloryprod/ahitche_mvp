@@ -12,8 +12,8 @@ const annee = new Date().getFullYear()
 
         <div>
           <div class="flex items-center gap-2 mb-3">
-            <img src="/logo-ahitche-96.webp" alt="" width="40" height="40" loading="lazy" class="w-10 h-10" />
-            <span class="text-2xl font-display font-bold tracking-tight"><span class="text-foret">Ahi</span><span class="text-or-deep">tché</span></span>
+            <img src="/logo-ahitche-96.webp" alt="Ahitché" width="40" height="40" loading="lazy" class="w-10 h-10" />
+            <span class="text-2xl font-display font-bold tracking-tight text-foret" aria-hidden="true">Ahitché</span>
           </div>
           <p class="text-gris text-sm mb-4">Le marché, organisé pour vous.</p>
           <a

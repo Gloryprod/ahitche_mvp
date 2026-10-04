@@ -30,7 +30,7 @@ async function choisirFoyer(valeur: TailleFoyer) {
   <section id="formules" class="py-20 bg-creme2/40">
     <div class="max-w-6xl mx-auto px-4">
       <div class="text-center mb-10">
-        <span class="text-xs font-bold tracking-wider text-savane uppercase bg-savane/10 px-3 py-1 rounded-full">
+        <span class="text-xs font-bold tracking-wider text-foret uppercase bg-savane/10 px-3 py-1 rounded-full">
           Nos formules
         </span>
         <h2 class="mt-4 text-4xl md:text-5xl font-display font-bold text-foret leading-tight">
