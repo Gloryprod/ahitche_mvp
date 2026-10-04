@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
+const { ROLES } = require('../config/roles');
 
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['user', 'admin'], required: true, default: 'user' }, // 'user' ou 'admin'
-    telephone: { type: String, required: false, unique: true },
+    role: { type: String, enum: ROLES, required: true, default: 'user' }, // client ('user') ou membre de l'équipe, voir config/roles.js
+    telephone: { type: String, required: false }, // unique seulement s'il est renseigné (index plus bas)
     quartier: { type: String, required: false },
     adresse: { type: String, required: false },
     formuleHabituelle: { type: String, required: false },
@@ -18,5 +19,12 @@ const userSchema = new mongoose.Schema({
         default: null
     }
 }, { timestamps: true });
+
+// Un même numéro ne peut servir qu'à un compte, mais les comptes sans téléphone (équipe, anciens clients)
+// ne se bloquent plus entre eux. Remplace l'ancien index unique : voir scripts/migrerDonnees.js.
+userSchema.index(
+    { telephone: 1 },
+    { unique: true, name: 'telephone_unique_si_renseigne', partialFilterExpression: { telephone: { $gt: '' } } }
+);
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue';
 import axios from 'axios';
+import { EQUIPE, type Role } from '@/config/roles';
 
 // On configure Axios pour qu'il envoie automatiquement les cookies aux requêtes Cross-Origin
 const API_URL = import.meta.env.PROD 
@@ -13,7 +14,7 @@ interface User {
   id: string;
   email: string;
   username: string;
-  role: 'admin' | 'user';
+  role: Role;
   adresse: string;
   quartier: string;
   telephone: string;
@@ -27,6 +28,8 @@ const isInitialized = ref(false); // Permet de savoir si on a vérifié la sessi
 export function useAuthStore() {
   const isAuthenticated = computed(() => !!user.value);
   const isAdmin = computed(() => !!user.value && user.value.role === 'admin');
+  const role = computed<Role | undefined>(() => user.value?.role);
+  const isEquipe = computed(() => !!user.value && EQUIPE.includes(user.value.role));
 
   // 💡 Fonction pour récupérer l'utilisateur connecté au chargement du site
   async function checkSession() {
@@ -75,5 +78,5 @@ export function useAuthStore() {
     }
   }
 
-  return { user, isInitialized, isAuthenticated, isAdmin, login, logout, checkSession, forgotPassword, resetPassword };
+  return { user, isInitialized, isAuthenticated, isAdmin, role, isEquipe, login, logout, checkSession, forgotPassword, resetPassword };
 }

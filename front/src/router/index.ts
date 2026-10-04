@@ -19,6 +19,7 @@ import VueGlobalInventory from '@/components/admin/stock/VueGlobalInventory.vue'
 import StockMovementsView from '@/components/admin/stock/StockMovementsView.vue'
 import PurchaseOrdersView from '@/components/admin/stock/PurchaseOrdersView.vue'
 import { useAuthStore } from '../stores/auth';
+import { ACCES, EQUIPE, espaceParDefaut, type Role } from '@/config/roles';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -62,68 +63,80 @@ const router = createRouter({
       path: '/dashboard/admin',
       name: 'admin-dashboard',
       component: ProfileViewAdmin,
-      meta: { hideNavigation: true, requiresAuth: true, roles: ['admin'] },
+      meta: { hideNavigation: true, requiresAuth: true, roles: EQUIPE },
       children: [
         {
           path: '',
           name: 'admin-dashboard-page',
+          meta: { roles: ACCES.tableauDeBord.lecture },
           component: DashboardHome
         },
         {
           path: 'clients',
           name: 'client-page',
+          meta: { roles: ACCES.clients.lecture },
           component: ClientComponents,
         },
         {
           path: 'commandes', // (/dashboard/admin/commandes)
           name: 'commandes-page',
+          meta: { roles: ACCES.commandes.lecture },
           component: CommandeComponent
         },
         // Données de base
         {
           path: 'categories', 
           name: 'categories-page',
+          meta: { roles: ACCES.donneesBase.lecture },
           component: CategoryManagement
         },
         {
           path: 'regles', 
           name: 'regles-page',
+          meta: { roles: ACCES.donneesBase.lecture },
           component: CompositionRuleManagement
         },
         {
           path: 'products',
           name: 'products-page',
+          meta: { roles: ACCES.donneesBase.lecture },
           component: ProductManagement
         },
         {
           path: 'formulas',
           name: 'formulas-page',
+          meta: { roles: ACCES.donneesBase.lecture },
           component: FormulaManagement
         },
         // Gestion de stock
         {
           path: 'saveStock',
           name: 'saveStock-page',
+          meta: { roles: ACCES.stock.lecture },
           component: AjouterEntreeStock
         },
         {
           path: 'inventaire',
           name: 'inventaire-page',
+          meta: { roles: ACCES.stock.lecture },
           component: VueGlobalInventory
         },
         {
           path: 'mouvement-stock',
           name: 'mouvement-stock-page',
+          meta: { roles: ACCES.stock.lecture },
           component: StockMovementsView
         },
         {
           path: 'bon-commande',
           name: 'bon-commande-page',
+          meta: { roles: ACCES.stock.lecture },
           component: PurchaseOrdersView
         },
         {
           path: 'posts',
           name: 'posts-page',
+          meta: { roles: ACCES.contenus.lecture },
           component: PostManagement
         }
       ]
@@ -133,23 +146,27 @@ const router = createRouter({
 
 
 router.beforeEach(async (to) => {
+  // Les pages publiques s'affichent sans attendre l'API : la session n'est vérifiée
+  // que pour les espaces protégés (connexions mobiles parfois lentes).
+  if (!to.meta.requiresAuth) return true;
+
   const authStore = useAuthStore();
 
-  // Si l'application vient d'être rechargée, on attend impérativement
-  // que le serveur valide ou rejette la session avant d'aller plus loin.
-  if (!authStore.isInitialized) {
+  // Après un rechargement, on attend que le serveur valide ou rejette la session
+  if (!authStore.isInitialized.value) {
     await authStore.checkSession();
   }
-  
-  // Vérification de l'authentification requise
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+
+  if (!authStore.isAuthenticated.value) {
     return { path: '/login' };
   }
 
-  // Vérification des restrictions de rôle
-  if (to.meta.roles && !authStore.isAdmin) {
-    // Redirige vers l'accueil ou une page 403 si le rôle ne correspond pas
-    return { path: '/' };
+  // Rôles autorisés : ceux de la page la plus précise (les enfants admin précisent ceux du parent)
+  const role = authStore.role.value;
+  const rolesAutorises = [...to.matched].reverse().find(r => r.meta.roles)?.meta.roles as Role[] | undefined;
+  if (rolesAutorises && (!role || !rolesAutorises.includes(role))) {
+    const destination = espaceParDefaut(role);
+    return destination === to.path ? { path: '/' } : { path: destination };
   }
 
   return true;

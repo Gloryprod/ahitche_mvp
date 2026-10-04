@@ -327,7 +327,7 @@ const telechargerRecu = (commande: Commande) => {
 onMounted(async () => {
   await authStore.checkSession();
   
-  if (!authStore.isAuthenticated) {
+  if (!authStore.isAuthenticated.value) {
     // 💡 Toast d'avertissement si l'utilisateur tente de forcer l'accès
     toast.error("Accès refusé. Veuillez vous connecter.");
     router.push('/');

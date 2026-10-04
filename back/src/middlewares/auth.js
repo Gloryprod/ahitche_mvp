@@ -39,3 +39,19 @@ exports.checkRole = (roles) => {
     }
   };
 };
+
+// Droits d'une section selon la méthode HTTP (à placer après checkRole, qui renseigne req.user.role) :
+// GET = lecture, toute autre méthode = écriture. Voir config/roles.js.
+exports.acces = ({ lecture, ecriture }) => {
+  return (req, res, next) => {
+    const roles = req.method === 'GET' ? lecture : ecriture;
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        message: req.method === 'GET'
+          ? 'Cette section ne fait pas partie de vos accès.'
+          : 'Votre rôle permet seulement de consulter cette section.'
+      });
+    }
+    next();
+  };
+};

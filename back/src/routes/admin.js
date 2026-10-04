@@ -9,13 +9,21 @@ const orderC = require('../controllers/admin/OrderController');
 const stockC = require('../controllers/admin/StockController');
 const invC = require('../controllers/admin/InventoryController');
 const postC = require('../controllers/admin/PostController');
-const { verifyToken, checkRole } = require('../middlewares/auth');
+const { verifyToken, checkRole, acces } = require('../middlewares/auth');
+const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
 // Importation du middleware Multer/Cloudinary
 const upload = require('../config/cloudinary');
 
-// Toutes les routes admin exigent une session valide ET le rôle admin
-router.use(verifyToken, checkRole(['admin']));
+// Toutes les routes admin exigent une session valide ET un rôle de l'équipe
+router.use(verifyToken, checkRole(EQUIPE));
+
+// Droits par section (lecture = GET, écriture = autres méthodes), voir config/roles.js
+router.use('/users', acces(ACCES.clients));
+router.use(['/commandes', '/orders'], acces(ACCES.commandes));
+router.use(['/categories', '/composition-rules', '/products', '/formulas'], acces(ACCES.donneesBase));
+router.use(['/posts', '/upload'], acces(ACCES.contenus));
+router.use(['/stock', '/inventory', '/mouvements', '/bons-commande'], acces(ACCES.stock));
 
 // Users
 router.get('/users', userC.index);

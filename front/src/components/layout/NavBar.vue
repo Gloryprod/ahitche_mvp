@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from 'vue-toastification'
+import { espaceParDefaut } from '@/config/roles'
 
 const router = useRouter()
 const isScrolled = ref(false)
@@ -54,12 +55,8 @@ const handleLogin = async () => {
 
     toast.success(data.message);
 
-    if(userRole === "admin"){
-      router.push('/dashboard/admin') // Redirige vers le tableau de bord admin
-    }
-    else{
-      router.push('/dashboard/user') // Redirige vers le tableau de bord utilisateur
-    }
+    // Client -> son espace ; équipe -> la première section accessible avec son rôle
+    router.push(espaceParDefaut(userRole))
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
   } finally {
