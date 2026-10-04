@@ -2,12 +2,16 @@
 import { ref } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 
+// 17 produits de base ; les quantités varient selon la formule et ne sont pas affichées
 const produitsInclus = ref([
   "Riz local", "Haricots", "Coquillettes", "Spaghetti",
-  "Couscous", "Gari", "Tapioca", "Huile végétale",
+  "Couscous", "Gari", "Tapioca", "Farine de maïs", "Huile végétale",
   "Tomates", "Oignons", "Sucre", "Lait concentré",
   "Œufs", "Épices Ahitché", "Assaisonnement", "Huile de palme"
 ])
+
+// Produits absents de la formule AHI Essentiel
+const exclusEssentiel = ["Huile de palme"]
 </script>
 
 <template>
@@ -148,16 +152,18 @@ const produitsInclus = ref([
       </div>
 
       <div class="bg-white rounded-3xl p-8 border border-creme2 text-center max-w-4xl mx-auto shadow-xs">
-        <p class="text-foret font-bold mb-6 font-body">Composition adaptée à vos besoins, plus de 16 produits garantis</p>
+        <p class="text-foret font-bold mb-2 font-body">Composition adaptée à vos besoins : {{ produitsInclus.length }} produits de base</p>
+        <p class="text-gris text-sm mb-6">Les quantités varient selon la formule et la taille de votre foyer.</p>
         <div class="flex flex-wrap justify-center gap-2">
-          <span 
-            v-for="produit in produitsInclus" 
+          <span
+            v-for="produit in produitsInclus"
             :key="produit"
             class="bg-creme text-foret text-sm font-medium px-4 py-2 rounded-full border border-creme2/60 transition-colors duration-200 hover:bg-creme2"
           >
-            {{ produit }}
+            {{ produit }}<span v-if="exclusEssentiel.includes(produit)" aria-hidden="true">*</span>
           </span>
         </div>
+        <p class="text-gris text-xs mt-5">* Non incluse dans la formule AHI Essentiel.</p>
       </div>
     </div>
   </section>

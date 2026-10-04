@@ -160,7 +160,7 @@ onUnmounted(() => {
       <div class="flex items-center justify-center gap-5 flex-wrap">
         <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span>🚀</span> Livraison 72h</div>
         <div class="w-px h-5 bg-white/18 hidden sm:block"></div>
-        <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span>📦</span> Composition adaptée à vos besoins, plus de 16 produits garantis</div>
+        <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span>📦</span> Composition adaptée à vos besoins, 17 produits de base</div>
         <div class="w-px h-5 bg-white/18 hidden sm:block"></div>
         <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span>🛡️</span> Satisfait ou compensé</div>
       </div>
