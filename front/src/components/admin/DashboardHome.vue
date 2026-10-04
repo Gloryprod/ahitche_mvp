@@ -77,17 +77,34 @@ const inventaireRaw = computed((): InventoryItem[] => {
 
 const stockAlerts = computed(() => inventaireRaw.value.filter(item => item.enAlerte))
 
-// --- 4. GESTION DES RENOUVELLEMENTS (Livrés + 30j -> Alerte si <= 5j) ---
+// --- 4. GESTION DES RENOUVELLEMENTS ---
+// Relance si le client ne se manifeste pas : 14 jours après la livraison (Essentiel, Fraîcheur) ou 30 jours
+// (autres packs), selon le cycle enregistré sur la formule ; alerte à J-5.
+const CYCLES_PAR_DEFAUT: Record<string, number> = { 'ahi-essentiel': 14, 'ahi-fraicheur': 14 }
+const cycleJours = (formuleSlug: string): number => {
+  const index = PACKS_CONFIG.findIndex(pack => `ahi-${pack.key}` === formuleSlug)
+  return formulaQueries.value[index]?.data?.formule?.cycleJours ?? CYCLES_PAR_DEFAUT[formuleSlug] ?? 30
+}
+
 const upcomingRenewals = computed(() => {
   const now = new Date()
-  
-  return ordersList.value
+  const commandesActives = ordersList.value.filter(o => o && o.deletedAt == null)
+
+  // Dernière commande de chaque client (la liste arrive de la plus récente à la plus ancienne) :
+  // une relance n'a de sens que s'il n'a rien commandé depuis
+  const derniereParClient = new Map<string, Commande>()
+  for (const order of commandesActives) {
+    const cle = order.userId ?? order.clientName
+    if (!derniereParClient.has(cle)) derniereParClient.set(cle, order)
+  }
+
+  return [...derniereParClient.values()]
     .filter(order => order.statut === 'Livrée' && order.dateLivraison)
     .map(order => {
       const deliveryDate = new Date(order.dateLivraison)
-      // Échéance de l'abonnement à +30 jours
+      // Échéance du cycle de la formule
       const expiryDate = new Date(deliveryDate)
-      expiryDate.setDate(expiryDate.getDate() + 30)
+      expiryDate.setDate(expiryDate.getDate() + cycleJours(order.formuleSlug))
 
       // Calcul de la différence en jours
       const diffTime = expiryDate.getTime() - now.getTime()

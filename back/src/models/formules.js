@@ -57,6 +57,12 @@ const formuleSchema = new mongoose.Schema({
     enum: ['actif', 'inactif'],
     default: 'actif'
   },
+  // Délai de relance après livraison si le client ne se manifeste pas (alerte à J-5 dans le tableau de bord)
+  cycleJours: {
+    type: Number,
+    default: 30,
+    min: 1
+  },
   // Formule annoncée mais pas encore ouverte : visible côté client, non commandable
   bientotDisponible: {
     type: Boolean,

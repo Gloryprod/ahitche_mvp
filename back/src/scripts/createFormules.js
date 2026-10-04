@@ -19,6 +19,7 @@ const formulesData = [
     ancienPrix: 24000,
     prixActuel: 10800,
     estRecommandee: false,
+    cycleJours: 14, // Relance 14 jours après la livraison
     bientotDisponible: false,
     lienWhatsApp: "https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20ESSENTIEL%20(10%20800%20FCFA)."
   },
@@ -33,6 +34,7 @@ const formulesData = [
     ancienPrix: 50000,
     prixActuel: 22500,
     estRecommandee: true,
+    cycleJours: 30, // Relance 30 jours après la livraison
     bientotDisponible: false,
     lienWhatsApp: "https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20%C3%89QUILIBR%C3%89%20(22%20500%20FCFA)."
   },
@@ -47,6 +49,7 @@ const formulesData = [
     ancienPrix: 110000,
     prixActuel: 50300,
     estRecommandee: false,
+    cycleJours: 30, // Relance 30 jours après la livraison
     bientotDisponible: false,
     lienWhatsApp: "https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20CONFORT%20(50%20300%20FCFA)."
   },
@@ -61,6 +64,7 @@ const formulesData = [
     ancienPrix: 125000,
     prixActuel: 105000, // Conforme au simulateur v4
     estRecommandee: false,
+    cycleJours: 30, // Relance 30 jours après la livraison
     bientotDisponible: true, // Ouverture prévue après le lancement
     lienWhatsApp: "https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20R%C3%89SERVE%20(105%20000%20FCFA)."
   },
@@ -75,6 +79,7 @@ const formulesData = [
     ancienPrix: 6000,
     prixActuel: 4850, // Base brute minimale du panier frais v4
     estRecommandee: false,
+    cycleJours: 14, // Relance 14 jours après la livraison
     bientotDisponible: true, // Ouverture prévue après le lancement
     lienWhatsApp: "https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20en%20savoir%20plus%20et%20composer%20ma%20formule%20AHI%20FRA%C3%8ECHEUR."
   }
