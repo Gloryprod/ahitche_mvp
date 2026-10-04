@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/stores/api'
-import { X, User, CheckCircle2, ArrowRight, Plus, Minus, Trash2, PlusCircle } from 'lucide-vue-next'
+import { X, User, CheckCircle2, ArrowRight, Plus, Minus, Trash2, PlusCircle, Layers } from 'lucide-vue-next'
 import type { Client, Product, Commande } from '@/type'
 
 interface AdjustedItem {

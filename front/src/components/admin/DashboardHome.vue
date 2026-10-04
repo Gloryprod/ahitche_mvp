@@ -490,7 +490,7 @@ const getStatutClass = (statut: Commande['statut']) => {
           <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
             <div class="flex items-center justify-between border-b border-gray-100 pb-2">
               <h2 class="font-bold text-noir text-sm">Dernières commandes</h2>
-              <router-link to="/commandes" class="text-[10px] text-foret font-bold hover:underline">Voir tout →</router-link>
+              <router-link to="/dashboard/admin/commandes" class="text-[10px] text-foret font-bold hover:underline">Voir tout →</router-link>
             </div>
 
             <table class="w-full text-left">

@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { useQuery, keepPreviousData } from '@tanstack/vue-query'
 import type { Client } from '@/type'
 import api from '@/stores/api'
+import { Search } from 'lucide-vue-next'
 
 // Interface pour la réponse paginée de ton API backend
 interface PaginatedClientsResponse {
