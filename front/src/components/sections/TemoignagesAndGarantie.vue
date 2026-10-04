@@ -1,27 +1,5 @@
 <script setup lang="ts">
 import BaseButton from '../ui/BaseButton.vue'
-
-// Prêt pour la v2 : Décommenter pour injecter de vrais témoignages
-/*
-const temoignages = [
-  {
-    prenom: "Amina",
-    quartier: "Calavi Kpota",
-    formule: "AHI ÉQUILIBRÉ",
-    note: 5,
-    citation: "Ils m'ont livré à Kpota en moins de 24h. Tout était complet et bien emballé !",
-    couleur: "#1A5C38"
-  },
-  {
-    prenom: "Kofi",
-    quartier: "Godomey",
-    formule: "AHI ESSENTIEL",
-    note: 5,
-    citation: "Enfin un service sérieux à Abomey-Calavi. Plus besoin de courir au marché.",
-    couleur: "#2E7D4F"
-  }
-]
-*/
 </script>
 
 <template>

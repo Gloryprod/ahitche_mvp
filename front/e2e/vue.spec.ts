@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test'
 
-// See here how to get started:
-// https://playwright.dev/docs/intro
-test('visits the app root url', async ({ page }) => {
+// Test de fumée : la page d'accueil s'affiche avec son titre principal et les 3 formules
+test("affiche la page d'accueil", async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('h1')).toHaveText('You did it!')
+  await expect(page.locator('h1')).toContainText('Votre alimentation')
+  await expect(page.locator('#formules')).toContainText('AHI ESSENTIEL')
+  await expect(page.locator('#formules')).toContainText('AHI ÉQUILIBRÉ')
+  await expect(page.locator('#formules')).toContainText('AHI CONFORT')
 })

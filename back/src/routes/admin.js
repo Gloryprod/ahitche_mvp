@@ -1,7 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/user');
-const Category = require('../models/category');
 const userC = require('../controllers/admin/UserController');
 const categoryC = require('../controllers/admin/CategoryController');
 const compositionRuleC = require('../controllers/admin/CompositionRuleController');
