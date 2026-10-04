@@ -5,6 +5,13 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from 'vue-toastification'
 import { espaceParDefaut } from '@/config/roles'
+import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
+
+// Liens du menu (la FAQ s'ajoutera avec sa section)
+const LIENS = [
+  { href: '#formules', texte: 'Formules' },
+  { href: '#comment', texte: 'Comment ça marche' },
+]
 
 const router = useRouter()
 const isScrolled = ref(false)
@@ -15,6 +22,7 @@ const toast = useToast()
 
 // Utilisateur connecté : lien direct vers son espace (sinon, bouton « Connexion »)
 const monEspace = computed(() => authStore.isAuthenticated.value ? espaceParDefaut(authStore.role.value) : null)
+const libelleCompte = computed(() => monEspace.value ? 'Mon espace' : 'Connexion')
 
 const isLoginModalOpen = ref(false)
 const isLoading = ref(false)
@@ -121,80 +129,72 @@ onUnmounted(() => {
         <span class="hidden min-[400px]:inline"><span :class="isScrolled ? 'text-foret' : 'text-white'">Ahi</span><span :class="isScrolled ? 'text-or-deep' : 'text-or'">tché</span></span>
       </a>
 
-      <!-- Liens Desktop -->
+      <!-- Liens (ordinateur) -->
       <div class="hidden md:flex items-center gap-7">
-        <a 
-          v-for="(link, idx) in [
-            { href: '#probleme', text: 'Pourquoi Ahitché ?' },
-            { href: '#formules', text: 'Formules' },
-            { href: '#comment', text: 'Comment ça marche' },
-            { href: '#variables', text: 'Cette semaine' },
-            { href: '/blog', text: 'Blog / Actualités' }
-          ]" 
-          :key="idx"
-          :href="link.href"
-          :class="[
-            'text-sm font-semibold transition-colors duration-250',
-            isScrolled ? 'text-gris hover:text-foret' : 'text-white/80 hover:text-white'
-          ]"
+        <a
+          v-for="lien in LIENS"
+          :key="lien.href"
+          :href="lien.href"
+          :class="['text-sm font-semibold transition-colors duration-250', isScrolled ? 'text-gris hover:text-foret' : 'text-white/85 hover:text-white']"
         >
-          {{ link.text }}
+          {{ lien.texte }}
         </a>
       </div>
 
-      <!-- Actions de droite (WhatsApp + Commander) -->
-      <div class="flex items-center gap-3">
-
+      <!-- Actions : compte (discret) et commande (toujours visible) -->
+      <div class="flex items-center gap-1 sm:gap-2">
         <!-- Connecté : accès direct à son espace ; visiteur : fenêtre de connexion -->
-        <RouterLink
-          v-if="monEspace"
-          :to="monEspace"
-          class="cursor-pointer flex items-center bg-or text-foret px-5 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all duration-250 hover:bg-or-deep hover:-translate-y-px shadow-md"
+        <component
+          :is="monEspace ? 'RouterLink' : 'button'"
+          v-bind="monEspace ? { to: monEspace } : { type: 'button' }"
+          @click="!monEspace && openLoginModal()"
+          :aria-label="libelleCompte"
+          :class="[
+            'cursor-pointer inline-flex items-center justify-center gap-2 min-w-11 min-h-11 px-2 md:px-3 rounded-full text-sm font-semibold transition-colors duration-250',
+            isScrolled ? 'text-foret hover:bg-foret/8' : 'text-white hover:bg-white/12'
+          ]"
         >
-          Mon espace
-        </RouterLink>
-        <button
-          v-else
-          type="button"
-          @click="openLoginModal"
-          class="cursor-pointer flex items-center bg-or text-foret px-5 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all duration-250 hover:bg-or-deep hover:-translate-y-px shadow-md"
-        >
-          Connexion
-        </button>
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          <span class="hidden md:inline">{{ libelleCompte }}</span>
+        </component>
 
-        <!-- Burger Menu (Mobile) -->
-        <button 
-          class="flex md:hidden flex-col justify-center gap-1.25 w-10 h-10 bg-transparent border-none cursor-pointer p-1.5 rounded-lg transition-colors hover:bg-white/10" 
+        <a
+          :href="lienWhatsApp(MESSAGES_WHATSAPP.commande)"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center min-h-11 bg-or text-noir px-4 sm:px-5 rounded-full font-bold text-sm whitespace-nowrap transition-all duration-250 hover:bg-or-deep active:scale-97 shadow-md"
+        >
+          Commander
+        </a>
+
+        <!-- Menu mobile -->
+        <button
+          type="button"
+          class="flex md:hidden flex-col items-center justify-center gap-1.25 w-11 h-11 bg-transparent border-none cursor-pointer rounded-lg transition-colors hover:bg-white/10"
           @click="toggleMenu"
           :aria-expanded="isMenuOpen ? 'true' : 'false'"
           aria-label="Menu"
         >
           <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', isScrolled ? 'bg-foret' : 'bg-white', isMenuOpen ? 'w-[22px] translate-y-[7px] rotate-45' : 'w-[22px]']"></span>
-          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', isScrolled ? 'bg-foret' : 'bg-white', isMenuOpen ? 'opacity-0 scale-x-0' : 'w-[18px]']"></span>
-          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', isScrolled ? 'bg-foret' : 'bg-white', isMenuOpen ? 'w-[22px] -translate-y-[7px] rotate-45' : 'w-[22px]']"></span>
+          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', isScrolled ? 'bg-foret' : 'bg-white', isMenuOpen ? 'opacity-0 scale-x-0' : 'w-[22px]']"></span>
+          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', isScrolled ? 'bg-foret' : 'bg-white', isMenuOpen ? 'w-[22px] -translate-y-[7px] -rotate-45' : 'w-[22px]']"></span>
         </button>
       </div>
     </div>
 
-    <!-- Menu Mobile Dropdown -->
-    <div 
-      v-if="isMenuOpen" 
-      class="md:hidden fixed top-[66px] left-0 right-0 bg-creme/98 backdrop-blur-md p-6 flex flex-col gap-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] animate-[slideDown_0.25s_ease] z-99"
+    <!-- Menu mobile déroulant -->
+    <div
+      v-if="isMenuOpen"
+      class="md:hidden fixed top-[70px] left-0 right-0 bg-creme/98 backdrop-blur-md px-6 py-4 flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.12)] animate-[slideDown_0.25s_ease] z-99"
     >
-      <a 
-        v-for="(link, idx) in [
-          { href: '#probleme', text: 'Pourquoi Ahitché ?' },
-          { href: '#formules', text: 'Formules' },
-          { href: '#comment', text: 'Comment ça marche' },
-          { href: '#variables', text: 'Cette semaine' },
-          { href: '/blog', text: 'Blog / Actualités' }
-        ]" 
-        :key="idx"
-        :href="link.href" 
+      <a
+        v-for="lien in LIENS"
+        :key="lien.href"
+        :href="lien.href"
         @click="closeMenu"
-        class="text-noir text-base py-3 border-b border-foret/7 last:border-none font-semibold"
+        class="text-noir text-base py-3 border-b border-foret/7 font-semibold"
       >
-        {{ link.text }}
+        {{ lien.texte }}
       </a>
     </div>
   </nav>
