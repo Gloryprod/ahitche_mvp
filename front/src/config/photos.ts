@@ -28,7 +28,7 @@ export const PHOTOS = {
   fermeRecolte: {
     sujet: 'Mains qui récoltent ou trient des légumes',
     cadrage: 'Gros plan',
-    dimensions: '1200 × 1200 px (1:1)',
+    dimensions: '1600 × 1200 px (4:3)',
     ratio: '4 / 3',
   },
   fermePreparation: {
@@ -46,7 +46,7 @@ export const PHOTOS = {
   fermeReception: {
     sujet: 'Déballage du pack dans une cuisine',
     cadrage: 'Plan moyen',
-    dimensions: '1200 × 1200 px (1:1)',
+    dimensions: '1600 × 1200 px (4:3)',
     ratio: '4 / 3',
   },
 } satisfies Record<string, EmplacementPhoto>
