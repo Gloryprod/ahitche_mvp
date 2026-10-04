@@ -134,7 +134,7 @@ onUnmounted(() => {
     <!-- Contenu -->
     <div class="relative z-2 max-w-175 mx-auto text-center">
       <div class="inline-flex items-center gap-2 bg-white/12 backdrop-blur-md border border-white/20 text-white/92 text-xs font-semibold px-4 py-1.5 rounded-full mb-7">
-        <span class="w-1.75 h-1.75 bg-[#4ade80] rounded-full shrink-0 shadow-[0_0_0_3px_rgba(74,222,128,0.3)] animate-[pulseHalo_2s_infinite]"></span>
+        <span class="w-1.75 h-1.75 bg-[#4ade80] rounded-full shrink-0 shadow-[0_0_0_3px_rgba(74,222,128,0.3)] motion-safe:animate-[pulseHalo_2s_infinite]"></span>
         Livraisons actives à Cotonou & Abomey-Calavi.
       </div>
 
@@ -158,16 +158,16 @@ onUnmounted(() => {
       </div>
 
       <div class="flex items-center justify-center gap-5 flex-wrap">
-        <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span>🚀</span> Livraison 72h</div>
+        <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span aria-hidden="true">🚀</span> Livraison 72h</div>
         <div class="w-px h-5 bg-white/18 hidden sm:block"></div>
-        <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span>📦</span> Composition adaptée à vos besoins, 17 produits de base</div>
+        <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span aria-hidden="true">📦</span> Composition adaptée à vos besoins, 17 produits de base</div>
         <div class="w-px h-5 bg-white/18 hidden sm:block"></div>
-        <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span>🛡️</span> Satisfait ou compensé</div>
+        <div class="flex items-center gap-1.5 text-white/68 text-xs font-medium"><span aria-hidden="true">🛡️</span> Satisfait ou compensé</div>
       </div>
     </div>
 
     <div class="absolute bottom-7 left-1/2 -translate-x-1/2 z-2">
-      <div class="w-px h-11 bg-linear-to-b from-white/45 to-transparent mx-auto animate-[scrollHint_2s_ease-in-out_infinite]"></div>
+      <div class="w-px h-11 bg-linear-to-b from-white/45 to-transparent mx-auto motion-safe:animate-[scrollHint_2s_ease-in-out_infinite]"></div>
     </div>
   </section>
 </template>

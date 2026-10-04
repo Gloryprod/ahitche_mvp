@@ -70,7 +70,7 @@ const exclusEssentiel = ["Huile de palme"]
 
         <div class="relative flex flex-col justify-between bg-white rounded-3xl p-8 border-2 border-or shadow-xl transition-all duration-300 hover:shadow-2xl md:-translate-y-4">
           <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-or text-foret text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
-            ⭐ Le plus choisi
+            <span aria-hidden="true">⭐</span> Le plus choisi
           </div>
           <div>
             <div class="flex items-center gap-4 mb-4 mt-2">

@@ -37,8 +37,8 @@ const getWhatsAppLink = () => {
           :key="idx"
           class="bg-white border border-foret/6 rounded-2xl p-5 flex flex-col items-center justify-center text-center transition-all duration-250 hover:-translate-y-1 hover:shadow-md"
         >
-          <div class="text-4xl mb-3.5 select-none">{{ prod.emoji }}</div>
-          <h4 class="text-sm font-bold text-noir mb-1.5 leading-snug">{{ prod.nom }}</h4>
+          <div class="text-4xl mb-3.5 select-none" aria-hidden="true">{{ prod.emoji }}</div>
+          <h3 class="text-sm font-bold text-noir mb-1.5 leading-snug">{{ prod.nom }}</h3>
           <div class="text-xs font-extrabold text-savane bg-savane/8 px-2.5 py-1 rounded-full">{{ prod.prix }}</div>
         </div>
       </div>

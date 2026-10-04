@@ -28,7 +28,7 @@
         </div>
 
         <div>
-          <h4 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Horaires</h4>
+          <h3 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Horaires</h3>
           <p class="text-gris text-sm leading-relaxed">
             Lundi – Samedi<br />
             9h00 – 18h00
@@ -36,7 +36,7 @@
         </div>
 
         <div>
-          <h4 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Zone de livraison</h4>
+          <h3 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Zone de livraison</h3>
           <p class="text-gris text-sm leading-relaxed">
             Cotonou &amp; Abomey-Calavi<br />
             <span class="text-savane font-medium">Calavi Kpota (zone prioritaire)</span>
@@ -44,7 +44,7 @@
         </div>
 
         <div>
-          <h4 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Formules</h4>
+          <h3 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Formules</h3>
           <ul class="space-y-2 text-sm">
             <li>
               <a href="#formules" class="text-gris hover:text-savane transition-colors">AHI Essentiel</a>

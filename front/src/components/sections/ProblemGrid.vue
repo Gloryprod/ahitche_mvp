@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import BaseBadge from '../ui/BaseBadge.vue'
-import { motion } from "motion-v"
+import { motion, MotionConfig } from "motion-v"
 
 
 const problemes = [
@@ -34,7 +34,8 @@ const problemes = [
         </h2>
       </div>
 
-      <!-- Grille des 3 Problèmes -->
+      <!-- Grille des 3 Problèmes (sans zoom si l'utilisateur a demandé à réduire les animations) -->
+      <MotionConfig reduced-motion="user">
       <div class="grid md:grid-cols-3 gap-7 mb-20">
         <motion.div 
           :initial="{ opacity: 0, scale: 0 }"
@@ -47,11 +48,12 @@ const problemes = [
           :key="idx"
           class="bg-creme/60 border border-foret/5 rounded-2xl p-8 transition-all duration-250 hover:shadow-md hover:border-foret/15"
         >
-          <div class="text-3xl mb-4.5 select-none">{{ p.emoji }}</div>
+          <div class="text-3xl mb-4.5 select-none" aria-hidden="true">{{ p.emoji }}</div>
           <h3 class="text-lg font-bold text-noir mb-2.5">{{ p.titre }}</h3>
           <p class="text-sm text-gris leading-relaxed">{{ p.description }}</p>
         </motion.div>
       </div>
+      </MotionConfig>
 
       <!-- Le Bloc Solution (L'alignement Ahitché) -->
       <div class="bg-foret rounded-3xl p-8 md:p-12 text-white relative overflow-hidden shadow-xl">

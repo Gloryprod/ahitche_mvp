@@ -57,8 +57,11 @@
 }
 
 /* Base resets & smooth behaviors */
-html {
-  scroll-behavior: smooth;
+/* Défilement doux seulement si l'utilisateur n'a pas demandé à réduire les animations */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 body {
   @apply bg-creme text-noir font-body antialiased overflow-x-hidden;

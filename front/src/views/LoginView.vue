@@ -3,7 +3,7 @@
         <div class="hidden md:block md:w-1/2 relative bg-foret min-h-112.5">
             <img 
               src="/beautiful-couple-looking-their-laptop.jpg" 
-              alt="Plat Ahitché" 
+              alt="" 
               class="w-full h-full object-cover"
             />
             <div class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-8 text-white">
