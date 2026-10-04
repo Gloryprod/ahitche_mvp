@@ -28,17 +28,25 @@ npm run test:e2e     # playwright
 npm run dev          # nodemon index.js
 npm start
 node src/scripts/createAdmin.js     # crée l'admin (ADMIN_PASSWORD dans .env)
-node src/scripts/createFormules.js  # upsert des formules
+node src/scripts/createFormules.js  # upsert des formules (prix, « Bientôt », cycle de relance)
+node src/scripts/migrerDonnees.js   # migration idempotente (téléphone, fournisseurs, zones, statuts, taux)
+STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <role>  # compte de l'équipe
 ```
+Les transactions MongoDB (livraison + sortie de stock FIFO) exigent un replica set : c'est le cas sur Atlas ; en local, utiliser `MongoMemoryReplSet` ou un replica set à un nœud.
 Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL`, `CLOUDINARY_*`, `ADMIN_PASSWORD`, `NODE_ENV`, `PORT`.
 
 ## Structure
 - `front/src/views/` : pages (accueil, login, register, reset, blog, dashboards user et admin).
 - `front/src/components/sections/` : sections de la page d'accueil (Hero, Formules, Comment ça marche…).
-- `front/src/components/admin/` : back-office (commandes, stock, produits, formules, posts).
-- `front/src/stores/auth.ts` : état d'authentification (composable, pas un store Pinia). `stores/api.ts` : instance axios avec un intercepteur 401.
-- `back/src/routes/` : `auth.js` (client), `admin.js` (back-office), `public.js` (blog).
-- `back/src/controllers/`, `models/`, `services/` : logique Express et Mongoose.
+- `front/src/components/admin/` : back-office (commandes, stock, produits, formules, posts) et les sections Gestion : `prestataires/`, `logistique/`, `finances/`, `simulateurs/`, `nutrition/` (chargées à la demande).
+- `front/src/components/client/` : blocs de l'espace client (suivi alimentaire).
+- `front/src/config/roles.ts` et `back/src/config/roles.js` : rôles (`user`, `admin`, `gestionnaire`, `comptable`, `nutritionniste`) et droits lecture/écriture par section, à garder synchronisés. Le serveur fait foi (middleware `acces()`).
+- `front/src/config/commandes.ts` et `back/src/services/commandeService.js` : statuts de commande et passages autorisés.
+- `front/src/stores/auth.ts` : état d'authentification (composable, pas un store Pinia ; `user`, `role`… sont des refs/computed, donc à lire avec `.value`). `stores/api.ts` : instance axios avec un intercepteur 401.
+- `back/src/routes/` : `auth.js` (client), `admin.js` (back-office, droits par section), `public.js` (blog, zones).
+- `back/src/controllers/`, `models/`, `services/` : logique Express et Mongoose. `services/compositionService.js` calcule la composition d'un pack (Formules, Logistique, Simulateurs).
+- `back/src/data/zones-livraison.json` : 22 zones (arrondissements de Cotonou et d'Abomey-Calavi) et leurs quartiers.
+- `docs/conception-menu-admin.md` : décisions métier du back-office (statuts, paiement, relances, rôles, APDP).
 
 ## Conventions
 - Le code, les commentaires et les messages sont en français. On garde le style existant (`async function` + `module.exports` côté back, `<script setup lang="ts">` côté front).
@@ -47,3 +55,7 @@ Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`,
 - Prix de vente = `prixCommercial` s'il est fixé par l'admin, sinon `prixActuel`. `GET /api/admin/formulas/:pack` est en lecture seule et renvoie la valeur issue du catalogue dans `prixCalcule`.
 - Une commande client est enregistrée par le serveur, qui fixe lui-même le prix et la référence `CMD-xxx` (`orderReferenceService`). Les packs `bientotDisponible` (Réserve, Fraîcheur) sont visibles mais ne peuvent pas être commandés.
 - Liste commune : 17 produits de base. L'Essentiel exclut l'huile de palme. Les quantités par pack ne sont pas affichées.
+- Commande : En attente → Confirmée → En préparation → En livraison → Livrée (paiement Mobile Money à la livraison, référence obligatoire ; Espèces/Acompte avec note) ou Échec ; Annulée. Livraison > 24 h après le créneau = compensation remise à la commande suivante.
+- Finances : toute action sur les dépenses, lignes budgétaires, taux et prix de formule passe par `journaliser()` (journal des modifications). Une dépense payée (justificatif obligatoire) ne se modifie plus.
+- Nutrition : aucune donnée de santé ni conviction religieuse sans autorisation préalable de l'APDP (Code du numérique, art. 394).
+- Écrans admin : vérifier l'affichage à 375 px ; la Logistique est conçue d'abord pour le téléphone.

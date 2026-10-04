@@ -1,6 +1,8 @@
 # Conception du menu admin : décisions validées
 
-Ce document réunit les réponses du 2026-10-04 aux 41 questions de conception, complétées le même jour (zones, affichage « par mois », modes de paiement). Il sert de référence pour créer les routes et les écrans. Rien n'est encore développé.
+Ce document réunit les réponses du 2026-10-04 aux 41 questions de conception, complétées le même jour (zones, affichage « par mois », modes de paiement). Il sert de référence pour les routes et les écrans.
+
+**Statut : développé le 2026-10-04**, dans l'ordre prévu (lot 0 puis Prestataires, Logistique, Finances, Simulateurs, Nutrition). La mise en production et les points restants sont décrits à la section 5.
 
 ## 1. Règles métier transverses
 
@@ -166,3 +168,39 @@ Sources :
   - Fraîcheur affiche encore « Par semaine » et Réserve « Mensuel / Bi-mensuel ».
 - **Décidé :** les modes « Espèces » et « Acompte » sont conservés pour les cas particuliers (voir la section Paiement).
 - Le délai de la garantie est maintenant fixé (24 h après le créneau confirmé). Le texte du site (« livrée avec plus de 24h de retard ») peut le préciser.
+
+## 5. Mise en production et suite
+
+### 5.1 Étapes de déploiement (dans cet ordre)
+
+1. **Back** : `npm install` (ajout de `helmet`), puis vérifier les variables d'environnement : `NODE_ENV=production` (cookie `Secure`), `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL` et `CLOUDINARY_*` (aussi utilisées pour les justificatifs des Finances).
+2. **Migration des données**, à lancer une fois, et relançable sans risque : `node src/scripts/migrerDonnees.js`. Elle :
+   - remplace l'index unique du téléphone (les comptes sans téléphone ne se bloquent plus) ;
+   - crée les fiches des 3 fournisseurs et y relie les lots et bons de commande ;
+   - crée les 22 zones et rattache les clients dont le quartier est reconnu ;
+   - convertit « Livré » en « Livrée » et les commandes supprimées en « Annulée » ;
+   - enregistre le taux USD/FCFA 571.
+3. **Référentiel des formules** : `node src/scripts/createFormules.js`. Il restaure les prix officiels, l'état « Bientôt » de Réserve et Fraîcheur, le cycle de relance (14 ou 30 jours) et l'affichage « par mois ».
+4. **Comptes de l'équipe** : `STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <gestionnaire|comptable|nutritionniste|admin>`.
+5. **Front** : déployer après le back (le front envoie désormais `fournisseurId`, `zone`, etc.).
+6. **Saisies de départ** dans le back-office :
+   - livreurs dans Prestataires ;
+   - tarifs de course par zone dans Logistique > Zones ;
+   - budget de la convention par import CSV dans Finances.
+
+### 5.2 Points restants
+
+- **APDP** : la Nutrition ne collecte aucune donnée de santé. Il reste à vérifier auprès de l'APDP la formalité applicable aux données ordinaires déjà traitées (déclaration), et à demander l'autorisation avant d'ajouter allergies, objectifs de santé ou interdits religieux.
+- **Quartiers** : confirmer le rattachement de « Calavi Kpota » et relire l'orthographe de la liste (point 4.1).
+- **Lots de stock antérieurs** : ils n'ont pas de dépense d'achat associée. Il faut les saisir à la main dans Finances > Exploitation si besoin.
+- **Écrans existants en lecture seule** : en dehors des nouvelles sections et de Commandes, les écrans existants (stock, données de base) affichent encore leurs boutons d'écriture au comptable. Le serveur refuse l'action (403) avec un message, mais il faudrait masquer ces boutons.
+- **Hors périmètre de ce développement** (voir l'audit) :
+  - images de 11 Mo ;
+  - bundle principal de 1,2 Mo ;
+  - accessibilité 🟠 (`lang`, contrastes, labels) ;
+  - polices de la charte ;
+  - SEO local ;
+  - limitation des tentatives de connexion ;
+  - nom complet unique, qui bloque les homonymes à l'inscription ;
+  - texte « x / 16 produits » de l'écran Formules ;
+  - cycle de 14 jours de l'Essentiel alors que l'offre est affichée « par mois ».
