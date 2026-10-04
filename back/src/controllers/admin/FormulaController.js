@@ -180,18 +180,11 @@ async function getPackDetails(req, res) {
       ? packItems.filter(item => item.quantity > 0)
       : packItems;
 
-    // 4. Calculer dynamiquement l'ancien prix de manière proportionnelle
-    const ratioAncienPrix = formuleData.prixActuel > 0 ? (formuleData.ancienPrix / formuleData.prixActuel) : 1;
-    const dynamicAncienPrix = Math.round(totalPackPrice * ratioAncienPrix);
-
-    // 5. MODIFICATION ET SAUVEGARDE EN BASE DE DONNÉES
-    formuleData.prixActuel = totalPackPrice;
-    formuleData.ancienPrix = dynamicAncienPrix;
-    
-    await formuleData.save();
-
+    // Lecture seule : le prix de vente (prixActuel / prixCommercial) n'est jamais modifié ici.
+    // La valeur issue du catalogue est renvoyée à part, dans prixCalcule.
     return res.status(200).json({
       formule: formuleData,
+      prixCalcule: totalPackPrice,
       itemCount: packItems.filter(item => item.quantity > 0).length,
       items: filteredPackItems
     });
@@ -217,8 +210,12 @@ async function updateFormulaPrice(req, res) {
 
     // Mise à jour de la formule en BDD MongoDB
     const updatedFormula = await Formule.findOne(
-      { slug: `ahi-${type}`, statut: 'actif' },      
+      { slug: `ahi-${type}`, statut: 'actif' },
     );
+
+    if (!updatedFormula) {
+      return res.status(404).json({ success: false, message: 'Formule introuvable' });
+    }
 
     updatedFormula.prixCommercial = prixFixe;
     await updatedFormula.save();

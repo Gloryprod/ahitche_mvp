@@ -128,7 +128,7 @@ const getPackColorClass = (pack: string) => {
           <div>
             <span class="text-[10px] block opacity-70">VALEUR FINANCIÈRE DU PACK</span>
             <h2 class="text-2xl font-black tracking-tight font-mono">
-              {{ data?.formule.prixActuel.toLocaleString() }} <span class="text-sm font-bold">FCFA</span>
+              {{ data?.prixCalcule?.toLocaleString() }} <span class="text-sm font-bold">FCFA</span>
             </h2>
           </div>
 
@@ -170,6 +170,7 @@ interface PackDetailsResponse {
   formule: Formule;
   itemCount: number;
   items: ProductItem[];
+  prixCalcule: number; // Valeur du pack calculée depuis le catalogue (le prix de vente reste formule.prixActuel)
 }
 
 const queryClient = useQueryClient()
@@ -357,8 +358,8 @@ const getPeriodText = computed(() => {
           <div>
             <span class="text-[10px] block opacity-70">VALEUR FINANCIÈRE DU PACK (GÉNÉRÉE)</span>
             <h2 class="text-2xl font-black tracking-tight font-mono">
-              <span v-if="activePack === 'fraicheur' && data?.formule.prixActuel === 0" class="text-lg">À définir après pilote</span>
-              <span v-else>{{ data?.formule.prixActuel.toLocaleString() }} <span class="text-sm font-bold">FCFA</span></span>
+              <span v-if="activePack === 'fraicheur' && data?.prixCalcule === 0" class="text-lg">À définir après pilote</span>
+              <span v-else>{{ data?.prixCalcule?.toLocaleString() }} <span class="text-sm font-bold">FCFA</span></span>
             </h2>
           </div>
 

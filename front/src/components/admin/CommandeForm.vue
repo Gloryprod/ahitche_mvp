@@ -275,7 +275,7 @@ const submitOrder = async () => {
           <div v-if="selectedPackSlug && packDetails" class="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-2xs">
             <div class="px-3 py-2 bg-gray-100/70 font-semibold text-gray-500 flex justify-between items-center border-b">
               <span class="flex items-center gap-1"><Layers class="w-3.5 h-3.5" /> Dotation auto ({{ packDetails.itemCount }} produits)</span>
-              <strong class="font-mono text-noir font-bold">{{ packDetails.formule.prixActuel.toLocaleString() }} F</strong>
+              <strong class="font-mono text-noir font-bold">{{ packDetails.prixCalcule?.toLocaleString() }} F</strong>
             </div>
             <div class="max-h-36 overflow-y-auto divide-y divide-gray-100 bg-white">
               <div v-for="item in packDetails.items" :key="item.productId" class="flex justify-between px-3 py-1.5 text-[11px]">

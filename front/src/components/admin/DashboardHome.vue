@@ -195,7 +195,7 @@ const grossMargins = computed(() => {
     const data = query?.data
 
     // Prix de vente (ou depuis l'API si disponible)
-    const launchPrice = data?.formule?.prixActuel ?? pack.defaultLaunchPrice
+    const launchPrice = data?.formule?.prixCommercial ?? data?.formule?.prixActuel ?? pack.defaultLaunchPrice
 
     // Calcul du coût réel de la dotation (somme des sous-totaux des produits)
     const realCost = data?.items
