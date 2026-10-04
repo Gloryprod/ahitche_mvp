@@ -4,9 +4,9 @@ import FormuleCard, { type FormuleVitrine } from '../ui/FormuleCard.vue'
 
 // Formules ouvertes au lancement (prix de vente en FCFA, identiques au référentiel createFormules.js)
 const formules: FormuleVitrine[] = [
-  { emoji: '🌿', nom: 'AHI ESSENTIEL', cible: '1 personne · par semaine', accroche: 'Un suivi alimentaire simple, pour commencer.', repas: '20–30', heures: '2–4h', ancienPrix: 24000, prix: 10800 },
-  { emoji: '🌾', nom: 'AHI ÉQUILIBRÉ', cible: '2–3 personnes · par semaine', accroche: 'Mieux manger sans compliquer votre quotidien.', repas: '35–50', heures: '4–6h', ancienPrix: 50000, prix: 22500, recommandee: true },
-  { emoji: '👑', nom: 'AHI CONFORT', cible: 'Famille 4–6 · par semaine', accroche: 'Un ravitaillement complet, pensé pour toute la famille.', repas: '60–90', heures: '6–10h', ancienPrix: 110000, prix: 50300 },
+  { emoji: '🌿', nom: 'AHI ESSENTIEL', cible: '1 personne · par mois', accroche: 'Un suivi alimentaire simple, pour commencer.', repas: '20–30', heures: '2–4h', ancienPrix: 24000, prix: 10800 },
+  { emoji: '🌾', nom: 'AHI ÉQUILIBRÉ', cible: '2–3 personnes · par mois', accroche: 'Mieux manger sans compliquer votre quotidien.', repas: '35–50', heures: '4–6h', ancienPrix: 50000, prix: 22500, recommandee: true },
+  { emoji: '👑', nom: 'AHI CONFORT', cible: 'Famille 4–6 · par mois', accroche: 'Un ravitaillement complet, pensé pour toute la famille.', repas: '60–90', heures: '6–10h', ancienPrix: 110000, prix: 50300 },
 ]
 
 // 17 produits de base ; les quantités varient selon la formule et ne sont pas affichées

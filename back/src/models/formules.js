@@ -19,7 +19,7 @@ const formuleSchema = new mongoose.Schema({
   },
   cible: { 
     type: String, 
-    required: true // Ex: "1 personne · par semaine"
+    required: true // Ex: "1 personne · par mois"
   },
   phraseAccroche: { 
     type: String, 

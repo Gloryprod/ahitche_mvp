@@ -5,7 +5,7 @@ import BaseButton from './BaseButton.vue'
 export interface FormuleVitrine {
   emoji: string
   nom: string // Ex : "AHI ESSENTIEL"
-  cible: string // Ex : "1 personne · par semaine"
+  cible: string // Ex : "1 personne · par mois"
   accroche: string
   repas: string // Ex : "20–30"
   heures: string // Ex : "2–4h"

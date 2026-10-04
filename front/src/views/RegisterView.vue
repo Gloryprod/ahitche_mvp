@@ -8,7 +8,7 @@
             />
             <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-8 text-white">
                 <h3 class="font-display text-2xl font-bold mb-2">Prêt à commander ?</h3>
-                <p class="text-white/80 text-sm">Créez votre compte en un instant pour planifier et recevoir vos formules de la semaine.</p>
+                <p class="text-white/80 text-sm">Créez votre compte en un instant pour planifier et recevoir vos formules.</p>
             </div>
         </div>
 
