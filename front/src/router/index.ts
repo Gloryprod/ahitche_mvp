@@ -194,7 +194,8 @@ router.beforeEach(async (to) => {
   }
 
   if (!authStore.isAuthenticated.value) {
-    return { path: '/login' };
+    // Après connexion, l'utilisateur revient sur la page demandée (lien partagé, favori…)
+    return { path: '/login', query: { redirect: to.fullPath } };
   }
 
   // Rôles autorisés : ceux de la page la plus précise (les enfants admin précisent ceux du parent)

@@ -11,13 +11,24 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Plusieurs requêtes peuvent échouer en même temps quand la session expire : une seule redirection
+let redirectionEnCours = false;
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
       // Session expirée ou refusée par le serveur : on l'oublie côté navigateur (aucun appel réseau nécessaire)
       useAuthStore().effacerSessionLocale();
-      router.push('/login');     // Redirige sur-le-champ
+
+      // Retour à la connexion avec un message, puis à la page en cours une fois reconnecté
+      const pageEnCours = router.currentRoute.value;
+      if (pageEnCours.meta.requiresAuth && !redirectionEnCours) {
+        redirectionEnCours = true;
+        router
+          .replace({ path: '/login', query: { redirect: pageEnCours.fullPath, session: 'expiree' } })
+          .finally(() => { redirectionEnCours = false; });
+      }
     }
     return Promise.reject(error);
   }
