@@ -1,23 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+// Seul l'accueil est dans le paquet principal : les autres pages se chargent à la demande
 import HomeView from '../views/HomeView.vue'
-import RegisterView from '@/views/RegisterView.vue'
-import LoginView from '@/views/LoginView.vue'
-import PublicContentList from '@/views/PublicContentList.vue'
-import ResetPassword from '../views/ResetPassword.vue'
-import ProfileView from '@/views/dashboard/user/ProfileView.vue'
-import ProfileViewAdmin from '@/views/dashboard/admin/ProfileView.vue'
-import ClientComponents from '@/components/admin/ClientComponents.vue';
-import CommandeComponent from '@/components/admin/CommandeComponent.vue';
-import DashboardHome from '@/components/admin/DashboardHome.vue';
-import CategoryManagement from '@/components/admin/bases/categories/CategoryManagement.vue'
-import CompositionRuleManagement from '@/components/admin/bases/compositionrules/CompositionRuleManagement.vue'
-import ProductManagement from '@/components/admin/bases/produits/ProductManagement.vue'
-import FormulaManagement from '@/components/admin/bases/formules/FormulaManagement.vue'
-import PostManagement from '@/components/admin/bases/posts/PostManagement.vue'
-import AjouterEntreeStock from '@/components/admin/AjouterEntreeStock.vue'
-import VueGlobalInventory from '@/components/admin/stock/VueGlobalInventory.vue'
-import StockMovementsView from '@/components/admin/stock/StockMovementsView.vue'
-import PurchaseOrdersView from '@/components/admin/stock/PurchaseOrdersView.vue'
 import { useAuthStore } from '../stores/auth';
 import { ACCES, EQUIPE, espaceParDefaut, type Role } from '@/config/roles';
 
@@ -32,106 +15,106 @@ const router = createRouter({
     {
       path: '/register',
       name: 'register',
-      component: RegisterView,
+      component: () => import('@/views/RegisterView.vue'),
       meta: { hideNavigation: true }
     },
     {
       path: '/login',
       name: 'login',
-      component: LoginView,
+      component: () => import('@/views/LoginView.vue'),
       meta: { hideNavigation: true }
     },
     {
       path: '/blog',
       name: 'blog',
-      component: PublicContentList,
+      component: () => import('@/views/PublicContentList.vue'),
       meta: { hideNavigation: true }
     },
     {
       path: '/reset-password',
       name: 'ResetPassword',
-      component: ResetPassword,
+      component: () => import('../views/ResetPassword.vue'),
       meta: { hideNavigation: true }
     },
     {
       path: '/dashboard/user',
       name: 'user-dashboard',
-      component: ProfileView,
+      component: () => import('@/views/dashboard/user/ProfileView.vue'),
       meta: { hideNavigation: true, requiresAuth: true, roles: ['user'] }
     },
     {
       path: '/dashboard/admin',
       name: 'admin-dashboard',
-      component: ProfileViewAdmin,
+      component: () => import('@/views/dashboard/admin/ProfileView.vue'),
       meta: { hideNavigation: true, requiresAuth: true, roles: EQUIPE },
       children: [
         {
           path: '',
           name: 'admin-dashboard-page',
           meta: { roles: ACCES.tableauDeBord.lecture },
-          component: DashboardHome
+          component: () => import('@/components/admin/DashboardHome.vue')
         },
         {
           path: 'clients',
           name: 'client-page',
           meta: { roles: ACCES.clients.lecture },
-          component: ClientComponents,
+          component: () => import('@/components/admin/ClientComponents.vue'),
         },
         {
           path: 'commandes', // (/dashboard/admin/commandes)
           name: 'commandes-page',
           meta: { roles: ACCES.commandes.lecture },
-          component: CommandeComponent
+          component: () => import('@/components/admin/CommandeComponent.vue')
         },
         // Données de base
         {
           path: 'categories', 
           name: 'categories-page',
           meta: { roles: ACCES.donneesBase.lecture },
-          component: CategoryManagement
+          component: () => import('@/components/admin/bases/categories/CategoryManagement.vue')
         },
         {
           path: 'regles', 
           name: 'regles-page',
           meta: { roles: ACCES.donneesBase.lecture },
-          component: CompositionRuleManagement
+          component: () => import('@/components/admin/bases/compositionrules/CompositionRuleManagement.vue')
         },
         {
           path: 'products',
           name: 'products-page',
           meta: { roles: ACCES.donneesBase.lecture },
-          component: ProductManagement
+          component: () => import('@/components/admin/bases/produits/ProductManagement.vue')
         },
         {
           path: 'formulas',
           name: 'formulas-page',
           meta: { roles: ACCES.donneesBase.lecture },
-          component: FormulaManagement
+          component: () => import('@/components/admin/bases/formules/FormulaManagement.vue')
         },
         // Gestion de stock
         {
           path: 'saveStock',
           name: 'saveStock-page',
           meta: { roles: ACCES.stock.lecture },
-          component: AjouterEntreeStock
+          component: () => import('@/components/admin/AjouterEntreeStock.vue')
         },
         {
           path: 'inventaire',
           name: 'inventaire-page',
           meta: { roles: ACCES.stock.lecture },
-          component: VueGlobalInventory
+          component: () => import('@/components/admin/stock/VueGlobalInventory.vue')
         },
         {
           path: 'mouvement-stock',
           name: 'mouvement-stock-page',
           meta: { roles: ACCES.stock.lecture },
-          component: StockMovementsView
+          component: () => import('@/components/admin/stock/StockMovementsView.vue')
         },
         {
           path: 'bon-commande',
           name: 'bon-commande-page',
           meta: { roles: ACCES.stock.lecture },
-          component: PurchaseOrdersView
+          component: () => import('@/components/admin/stock/PurchaseOrdersView.vue')
         },
         // Sections « Gestion » : chargées à la demande pour ne pas alourdir le site public
         {
@@ -168,7 +151,7 @@ const router = createRouter({
           path: 'posts',
           name: 'posts-page',
           meta: { roles: ACCES.contenus.lecture },
-          component: PostManagement
+          component: () => import('@/components/admin/bases/posts/PostManagement.vue')
         }
       ]
     },

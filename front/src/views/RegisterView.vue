@@ -93,6 +93,8 @@ import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 import LienAccueil from '@/components/ui/LienAccueil.vue';
+import { VueTelInput } from 'vue-tel-input';
+import 'vue-tel-input/vue-tel-input.css';
 
 const formRegister = ref({ username: '', email: '', password: '', telephone:'' })
 const isLoading = ref(false)

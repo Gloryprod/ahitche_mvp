@@ -7,15 +7,12 @@ import router from './router'
 import axios from 'axios';
 import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
-import VueTelInput from 'vue-tel-input';
-import 'vue-tel-input/vue-tel-input.css';
 import { VueQueryPlugin } from '@tanstack/vue-query'
 
 
 axios.defaults.withCredentials = true;
 
 const app = createApp(App)
-app.use(VueTelInput)
 app.use(createPinia())  
 app.use(router)
 
