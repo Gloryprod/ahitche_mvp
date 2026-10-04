@@ -159,6 +159,12 @@ const router = createRouter({
           component: () => import('@/components/admin/simulateurs/SimulateursView.vue')
         },
         {
+          path: 'nutrition',
+          name: 'nutrition-page',
+          meta: { roles: ACCES.nutrition.lecture },
+          component: () => import('@/components/admin/nutrition/NutritionView.vue')
+        },
+        {
           path: 'posts',
           name: 'posts-page',
           meta: { roles: ACCES.contenus.lecture },

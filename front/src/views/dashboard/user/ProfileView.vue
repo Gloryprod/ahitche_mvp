@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { genererRecuPDF } from '@/services/pdfRecuCommande';
 import { ANNULABLES_PAR_CLIENT, classeStatut, type StatutCommande } from '@/config/commandes';
+import SuiviAlimentaire from '@/components/client/SuiviAlimentaire.vue';
 
 interface Commande {
   id: string;
@@ -746,6 +747,9 @@ onMounted(async () => {
 
         </div>
       </div>
+
+      <!-- SUIVI ALIMENTAIRE (questionnaire, conseils, menus) -->
+      <SuiviAlimentaire />
     </div>
 
   </div>

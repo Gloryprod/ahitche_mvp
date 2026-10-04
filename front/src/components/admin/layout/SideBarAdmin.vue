@@ -72,7 +72,7 @@ const tousLesGroupes: { title: string; items: MenuItem[] }[] = [
       { id: 'simulateur', name: 'Simulateurs', icon: Sliders, hasChevron: true, path: '/dashboard/admin/simulateurs', section: 'simulateurs' },
       { id: 'prestataires', name: 'Prestataires', icon: Users, hasChevron: true, path: '/dashboard/admin/prestataires', section: 'prestataires' },
       { id: 'logistique', name: 'Logistique', icon: FolderTree, hasChevron: true, path: '/dashboard/admin/logistique', section: 'logistique' },
-      { id: 'nutrition', name: 'Nutrition', icon: Scale, hasChevron: true, path: '/dashboard/admin/nutrition', section: 'nutrition', bientot: true },
+      { id: 'nutrition', name: 'Nutrition', icon: Scale, hasChevron: true, path: '/dashboard/admin/nutrition', section: 'nutrition' },
     ]
   },
   {
