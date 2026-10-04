@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import BaseButton from '../ui/BaseButton.vue'
+import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
 </script>
 
 <template>
@@ -26,7 +27,7 @@ import BaseButton from '../ui/BaseButton.vue'
               Commandez dès maintenant et bénéficiez du prix de lancement bloqué pendant 3 mois.
             </p>
             <BaseButton
-              href="https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20voudrais%20devenir%20client%20fondateur."
+              :href="lienWhatsApp(MESSAGES_WHATSAPP.fondateur)"
               variant="primary"
               external
             >

@@ -13,6 +13,7 @@ import { genererRecuPDF } from '@/services/pdfRecuCommande';
 import { ANNULABLES_PAR_CLIENT, classeStatut, type StatutCommande } from '@/config/commandes';
 import SuiviAlimentaire from '@/components/client/SuiviAlimentaire.vue';
 import { useDeconnexion } from '@/composables/useDeconnexion';
+import { lienWhatsApp } from '@/config/contact';
 
 interface Commande {
   id: string;
@@ -191,8 +192,6 @@ const sauvegarderInfos = async () => {
 // Génère le lien WhatsApp de commande avec les infos de livraison.
 // Le montant et la référence proviennent de la commande enregistrée par le serveur quand elle existe.
 const genererLienWhatsApp = (commande?: { reference: string; total: number }) => {
-  const numeroWhatsApp = "22998136635";
-
   // On cherche les infos de la formule actuellement sélectionnée dans notre liste API
   const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle);
   const montant = commande?.total ?? (formuleChoisie ? prixDeVente(formuleChoisie) : null);
@@ -215,14 +214,11 @@ const genererLienWhatsApp = (commande?: { reference: string; total: number }) =>
     message += `⚠️ _Je n'ai pas encore renseigné mes détails de livraison, nous ferons le point ici._`;
   }
 
-  // Encodage strict au format URL
-  return `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(message)}`;
+  return lienWhatsApp(message);
 };
 
 // Fonction pour générer le lien WhatsApp d'annulation pour une commande spécifique
 const genererLienAnnulation = (commande: Commande) => {
-  const numeroWhatsApp = "22998136635";
-  
   // Construction du texte d'annulation clair et précis
   let message = `Bonjour Ahitché ! ❌\n\n`;
   message += `Je souhaite annuler ma commande *${commande.reference || commande._id}*.\n\n`;
@@ -232,8 +228,7 @@ const genererLienAnnulation = (commande: Commande) => {
   message += `- *Date du lancement :* ${commande.date}\n\n`;
   message += `Merci de prendre en compte ma demande d'annulation.`;
 
-  // Encodage au format URL WhatsApp
-  return `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(message)}`;
+  return lienWhatsApp(message);
 };
 
 const commandeEnCours = ref(false);

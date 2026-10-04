@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
+import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
 
 interface Props {
   slides?: string[]
@@ -185,7 +186,7 @@ onUnmounted(() => {
       </p>
 
       <div class="flex gap-3.5 justify-center flex-wrap mb-12">
-        <BaseButton href="https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!..." external>
+        <BaseButton :href="lienWhatsApp(MESSAGES_WHATSAPP.commande)" external>
           Commander sur WhatsApp
         </BaseButton>
         <BaseButton href="#formules" variant="secondary">

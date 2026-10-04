@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import BaseButton from '../ui/BaseButton.vue'
+import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
 </script>
 
 <template>
@@ -62,7 +63,7 @@ import BaseButton from '../ui/BaseButton.vue'
 
       <div class="text-center">
         <BaseButton
-          href="https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20passer%20ma%20premi%C3%A8re%20commande."
+          :href="lienWhatsApp(MESSAGES_WHATSAPP.premiereCommande)"
           variant="primary"
           external
         >

@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { WHATSAPP_AFFICHAGE } from '@/config/contact';
 
 export interface RecuData {
   commandeId: string;
@@ -41,7 +42,7 @@ export const genererRecuPDF = (data: RecuData) => {
   doc.setTextColor(...grisTexte);
   doc.text('Le marché suivi et organisé pour vous.', 14, 25);
   doc.text("Parce que votre santé n'a pas de prix.", 14, 30);
-  doc.text('Cotonou, Bénin | WhatsApp: +229 98 13 66 35', 14, 35);
+  doc.text(`Cotonou, Bénin | WhatsApp: ${WHATSAPP_AFFICHAGE}`, 14, 35);
 
   // --- BADGE REÇU / STATUT ---
   doc.setFontSize(16);

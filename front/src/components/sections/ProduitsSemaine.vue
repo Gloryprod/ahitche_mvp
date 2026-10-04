@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
 
 // Cet objet représente le contenu du fichier variables.js réadapté en structure réactive Vue
 const variablesSemaine = ref({
@@ -11,13 +12,9 @@ const variablesSemaine = ref({
     { nom: "Jus santé gingembre", prix: "2 000 FCFA", emoji: "🫚" },
     { nom: "Œufs supplémentaires (×6)", prix: "510 FCFA", emoji: "🥚" },
   ],
-  messageWhatsApp: "Bonjour Ahitché ! Je souhaite ajouter des produits variables à ma commande. Quels produits sont disponibles cette semaine ?"
 })
 
-const getWhatsAppLink = () => {
-  const base = "https://wa.me/22998136635"
-  return `${base}?text=${encodeURIComponent(variablesSemaine.value.messageWhatsApp)}`
-}
+const getWhatsAppLink = () => lienWhatsApp(MESSAGES_WHATSAPP.complements)
 </script>
 
 <template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import BaseButton from './BaseButton.vue'
+import { lienWhatsApp as lienWa } from '@/config/contact'
 
 export interface FormuleVitrine {
   emoji: string
@@ -22,7 +23,7 @@ const formaterPrix = (montant: number) => montant.toString().replace(/\B(?=(\d{3
 const lienWhatsApp = computed(() => {
   const { nom, prix } = props.formule
   const message = `Bonjour Ahitché ! Je souhaite commander la formule ${nom} (${formaterPrix(prix)} FCFA). Pouvez-vous me confirmer les détails ?`
-  return `https://wa.me/22998136635?text=${encodeURIComponent(message)}`
+  return lienWa(message)
 })
 </script>
 
