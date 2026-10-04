@@ -23,4 +23,4 @@ export const RESEAUX_SOCIAUX = [
 ] as const
 
 export const HORAIRES = 'Lundi – Samedi, 9h00 – 18h00'
-export const DELAI_LIVRAISON = '24 h' // Délai de livraison annoncé sur l'accueil
+export const DELAI_LIVRAISON = '24 h' // Délai de livraison annoncé sur l'accueil (espace insécable)
