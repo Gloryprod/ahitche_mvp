@@ -16,9 +16,10 @@ async function uploadImage(req, res) {
       url: req.file.path
     });
   } catch (error) {
+    console.error('Erreur uploadImage:', error);
     return res.status(500).json({ 
       success: false, 
-      message: error.message 
+      message: 'Erreur serveur lors du téléversement.' 
     });
   }
 }

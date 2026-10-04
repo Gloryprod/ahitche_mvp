@@ -6,6 +6,17 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // Adresse d'expéditeur officielle de l'application
 const FROM_EMAIL = 'L\'équipe Ahitche <contact@ahitchebj.com>';
 
+// Échappe les caractères HTML des données saisies par l'utilisateur (nom, etc.)
+// avant de les insérer dans le corps des e-mails
+function echapperHtml(texte) {
+  return String(texte ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * Envoie un e-mail de bienvenue à un nouvel utilisateur
  * @param {string} to - L'adresse e-mail de l'utilisateur
@@ -19,7 +30,7 @@ async function sendWelcomeEmail(to, username) {
       subject: 'Bienvenue sur Ahitche ! ✨',
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-            <h1 style="color: #1e3a1f;">Ravi de vous compter parmi nous, ${username} !</h1>
+            <h1 style="color: #1e3a1f;">Ravi de vous compter parmi nous, ${echapperHtml(username)} !</h1>
             <p style="font-size: 16px; color: #334155; line-height: 1.5;">
                 Votre compte a été créé avec succès. Vous pouvez dès à présent vous connecter et explorer toutes nos fonctionnalités.
             </p>
@@ -55,7 +66,7 @@ async function sendForgotPasswordMail(user, resetUrl) {
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee;">
             <h2 style="color: #0d5e42; text-align: center;">Réinitialisation de votre mot de passe</h2>
-            <p>Bonjour <strong>${user.username}</strong>,</p>
+            <p>Bonjour <strong>${echapperHtml(user.username)}</strong>,</p>
             <p>Vous avez demandé la réinitialisation de votre mot de passe sur Ahitché. Cliquez sur le bouton ci-dessous pour en configurer un nouveau :</p>
             <div style="text-align: center; margin: 30px 0;">
                 <a href="${resetUrl}" style="background-color: #0d5e42; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Réinitialiser mon mot de passe</a>

@@ -6,6 +6,21 @@ const crypto = require('crypto');
 
 // Vérifie que chaque valeur est une chaîne non vide.
 // Bloque les injections d'opérateurs MongoDB envoyées en JSON (ex : { "$ne": null }).
+// Options communes du cookie de session.
+// SameSite=Lax suffit : le site (ahitchebj.com) et l'API (api.ahitchebj.com) sont sur le même site.
+// Secure uniquement en production : en local (http), un cookie Secure serait refusé par le navigateur.
+const OPTIONS_COOKIE = {
+    httpOnly: true,                                 // Invisible en JS (protège contre le vol par XSS)
+    secure: process.env.NODE_ENV === 'production',  // HTTPS requis en production
+    sameSite: 'lax',                                // Pas envoyé depuis un autre site (protection CSRF)
+    path: '/'
+};
+
+// Les jetons de réinitialisation sont stockés hachés : une fuite de la base ne permet pas de les réutiliser
+function hacherJeton(jeton) {
+    return crypto.createHash('sha256').update(jeton).digest('hex');
+}
+
 function sontDesChaines(...valeurs) {
     return valeurs.every(v => typeof v === 'string' && v.length > 0);
 }
@@ -58,9 +73,7 @@ async function login(req, res) {
 
         // 💡 ENVOI DU TOKEN DANS UN COOKIE HTTPONLY
         res.cookie('token', token, {
-            httpOnly: true,                         // Protège contre les attaques XSS (invisible en JS)
-            secure: process.env.NODE_ENV === 'production', // true en production (HTTPS requis)
-            sameSite: 'none',                        // Protection CSRF basique
+            ...OPTIONS_COOKIE,
             maxAge: 24 * 60 * 60 * 1000            // Expire au bout de 1 jour (comme le JWT)
         });
 
@@ -76,7 +89,7 @@ async function login(req, res) {
 
 async function logout(req, res) {
     // Supprime le cookie contenant le token
-    res.clearCookie('token');
+    res.clearCookie('token', OPTIONS_COOKIE);
     res.json({ message: "Déconnexion réussie !" });
 }
 
@@ -113,7 +126,7 @@ async function forgotPassword(req, res) {
     const resetToken = crypto.randomBytes(32).toString('hex');
     
     // 3. Sauvegarder le token et l'expiration (Valable 1 heure)
-    user.resetPasswordToken = resetToken;
+    user.resetPasswordToken = hacherJeton(resetToken); // Seul le lien envoyé par e-mail contient le jeton en clair
     user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 heure dans le futur
     await user.save();
 
@@ -146,7 +159,7 @@ async function resetPassword(req, res) {
         // 1. Chercher l'utilisateur avec le jeton valide ET non expiré
         // $gt: Date.now() vérifie que la date d'expiration est supérieure à l'heure actuelle
         const user = await User.findOne({
-        resetPasswordToken: token,
+        resetPasswordToken: hacherJeton(token),
         resetPasswordExpires: { $gt: Date.now() }
         });
 

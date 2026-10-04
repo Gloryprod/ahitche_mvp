@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 const dns = require('node:dns')
 dns.setDefaultResultOrder('ipv4first');
 
@@ -14,6 +15,9 @@ const adminRoutes = require('./src/routes/admin');
 const publicRoutes = require('./src/routes/public');
 
 // Middlewares
+// En-têtes de sécurité HTTP (nosniff, HSTS, frameguard, etc.)
+app.use(helmet());
+
 const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',

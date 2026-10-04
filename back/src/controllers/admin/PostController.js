@@ -53,7 +53,8 @@ async function getPosts(req, res) {
       posts
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Erreur getPosts (admin):', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur lors de la récupération des contenus.' });
   }
 }
 

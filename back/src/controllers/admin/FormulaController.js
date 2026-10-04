@@ -226,7 +226,8 @@ async function updateFormulaPrice(req, res) {
       data: updatedFormula
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Erreur updateFormulaPrice:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur lors de la mise à jour du prix.' });
   }
 }
 
