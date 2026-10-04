@@ -1,16 +1,6 @@
 <template>
     <div class="min-h-screen flex md:flex-row">
-        <div class="hidden md:block md:w-1/2 relative bg-foret min-h-112.5">
-            <img 
-                src="/beautiful-couple-looking-their-laptop.jpg" 
-                alt="" 
-                class="w-full h-full object-cover"
-            />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-8 text-white">
-                <h3 class="font-display text-2xl font-bold mb-2">Prêt à commander ?</h3>
-                <p class="text-white/80 text-sm">Créez votre compte en un instant pour planifier et recevoir vos formules.</p>
-            </div>
-        </div>
+        <PanneauMarque titre="Prêt à commander ?" texte="Créez votre compte en un instant pour planifier et recevoir vos formules." />
 
         <!-- Partie droite : Formulaire d'inscription -->
         <div class="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
@@ -97,6 +87,7 @@
 </template>
 
 <script setup lang="ts">
+import PanneauMarque from '@/components/ui/PanneauMarque.vue'
 import { ref } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
