@@ -33,6 +33,10 @@ async function saveOrder(req, res){
             return res.status(404).json({ message: "Cette formule n'est pas disponible à la commande." });
         }
 
+        if (formuleInfo.bientotDisponible) {
+            return res.status(409).json({ message: `${formuleInfo.nom} sera bientôt disponible. Choisissez une autre formule en attendant.` });
+        }
+
         // Prix de vente : prix commercial fixé par l'admin, sinon prix officiel
         const total = formuleInfo.prixCommercial ?? formuleInfo.prixActuel;
 

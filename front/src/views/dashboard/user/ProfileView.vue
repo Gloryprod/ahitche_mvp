@@ -31,6 +31,7 @@ interface Formule {
   emoji: string;
   prixActuel: number;
   prixCommercial?: number | null;
+  bientotDisponible?: boolean;
   cible: string;
 }
 
@@ -505,23 +506,30 @@ onMounted(async () => {
                 v-for="formule in formulesApi" 
                 :key="formule._id"
                 :class="[
-                  'flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all duration-200 select-none transform hover:-translate-y-0.5',
-                  clientInfos.formuleHabituelle === formule.nom 
-                    ? 'border-foret bg-foret/[0.02] shadow-sm ring-2 ring-foret/20' 
-                    : 'border-gray-100 hover:border-gray-300 hover:shadow-sm bg-white'
+                  'flex items-center justify-between gap-3 p-4 rounded-xl border transition-all duration-200 select-none',
+                  formule.bientotDisponible
+                    ? 'border-dashed border-gray-200 bg-creme/50 opacity-70 cursor-not-allowed'
+                    : clientInfos.formuleHabituelle === formule.nom
+                      ? 'cursor-pointer transform hover:-translate-y-0.5 border-foret bg-foret/[0.02] shadow-sm ring-2 ring-foret/20'
+                      : 'cursor-pointer transform hover:-translate-y-0.5 border-gray-100 hover:border-gray-300 hover:shadow-sm bg-white'
                 ]"
-                @click="changerFormule(formule)"
+                :aria-disabled="formule.bientotDisponible ? 'true' : undefined"
+                @click="!formule.bientotDisponible && changerFormule(formule)"
               >
                 <div class="flex items-center gap-4">
-                  <span class="text-2xl filter drop-shadow-sm select-none">{{ formule.emoji }}</span>
+                  <span class="text-2xl filter drop-shadow-sm select-none" aria-hidden="true">{{ formule.emoji }}</span>
                   <div>
                     <p class="font-bold text-sm" :class="clientInfos.formuleHabituelle === formule.nom ? 'text-foret' : 'text-noir'">{{ formule.nom }}</p>
                     <p class="text-xs text-gris font-medium mt-0.5">{{ formaterFCFA(prixDeVente(formule)) }} · {{ formule.cible.split('·')[0] }}</p>
                   </div>
                 </div>
-                
+
+                <span v-if="formule.bientotDisponible" class="text-[11px] font-bold uppercase tracking-wider text-savane bg-savane/10 px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
+                  Bientôt
+                </span>
+
                 <!-- Radio moderne -->
-                <div 
+                <div v-else
                   :class="[
                     'w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-200',
                     clientInfos.formuleHabituelle === formule.nom ? 'border-foret bg-foret' : 'border-gray-300'

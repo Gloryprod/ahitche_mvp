@@ -52,10 +52,15 @@ const formuleSchema = new mongoose.Schema({
     type: Boolean, 
     default: false 
   },
-  statut: { 
-    type: String, 
-    enum: ['actif', 'inactif'], 
-    default: 'actif' 
+  statut: {
+    type: String,
+    enum: ['actif', 'inactif'],
+    default: 'actif'
+  },
+  // Formule annoncée mais pas encore ouverte : visible côté client, non commandable
+  bientotDisponible: {
+    type: Boolean,
+    default: false
   },
   // Lien WhatsApp pré-généré ou généré dynamiquement
   lienWhatsApp: { 
