@@ -59,3 +59,4 @@ Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`,
 - Finances : toute action sur les dépenses, lignes budgétaires, taux et prix de formule passe par `journaliser()` (journal des modifications). Une dépense payée (justificatif obligatoire) ne se modifie plus.
 - Nutrition : aucune donnée de santé ni conviction religieuse sans autorisation préalable de l'APDP (Code du numérique, art. 394).
 - Écrans admin : vérifier l'affichage à 375 px ; la Logistique est conçue d'abord pour le téléphone.
+- Navigation et session : la déconnexion passe par `useDeconnexion` (retour à l'accueil, cache vidé, session gardée si le serveur ne confirme pas). Toute page affichée sans le menu du site (`hideNavigation`) propose `LienAccueil`. Une page protégée renvoie vers `/login?redirect=…` (et `&session=expiree` sur un 401) ; seuls les chemins internes sont acceptés comme `redirect`.
