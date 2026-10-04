@@ -39,6 +39,26 @@ const py = ref(0)
 
 let cycleTimeout: ReturnType<typeof setTimeout> | null = null
 
+// Les animations ne tournent que si le hero est à l'écran et l'onglet visible (économie de batterie et de CPU)
+const sectionRef = ref<HTMLElement | null>(null)
+const heroVisible = ref(true)
+let observer: IntersectionObserver | null = null
+
+function stopCycle() {
+  if (cycleTimeout) clearTimeout(cycleTimeout)
+  cycleTimeout = null
+}
+
+function majAnimations(enVue: boolean) {
+  heroVisible.value = enVue && !document.hidden
+  if (prefersReducedMotion.value) return
+  if (heroVisible.value && !cycleTimeout) scheduleCycle(cycleKey.value === 0 ? ENTRANCE_BASE_DELAY * 1000 : cycleDurationMs)
+  if (!heroVisible.value) stopCycle()
+}
+
+let heroEnVue = true
+const onVisibilityChange = () => majAnimations(heroEnVue)
+
 function scheduleCycle(delayMs: number) {
   cycleTimeout = setTimeout(() => {
     cycleKey.value++
@@ -73,13 +93,24 @@ onMounted(() => {
   pointerFine.value = window.matchMedia('(pointer: fine)').matches
 
   if (!prefersReducedMotion.value) {
-    window.addEventListener('mousemove', onMouseMove)
+    if (pointerFine.value) window.addEventListener('mousemove', onMouseMove, { passive: true })
     scheduleCycle(ENTRANCE_BASE_DELAY * 1000)
+  }
+
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  if (sectionRef.value && 'IntersectionObserver' in window) {
+    observer = new IntersectionObserver(([entree]) => {
+      heroEnVue = !!entree?.isIntersecting
+      majAnimations(heroEnVue)
+    })
+    observer.observe(sectionRef.value)
   }
 })
 
 onUnmounted(() => {
-  if (cycleTimeout) clearTimeout(cycleTimeout)
+  stopCycle()
+  observer?.disconnect()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('mousemove', onMouseMove)
 })
 </script>
@@ -87,6 +118,7 @@ onUnmounted(() => {
 <template>
   <section
     id="accueil"
+    ref="sectionRef"
     class="min-h-svh flex items-center relative overflow-hidden bg-foret px-6 py-27.5 md:py-22.5"
   >
     <!-- Halos + grain -->
@@ -118,7 +150,7 @@ onUnmounted(() => {
       >
         <div
           class="relative overflow-hidden rounded-2xl shadow-[0_20px_45px_-10px_rgba(0,0,0,0.55)] ring-1 ring-white/15"
-          :class="[frame.size, !prefersReducedMotion ? 'animate-[float_var(--fd)_ease-in-out_infinite]' : '']"
+          :class="[frame.size, !prefersReducedMotion ? 'animate-[float_var(--fd)_ease-in-out_infinite]' : '', heroVisible ? '' : '[animation-play-state:paused]']"
           :style="{ '--fd': frame.floatDuration, animationDelay: !prefersReducedMotion ? `${floatDelay(i)}s` : '0s' }"
         >
           <img
@@ -134,7 +166,11 @@ onUnmounted(() => {
     <!-- Contenu -->
     <div class="relative z-2 max-w-175 mx-auto text-center">
       <div class="inline-flex items-center gap-2 bg-white/12 backdrop-blur-md border border-white/20 text-white/92 text-xs font-semibold px-4 py-1.5 rounded-full mb-7">
-        <span class="w-1.75 h-1.75 bg-[#4ade80] rounded-full shrink-0 shadow-[0_0_0_3px_rgba(74,222,128,0.3)] motion-safe:animate-[pulseHalo_2s_infinite]"></span>
+        <!-- Halo animé en transform/opacity (composité par le GPU, contrairement à box-shadow) -->
+        <span class="relative flex w-1.75 h-1.75 shrink-0" aria-hidden="true">
+          <span class="absolute inset-0 rounded-full bg-[#4ade80] opacity-60 motion-safe:animate-ping"></span>
+          <span class="relative w-1.75 h-1.75 bg-[#4ade80] rounded-full shadow-[0_0_0_3px_rgba(74,222,128,0.3)]"></span>
+        </span>
         Livraisons actives à Cotonou & Abomey-Calavi.
       </div>
 
