@@ -44,7 +44,7 @@ const getWhatsAppLink = () => lienWhatsApp(MESSAGES_WHATSAPP.complements)
         <a 
           :href="getWhatsAppLink()"
           target="_blank" 
-          rel="noopener"
+          rel="noopener noreferrer"
           class="inline-flex items-center justify-center gap-2 bg-savane text-white font-bold text-sm px-6 py-3.5 rounded-full shadow-md transition-all duration-250 hover:bg-foret hover:-translate-y-0.5"
         >
           <span>➕ Ajouter à ma formule</span>

@@ -22,7 +22,7 @@ const lienWhatsApp = computed(() => {
         : 'border border-creme2 shadow-sm hover:shadow-md'
     ]"
   >
-    <div v-if="formule.recommandee" class="absolute -top-4 left-1/2 -translate-x-1/2 bg-or text-foret text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
+    <div v-if="formule.recommandee" class="absolute -top-4 left-1/2 -translate-x-1/2 bg-or text-noir text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
       <span aria-hidden="true">⭐</span> Le plus choisi
     </div>
     <div>
