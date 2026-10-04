@@ -26,6 +26,6 @@ export const TEMOIGNAGES: Temoignage[] = [
     prenom: 'Boniface',
     quartier: 'Cadjéhoun',
     note: 5,
-    texte: "Je suis sceptique au départ, mais Ahitché m'a convaincu. Livraison rapide jusqu'à Cadjéhoun, produits de qualité, zéro surprise. C'est transparent et fiable.",
+    texte: "J'étais sceptique au départ, mais Ahitché m'a convaincu. Livraison rapide jusqu'à Cadjéhoun, produits de qualité, zéro surprise. C'est transparent et fiable.",
   },
 ]
