@@ -1,6 +1,6 @@
 # Conception du menu admin : décisions validées
 
-Ce document réunit les réponses du 2026-10-04 aux 41 questions de conception. Il sert de référence pour créer les routes et les écrans. Rien n'est encore développé.
+Ce document réunit les réponses du 2026-10-04 aux 41 questions de conception, complétées le même jour (zones, affichage « par mois », modes de paiement). Il sert de référence pour créer les routes et les écrans. Rien n'est encore développé.
 
 ## 1. Règles métier transverses
 
@@ -12,11 +12,12 @@ Ce document réunit les réponses du 2026-10-04 aux 41 questions de conception. 
 | AHI Fraîcheur | 14 jours après la livraison | J-5 |
 | AHI Équilibré, AHI Confort, AHI Réserve | 30 jours après la livraison | J-5, soit 25 jours après la livraison |
 
-La relance sert à recontacter le client s'il ne se manifeste pas de lui-même. Elle remplace le calcul unique à +30 jours du tableau de bord actuel. Le cycle est porté par la formule (nouveau champ `cycleJours`), et non codé en dur.
+Les cartes de formules affichent « par mois » (Essentiel, Équilibré, Confort). Le cycle de relance ci-dessus reste celui de 14 ou 30 jours. La relance sert à recontacter le client s'il ne se manifeste pas de lui-même. Elle remplace le calcul unique à +30 jours du tableau de bord actuel. Le cycle est porté par la formule (nouveau champ `cycleJours`), et non codé en dur.
 
 ### Paiement
 
 - Le paiement se fait **à la livraison, par Mobile Money**.
+- Les modes « Espèces » et « Acompte » sont **conservés pour les cas particuliers**. Proposition : pour ces modes, pas de référence de transaction, mais une note obligatoire qui explique le cas.
 - Une commande « Livrée » est une commande payée. La référence de transaction Mobile Money est saisie au moment où l'on marque la commande comme livrée.
 
 ### Statuts de commande
@@ -51,7 +52,7 @@ En attente -> Confirmée -> En préparation -> En livraison -> Livrée (paiement
 
 ### Logistique (`/dashboard/admin/logistique`), conçue d'abord pour le téléphone
 
-- **Zones :** liste fermée de quartiers regroupés en zones (Calavi Kpota, Calavi centre, Godomey, Cotonou…), avec un choix « Autre quartier » en texte libre (voir le point 4.1).
+- **Zones :** une zone par arrondissement, soit les 13 arrondissements de Cotonou et les 9 d'Abomey-Calavi, avec 315 quartiers et villages. Le référentiel est dans [back/src/data/zones-livraison.json](../back/src/data/zones-livraison.json) (voir le point 4.1). Le client choisit son quartier dans la liste, ou « Autre quartier » en texte libre. Le tarif livreur et le coût interne sont définis par zone, et l'admin peut regrouper des zones en secteurs de tournée.
 - **Frais :** aucun frais de livraison pour le client. Un coût interne par zone est suivi pour les finances.
 - **Créneaux :** du lundi au samedi, matin ou après-midi.
 - **Localisation :** champ facultatif « lien de localisation », en plus des repères.
@@ -125,9 +126,20 @@ Deux onglets :
 
 ## 4. Points à confirmer avant de coder
 
-### 4.1 Zones (question 20)
+### 4.1 Zones et quartiers (question 20) : décidé
 
-La réponse « liste fermée… ou le texte libre » est interprétée ainsi : liste fermée **plus** une option « Autre quartier » en texte libre. Il manque la liste réelle des quartiers et leur rattachement aux zones.
+- **Source :** relevé du 2026-10-04 sur toutbenin.com (Localisation 229). Les comptes sont cohérents avec les chiffres officiels : 149 villages et quartiers pour Abomey-Calavi, et 143 quartiers pour Cotonou, auxquels s'ajoutent quelques sous-quartiers.
+- **Découpage :** une zone par arrondissement. C'est le découpage officiel, donc fiable, et l'admin pourra ensuite regrouper des zones en secteurs de tournée.
+
+| Commune | Zones (nombre de quartiers ou villages) |
+|---|---|
+| Cotonou | 1er (13), 2e (13), 3e (13), 4e (12), 5e (15), 6e (19), 7e (11), 8e (8), 9e (6), 10e (9), 11e (13), 12e (19), 13e (14) |
+| Abomey-Calavi | Abomey-Calavi centre (21, **prioritaire**), Akassato (14), Godomey (49), Glo-Djigbé (14), Hêvié (9), Kpanroun (9), Ouèdo (8), Togba (11), Zinvié (15) |
+
+**À vérifier dans le fichier :**
+- « Calavi Kpota », la zone prioritaire du site, n'apparaît pas sous ce nom dans la liste officielle. Je l'ai ajouté comme « Kpota (Calavi Kpota) » dans Abomey-Calavi centre : le rattachement est à confirmer.
+- Certains noms existent dans deux arrondissements (Nouveau Pont, Missité, Gbénonkpo, Fandji, Finafa, Tankpè). Le sélecteur affichera donc « Quartier (arrondissement) ».
+- L'orthographe vient de la source et n'a pas été corrigée (par exemple « Cité de l'expériece », « Topka hoho », « Donaten »). Une relecture locale est conseillée.
 
 ### 4.2 Données de nutrition et réglementation béninoise (question 30)
 
@@ -148,6 +160,9 @@ Sources :
 
 ### 4.3 Cohérences à régler côté site
 
-- Les cartes de formules affichent « par semaine » pour Essentiel, Équilibré et Confort, alors que le renouvellement est à 14 ou 30 jours. Faut-il adapter le texte, par exemple « environ 2 semaines » pour l'Essentiel ?
-- Le modèle `Order` accepte les modes de paiement « Espèces » et « Acompte ». Avec un paiement uniquement par Mobile Money à la livraison, faut-il les garder pour les cas particuliers ?
+- **Fait (commit dc1bcbf) :** les cartes d'Essentiel, Équilibré et Confort affichent « par mois ». Restent à trancher :
+  - l'Essentiel est relancé à 14 jours mais affiché « par mois » : est-ce voulu (un pack couvrant environ deux semaines, deux livraisons par mois) ?
+  - les chiffres « repas possibles » et « heures économisées » (par exemple 20–30 repas et 2–4 h pour l'Essentiel) étaient pensés pour une semaine : faut-il les recalculer pour un mois ?
+  - Fraîcheur affiche encore « Par semaine » et Réserve « Mensuel / Bi-mensuel ».
+- **Décidé :** les modes « Espèces » et « Acompte » sont conservés pour les cas particuliers (voir la section Paiement).
 - Le délai de la garantie est maintenant fixé (24 h après le créneau confirmé). Le texte du site (« livrée avec plus de 24h de retard ») peut le préciser.
