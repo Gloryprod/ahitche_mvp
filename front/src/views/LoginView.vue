@@ -13,7 +13,10 @@
         </div>
 
         <div class="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
-            
+            <div class="mb-4">
+                <LienAccueil />
+            </div>
+
             <div v-if="isForgotPassword">
                 <div class="mb-6 text-center">
                     <h2 class="text-2xl font-bold text-foret font-display">Mot de passe oublié</h2>
@@ -112,6 +115,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
 import { espaceParDefaut } from '@/config/roles';
+import LienAccueil from '@/components/ui/LienAccueil.vue';
 
 const formLogin = ref({ email: '', password: '' })
 const forgotEmail = ref('')
@@ -130,8 +134,9 @@ const handleLogin = async () => {
 
     toast.success(data.message);
 
-    // Client -> son espace ; équipe -> la première section accessible avec son rôle
-    router.push(espaceParDefaut(userRole))
+    // Client -> son espace ; équipe -> la première section accessible avec son rôle.
+    // « replace » : le bouton retour ne ramène pas sur le formulaire de connexion.
+    router.replace(espaceParDefaut(userRole))
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
   } finally {

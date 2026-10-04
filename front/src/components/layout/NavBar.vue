@@ -37,9 +37,9 @@ const closeMenu = () => {
 
 // Fonctions de la modale
 const openLoginModal = () => {
+  closeMenu() // En premier : closeMenu rétablit le défilement de la page
   isLoginModalOpen.value = true
   document.body.style.overflow = 'hidden' // Bloque le scroll arrière
-  closeMenu()
 }
 
 const closeLoginModal = () => {
@@ -56,6 +56,7 @@ const handleLogin = async () => {
     toast.success(data.message);
 
     // Client -> son espace ; équipe -> la première section accessible avec son rôle
+    closeLoginModal() // Rétablit le défilement avant de quitter la page
     router.push(espaceParDefaut(userRole))
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
@@ -91,6 +92,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  document.body.style.overflow = '' // Menu ou fenêtre encore ouverts : la page suivante doit pouvoir défiler
 })
 </script>
 

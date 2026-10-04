@@ -177,11 +177,16 @@ const router = createRouter({
 
 
 router.beforeEach(async (to) => {
+  const authStore = useAuthStore();
+
+  // Déjà connecté (session connue dans cet onglet) : la connexion et l'inscription renvoient vers son espace
+  if ((to.name === 'login' || to.name === 'register') && authStore.isAuthenticated.value) {
+    return { path: espaceParDefaut(authStore.role.value) };
+  }
+
   // Les pages publiques s'affichent sans attendre l'API : la session n'est vérifiée
   // que pour les espaces protégés (connexions mobiles parfois lentes).
   if (!to.meta.requiresAuth) return true;
-
-  const authStore = useAuthStore();
 
   // Après un rechargement, on attend que le serveur valide ou rejette la session
   if (!authStore.isInitialized.value) {

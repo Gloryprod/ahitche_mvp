@@ -15,6 +15,10 @@
 
     <!-- Partie droite : Formulaire de nouveau mot de passe -->
     <div class="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
+      <div class="mb-4">
+        <LienAccueil />
+      </div>
+
       <div class="mb-6 text-center">
         <h2 class="text-2xl font-bold text-foret font-display">Nouveau mot de passe</h2>
         <p class="text-sm text-gray-500 mt-1">Choisissez un mot de passe sécurisé pour votre compte.</p>
@@ -62,6 +66,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
+import LienAccueil from '@/components/ui/LienAccueil.vue';
 
 const password = ref('');
 const confirmPassword = ref('');

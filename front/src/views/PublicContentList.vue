@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { Search, Play, FileText, Newspaper, Calendar, ArrowRight, User } from 'lucide-vue-next'
 import api from '@/stores/api'
+import LienAccueil from '@/components/ui/LienAccueil.vue'
 import { useQuery, keepPreviousData } from '@tanstack/vue-query'
 
 export interface Post {
@@ -73,7 +74,8 @@ const embedVideoUrl = computed(() => {
 
 <template>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 font-sans text-gray-800">
-    
+    <LienAccueil />
+
     <!-- En-tête / Hero Section -->
     <div class="text-center max-w-2xl mx-auto space-y-3">
       <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">Actualités & Médias</h1>

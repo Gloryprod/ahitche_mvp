@@ -20,7 +20,7 @@
                 <!-- <a href="/" class="nav-logo">
                     <span class="logo-mark">Ahi</span><span class="logo-accent">tché</span>
                 </a> -->
-                <a href="/" class="btn-retour ">← Retour à l'accueil</a>
+                <LienAccueil />
             </div>
         </nav>
 
@@ -101,6 +101,7 @@ import { ref } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
+import LienAccueil from '@/components/ui/LienAccueil.vue';
 
 const formRegister = ref({ username: '', email: '', password: '', telephone:'' })
 const isLoading = ref(false)
