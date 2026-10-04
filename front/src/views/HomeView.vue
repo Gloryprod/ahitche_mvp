@@ -9,6 +9,7 @@ import CommentCaMarche from '../components/sections/CommentCaMarche.vue'
 import ProduitsSemaine from '../components/sections/ProduitsSemaine.vue'
 import TemoignagesAndGarantie from '../components/sections/TemoignagesAndGarantie.vue'
 import FaqSection from '../components/sections/FaqSection.vue'
+import ActualitesSection from '../components/sections/ActualitesSection.vue'
 import ActionsFlottantes from '../components/layout/ActionsFlottantes.vue'
 </script>
 
@@ -24,6 +25,7 @@ import ActionsFlottantes from '../components/layout/ActionsFlottantes.vue'
     <ProduitsSemaine />
     <TemoignagesAndGarantie />
     <FaqSection />
+    <ActualitesSection />
   </main>
   <!-- Commande WhatsApp collante (mobile) et retour en haut de page -->
   <ActionsFlottantes />
