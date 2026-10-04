@@ -40,6 +40,7 @@ Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`,
 - `front/src/components/sections/` : sections de la page d'accueil (Hero, Formules, Comment ça marche…).
 - `front/src/components/admin/` : back-office (commandes, stock, produits, formules, posts) et les sections Gestion : `prestataires/`, `logistique/`, `finances/`, `simulateurs/`, `nutrition/` (chargées à la demande).
 - `front/src/components/client/` : blocs de l'espace client (suivi alimentaire).
+- Contenus de l'accueil, à modifier dans `front/src/config/` sans toucher aux composants : `contact.ts` (WhatsApp, messages pré-remplis, Facebook, TikTok, horaires, délai de livraison), `formules.ts` (vitrine, prix, taille de foyer), `photos.ts` (emplacements « PHOTO À FOURNIR » : n'y mettre que des photos à licence vérifiable), `temoignages.ts` (avis réels validés par les clients uniquement), `faq.ts`, `actualites.ts`.
 - `front/src/config/roles.ts` et `back/src/config/roles.js` : rôles (`user`, `admin`, `gestionnaire`, `comptable`, `nutritionniste`) et droits lecture/écriture par section, à garder synchronisés. Le serveur fait foi (middleware `acces()`).
 - `front/src/config/commandes.ts` et `back/src/services/commandeService.js` : statuts de commande et passages autorisés.
 - `front/src/stores/auth.ts` : état d'authentification (composable, pas un store Pinia ; `user`, `role`… sont des refs/computed, donc à lire avec `.value`). `stores/api.ts` : instance axios avec un intercepteur 401.
