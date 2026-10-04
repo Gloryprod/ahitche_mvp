@@ -1,5 +1,6 @@
 const Formule = require('../../models/formules');
 const { TYPES_PACK, calculerCompositionPack } = require('../../services/compositionService');
+const { journaliser } = require('../../services/journalService');
 
 // Composition et valeur catalogue d'un pack (lecture seule, voir services/compositionService.js)
 async function getPackDetails(req, res) {
@@ -47,8 +48,16 @@ async function updateFormulaPrice(req, res) {
       return res.status(404).json({ success: false, message: 'Formule introuvable' });
     }
 
+    const ancienPrix = updatedFormula.prixCommercial ?? updatedFormula.prixActuel;
     updatedFormula.prixCommercial = prixFixe;
     await updatedFormula.save();
+
+    // Journal des modifications : qui a changé le prix de vente, et quand
+    await journaliser(req, {
+      action: 'Modification', entite: 'Prix formule', entiteId: updatedFormula._id,
+      resume: `Prix de ${updatedFormula.nom} : ${ancienPrix} -> ${prixFixe} FCFA`,
+      avant: { prix: ancienPrix }, apres: { prix: prixFixe }
+    });
 
     res.status(200).json({
       success: true,

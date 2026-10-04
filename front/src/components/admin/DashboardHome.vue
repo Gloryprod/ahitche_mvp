@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { useQuery, keepPreviousData, useQueries } from '@tanstack/vue-query'
 import api from '@/stores/api'
 import { classeStatut } from '@/config/commandes'
+import { useAuthStore } from '@/stores/auth'
+import { peutLire } from '@/config/roles'
 import type { Commande } from '@/type'
 import { 
   AlertTriangle, 
@@ -76,6 +78,15 @@ const inventaireRaw = computed((): InventoryItem[] => {
 })
 
 const stockAlerts = computed(() => inventaireRaw.value.filter(item => item.enAlerte))
+
+// Taux USD/FCFA en vigueur (section Finances), affiché seulement aux rôles qui y ont accès
+const authStore = useAuthStore()
+const { data: tauxData } = useQuery({
+  queryKey: ['finances', 'taux'],
+  queryFn: async () => (await api.get('/api/admin/finances/taux')).data as { courant: number },
+  enabled: computed(() => peutLire(authStore.role.value, 'finances')),
+})
+const tauxUsd = computed(() => tauxData.value?.courant)
 
 // --- 4. GESTION DES RENOUVELLEMENTS ---
 // Relance si le client ne se manifeste pas : 14 jours après la livraison (Essentiel, Fraîcheur) ou 30 jours
@@ -270,8 +281,8 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
           <RefreshCw :class="['w-4 h-4 text-gray-600', isLoadingOrders || isLoadingStock ? 'animate-spin' : '']" />
         </button>
 
-        <div class="bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 font-mono text-[11px]">
-          1 USD = <span class="font-bold text-noir">571 FCFA</span>
+        <div v-if="tauxUsd" class="bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 font-mono text-[11px]">
+          1 USD = <span class="font-bold text-noir">{{ tauxUsd }} FCFA</span>
         </div>
       </div>
     </div>

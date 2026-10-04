@@ -12,6 +12,7 @@ const postC = require('../controllers/admin/PostController');
 const partnerC = require('../controllers/admin/PartnerController');
 const zoneC = require('../controllers/ZoneController');
 const logistiqueC = require('../controllers/admin/LogistiqueController');
+const financeC = require('../controllers/admin/FinanceController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -29,6 +30,7 @@ router.use(['/posts', '/upload'], acces(ACCES.contenus));
 router.use(['/stock', '/inventory', '/mouvements', '/bons-commande'], acces(ACCES.stock));
 router.use('/prestataires', acces(ACCES.prestataires));
 router.use(['/zones', '/logistique'], acces(ACCES.logistique));
+router.use('/finances', acces(ACCES.finances));
 
 // Users
 router.get('/users', userC.index);
@@ -114,6 +116,30 @@ router.put('/zones/:code', zoneC.modifierZone);
 // Logistique : planning du jour et planification (créneau + livreur)
 router.get('/logistique', logistiqueC.obtenirPlanning);
 router.patch('/logistique/commandes/:id/planification', logistiqueC.planifierCommande);
+
+// Finances : budget Next Impact, exploitation, taux USD/FCFA, journal des modifications
+router.get('/finances/synthese', financeC.obtenirSynthese);
+router.get('/finances/journal', financeC.obtenirJournal);
+router.route('/finances/taux')
+  .get(financeC.obtenirTaux)
+  .post(financeC.enregistrerTaux);
+router.post('/finances/lignes/import', financeC.importerLignes);
+router.route('/finances/lignes')
+  .get(financeC.listerLignes)
+  .post(financeC.creerLigne);
+router.route('/finances/lignes/:id')
+  .put(financeC.modifierLigne)
+  .delete(financeC.supprimerLigne);
+router.get('/finances/depenses/export', financeC.exporterDepenses);
+router.route('/finances/depenses')
+  .get(financeC.listerDepenses)
+  .post(financeC.creerDepense);
+router.route('/finances/depenses/:id')
+  .put(financeC.modifierDepense)
+  .delete(financeC.supprimerDepense);
+router.patch('/finances/depenses/:id/effectuer', financeC.effectuerDepense);
+router.patch('/finances/depenses/:id/audit', financeC.changerValiditeAudit);
+router.post('/finances/justificatifs', upload.uploadJustificatif.single('fichier'), financeC.televerserJustificatif);
 
 module.exports = router;
         

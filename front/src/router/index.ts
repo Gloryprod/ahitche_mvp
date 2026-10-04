@@ -147,6 +147,12 @@ const router = createRouter({
           component: () => import('@/components/admin/logistique/LogistiqueView.vue')
         },
         {
+          path: 'finances',
+          name: 'finances-page',
+          meta: { roles: ACCES.finances.lecture },
+          component: () => import('@/components/admin/finances/FinancesView.vue')
+        },
+        {
           path: 'posts',
           name: 'posts-page',
           meta: { roles: ACCES.contenus.lecture },

@@ -21,9 +21,25 @@ const storage = new CloudinaryStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: { fileSize: 100 * 1024 * 1024 } // Limite à 100 Mo
 });
 
+// Justificatifs des dépenses (Finances) : PDF ou image, 10 Mo maximum, sans retouche
+const FORMATS_JUSTIFICATIF = ['application/pdf', 'image/jpeg', 'image/png'];
+const uploadJustificatif = multer({
+  storage: new CloudinaryStorage({
+    cloudinary,
+    params: async () => ({
+      folder: 'justificatifs',
+      resource_type: 'image', // Cloudinary traite les PDF comme des images (aperçu possible)
+      allowed_formats: ['pdf', 'jpg', 'jpeg', 'png']
+    })
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, FORMATS_JUSTIFICATIF.includes(file.mimetype))
+});
+
 module.exports = upload;
+module.exports.uploadJustificatif = uploadJustificatif;

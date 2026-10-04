@@ -147,3 +147,51 @@ export interface ZoneLivraison {
   tarifCourse: number
   actif: boolean
 }
+
+// --- Finances ---
+export interface LigneBudget {
+  _id: string
+  code: string
+  libelle: string
+  montantPrevuUsd: number
+  montantPrevuFcfa: number
+  engageFcfa: number
+  reelFcfa: number
+  reelUsd: number
+  nbDepenses: number
+  tauxExecution: number
+}
+
+export interface Depense {
+  _id: string
+  categorie: 'Budget' | 'Exploitation'
+  referenceLigne: string
+  typeExploitation: 'Achat stock' | 'Livraison' | 'Compensation' | 'Autre' | null
+  libelle: string
+  partenaireId: { _id: string; nom: string; type: string } | null
+  lotStockId: string | null
+  montantPrevuUsd: number
+  montantPrevuFcfa: number
+  montantReelUsd: number
+  montantReelFcfa: number
+  tauxApplique: number
+  estEffectue: boolean
+  estValidePourAudit: boolean
+  datePaiement: string | null
+  urlPieceJointe: string | null
+  creePar: { username: string } | null
+  createdAt: string
+}
+
+export interface SyntheseFinances {
+  periode: { du: string; au: string }
+  exploitation: {
+    encaissements: { total: number; nombreLivraisons: number; parMode: { mode: string; total: number; nombre: number }[] }
+    coutLivraison: number
+    depenses: Record<'Achat stock' | 'Livraison' | 'Compensation' | 'Autre', { paye: number; aPayer: number }>
+    marge: number
+    livraisonsEnRetard: number
+  }
+  budget: { prevuFcfa: number; prevuUsd: number; reelFcfa: number; reelUsd: number }
+  taux: number
+}

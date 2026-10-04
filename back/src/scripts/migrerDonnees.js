@@ -9,6 +9,8 @@ const PurchaseOrder = require('../models/purchaseOrder');
 const { LotStockFifo } = require('../models/stock');
 const Zone = require('../models/zone');
 const Order = require('../models/order');
+const ExchangeRate = require('../models/exchangeRate');
+const { TAUX_CONVENTION } = require('../services/journalService');
 const { normaliser } = require('../utils/texte');
 
 dotenv.config();
@@ -110,11 +112,27 @@ async function migrerStatutsCommandes() {
   console.log(`  ✔ ${livrees.modifiedCount} commande(s) « Livré » -> « Livrée », ${annulees.modifiedCount} commande(s) supprimée(s) -> « Annulée »`);
 }
 
+// Étape 5 : le taux USD/FCFA 571 (Convention N°171), codé en dur jusqu'ici, devient le premier taux enregistré
+async function migrerTaux() {
+  if (await ExchangeRate.exists({})) {
+    console.log('  ✔ Un taux USD/FCFA est déjà enregistré');
+    return;
+  }
+  const admin = await User.findOne({ role: 'admin' }).sort({ createdAt: 1 });
+  if (!admin) {
+    console.log('  ⚠ Aucun compte admin : taux non enregistré (571 reste utilisé par défaut)');
+    return;
+  }
+  await ExchangeRate.create({ tauxUsdFcfa: TAUX_CONVENTION, creePar: admin._id });
+  console.log(`  ✔ Taux de la convention enregistré : 1 USD = ${TAUX_CONVENTION} FCFA`);
+}
+
 const ETAPES = [
   ['Index du téléphone', migrerIndexTelephone],
   ['Fournisseurs vers Prestataires', migrerFournisseurs],
   ['Zones de livraison', migrerZones],
   ['Statuts des commandes', migrerStatutsCommandes],
+  ['Taux USD/FCFA', migrerTaux],
 ];
 
 async function migrer() {

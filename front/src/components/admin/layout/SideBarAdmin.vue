@@ -68,7 +68,7 @@ const tousLesGroupes: { title: string; items: MenuItem[] }[] = [
   {
     title: 'Gestion',
     items: [
-      { id: 'finances', name: 'Finances', icon: Wallet2, hasChevron: true, path: '/dashboard/admin/finances', section: 'finances', bientot: true },
+      { id: 'finances', name: 'Finances', icon: Wallet2, hasChevron: true, path: '/dashboard/admin/finances', section: 'finances' },
       { id: 'simulateur', name: 'Simulateurs', icon: Sliders, hasChevron: true, path: '/dashboard/admin/simulateurs', section: 'simulateurs', bientot: true },
       { id: 'prestataires', name: 'Prestataires', icon: Users, hasChevron: true, path: '/dashboard/admin/prestataires', section: 'prestataires' },
       { id: 'logistique', name: 'Logistique', icon: FolderTree, hasChevron: true, path: '/dashboard/admin/logistique', section: 'logistique' },
