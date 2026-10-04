@@ -4,6 +4,7 @@ import { Search, Plus, Edit2, Trash2, Eye, X, Layers } from 'lucide-vue-next'
 import api from '@/stores/api'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
+import { useFournisseurs } from '@/composables/useFournisseurs'
 import type { Product } from '@/type'
 
 // --- INTERFACES TYPES ---
@@ -15,7 +16,8 @@ interface LotStockFifo {
   quantiteRestante: number
   prixAchatUnitaire: number
   dateReception: string
-  fournisseur: 'ETS EUROHI & FILS' | 'AHOUANDJO DAVID' | 'Hananim Distribution' | 'Autre'
+  fournisseur: string // Nom recopié de la fiche prestataire
+  fournisseurId?: string | null
   createdAt?: string
 }
 
@@ -35,6 +37,7 @@ const queryClient = useQueryClient()
 
 // Listes auxiliaires
 const listeProduits = ref<Product[]>([])
+const { fournisseurs } = useFournisseurs()
 
 // Gestion des volets d'affichage latéraux
 const showFormPanel = ref(false)
@@ -49,7 +52,7 @@ const form = ref({
   productId: '',
   quantiteRecue: null as number | null,
   prixAchatUnitaire: null as number | null,
-  fournisseur: '',
+  fournisseurId: '',
   dateReception: new Date().toISOString().substring(0, 10) // Date du jour par défaut (YYYY-MM-DD)
 })
 
@@ -112,7 +115,7 @@ const openCreateMode = () => {
     productId: '', 
     quantiteRecue: null, 
     prixAchatUnitaire: null, 
-    fournisseur: '',
+    fournisseurId: '',
     dateReception: new Date().toISOString().substring(0, 10)
   }
   showFormPanel.value = true
@@ -129,7 +132,7 @@ const openEditMode = (lot: LotStockFifo) => {
     productId: typeof lot.product === 'object' ? lot.product._id : lot.product,
     quantiteRecue: lot.quantiteInitiale, // On édite la quantité initiale d'entrée
     prixAchatUnitaire: lot.prixAchatUnitaire,
-    fournisseur: lot.fournisseur,
+    fournisseurId: lot.fournisseurId || '', // Anciens lots « Autre » : fournisseur à choisir
     dateReception: lot.dateReception ? lot.dateReception.substring(0, 10) : new Date().toISOString().substring(0, 10)
   }
   showFormPanel.value = true
@@ -381,13 +384,11 @@ const showNotification = (text: string, type: string) => {
 
           <div>
             <label class="block mb-1.5 font-bold text-noir text-[10px] uppercase">Fournisseur Grossiste</label>
-            <select v-model="form.fournisseur" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret text-noir" required>
+            <select v-model="form.fournisseurId" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret text-noir" required>
               <option value="" disabled>-- Choisir le fournisseur --</option>
-              <option value="ETS EUROHI & FILS">ETS EUROHI & FILS</option>
-              <option value="AHOUANDJO DAVID">AHOUANDJO DAVID</option>
-              <option value="Hananim Distribution">Hananim Distribution</option>
-              <option value="Autre">Autre</option>
+              <option v-for="f in fournisseurs" :key="f._id" :value="f._id">{{ f.nom }}</option>
             </select>
+            <p v-if="!fournisseurs.length" class="mt-1 text-[10px] text-gris">Aucun fournisseur actif : ajoutez-en un dans « Prestataires ».</p>
           </div>
 
           <div>

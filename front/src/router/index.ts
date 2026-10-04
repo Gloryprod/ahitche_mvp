@@ -133,6 +133,13 @@ const router = createRouter({
           meta: { roles: ACCES.stock.lecture },
           component: PurchaseOrdersView
         },
+        // Sections « Gestion » : chargées à la demande pour ne pas alourdir le site public
+        {
+          path: 'prestataires',
+          name: 'prestataires-page',
+          meta: { roles: ACCES.prestataires.lecture },
+          component: () => import('@/components/admin/prestataires/PrestataireManagement.vue')
+        },
         {
           path: 'posts',
           name: 'posts-page',

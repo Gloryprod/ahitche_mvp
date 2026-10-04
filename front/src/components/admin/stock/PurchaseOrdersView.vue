@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import type { Product } from '@/type'
 import { générerBonCommandePDF } from '@/services/pdfService'
 import Swal from 'sweetalert2'
+import { useFournisseurs } from '@/composables/useFournisseurs'
 
 interface OrderItem {
   productId: string
@@ -16,7 +17,8 @@ interface OrderItem {
 interface PurchaseOrder {
   _id: string
   numeroBon: string
-  fournisseur: string
+  fournisseur: string // Nom recopié de la fiche prestataire
+  fournisseurId?: string | null
   statut: 'En attente' | 'Reçu'
   items: {
     productId: Product | string
@@ -39,12 +41,12 @@ const activePanel = ref<'create' | 'edit' | 'details' | null>(null)
 const selectedBon = ref<PurchaseOrder | null>(null)
 
 // Formulaire
-const fournisseurSelectionne = ref('ETS EUROHI & FILS')
+const fournisseurSelectionne = ref('') // Identifiant de la fiche prestataire
 const itemsCommande = ref<OrderItem[]>([
   { productId: '', quantiteCommandee: 1, prixUnitairePrevu: 0 }
 ])
 
-const listeFournisseurs = ['ETS EUROHI & FILS', 'AHOUANDJO DAVID', 'Hananim Distribution', 'Autre']
+const { fournisseurs } = useFournisseurs()
 
 // Debounce pour la recherche
 let timeoutId: ReturnType<typeof setTimeout>
@@ -122,7 +124,7 @@ const deleteMutation = useMutation({
 // --- GESTION DU FORMULAIRE ET DES PANNEAUX ---
 const openCreatePanel = () => {
   selectedBon.value = null
-  fournisseurSelectionne.value = 'ETS EUROHI & FILS'
+  fournisseurSelectionne.value = fournisseurs.value[0]?._id ?? ''
   itemsCommande.value = [{ productId: '', quantiteCommandee: 1, prixUnitairePrevu: 0 }]
   activePanel.value = 'create'
 }
@@ -134,7 +136,7 @@ const openDetailsPanel = (bon: PurchaseOrder) => {
 
 const openEditPanel = (bon: PurchaseOrder) => {
   selectedBon.value = bon
-  fournisseurSelectionne.value = bon.fournisseur
+  fournisseurSelectionne.value = bon.fournisseurId || '' // Anciens bons « Autre » : fournisseur à choisir
   itemsCommande.value = bon.items.map(i => ({
     productId: typeof i.productId === 'object' ? i.productId._id : i.productId,
     quantiteCommandee: i.quantiteCommandee,
@@ -160,10 +162,10 @@ const retirerLigneProduit = (index: number) => {
 
 const soumettreFormulaire = () => {
   const itemsValides = itemsCommande.value.filter(item => item.productId !== '')
-  if (itemsValides.length === 0) return
+  if (itemsValides.length === 0 || !fournisseurSelectionne.value) return
 
   const payload = {
-    fournisseur: fournisseurSelectionne.value,
+    fournisseurId: fournisseurSelectionne.value,
     items: itemsValides
   }
 
@@ -395,8 +397,9 @@ const showNotification = (text: string, type: string) => {
         <form v-else-if="activePanel === 'create' || activePanel === 'edit'" @submit.prevent="soumettreFormulaire" class="space-y-4">
           <div class="space-y-1">
             <label class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Fournisseur</label>
-            <select v-model="fournisseurSelectionne" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret focus:bg-white transition-all">
-              <option v-for="f in listeFournisseurs" :key="f" :value="f">{{ f }}</option>
+            <select v-model="fournisseurSelectionne" required aria-label="Fournisseur" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret focus:bg-white transition-all">
+              <option value="" disabled>-- Choisir le fournisseur --</option>
+              <option v-for="f in fournisseurs" :key="f._id" :value="f._id">{{ f.nom }}</option>
             </select>
           </div>
 

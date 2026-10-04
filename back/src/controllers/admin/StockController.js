@@ -1,4 +1,6 @@
 const { LotStockFifo, MouvementStock } = require('../../models/stock');
+const { trouverFournisseur } = require('../../services/fournisseurService');
+const { echapperRegex } = require('../../utils/texte');
 
 /**
  * 1. LIRE LES LOTS (GET /api/stock/lots) - Avec Pagination & Recherche
@@ -17,8 +19,8 @@ async function obtenirLotsStock(req, res) {
     // Si une recherche est tapée (recherche par numéro de lot ou par fournisseur)
     if (search) {
       filtre.$or = [
-        { numeroLot: { $regex: search, $options: 'i' } },
-        { fournisseur: { $regex: search, $options: 'i' } }
+        { numeroLot: { $regex: echapperRegex(search), $options: 'i' } },
+        { fournisseur: { $regex: echapperRegex(search), $options: 'i' } }
       ];
     }
 
@@ -50,11 +52,17 @@ async function obtenirLotsStock(req, res) {
  */
 async function enregistrerEntreeStock(req, res) {
   try {
-    const { numeroLot, productId, quantiteRecue, prixAchatUnitaire, fournisseur, dateReception } = req.body;
+    const { numeroLot, productId, quantiteRecue, prixAchatUnitaire, fournisseurId, dateReception } = req.body;
 
-    if (!numeroLot || !productId || !quantiteRecue || !prixAchatUnitaire || !fournisseur) {
+    if (!numeroLot || !productId || !quantiteRecue || !prixAchatUnitaire || !fournisseurId) {
       return res.status(400).json({ message: "Veuillez remplir tous les champs obligatoires." });
     }
+
+    const fournisseurFiche = await trouverFournisseur(fournisseurId);
+    if (!fournisseurFiche) {
+      return res.status(400).json({ message: "Fournisseur introuvable ou inactif (voir Prestataires)." });
+    }
+    const fournisseur = fournisseurFiche.nom;
 
     const nouveauLot = await LotStockFifo.create({
       numeroLot,
@@ -62,6 +70,7 @@ async function enregistrerEntreeStock(req, res) {
       quantiteInitiale: quantiteRecue,
       quantiteRestante: quantiteRecue,
       prixAchatUnitaire,
+      fournisseurId: fournisseurFiche._id,
       fournisseur,
       dateReception: dateReception || Date.now()
     });
@@ -88,7 +97,7 @@ async function enregistrerEntreeStock(req, res) {
 async function modifierLotStock(req, res) {
   try {
     const { id } = req.params;
-    const { numeroLot, productId, quantiteRecue, prixAchatUnitaire, fournisseur, dateReception } = req.body;
+    const { numeroLot, productId, quantiteRecue, prixAchatUnitaire, fournisseurId, dateReception } = req.body;
 
     const lot = await LotStockFifo.findOne({ _id: id, deletedAt: null });
     if (!lot) {
@@ -103,7 +112,14 @@ async function modifierLotStock(req, res) {
     }
 
     if (prixAchatUnitaire !== undefined) lot.prixAchatUnitaire = prixAchatUnitaire;
-    if (fournisseur) lot.fournisseur = fournisseur;
+    if (fournisseurId) {
+      const fournisseurFiche = await trouverFournisseur(fournisseurId);
+      if (!fournisseurFiche) {
+        return res.status(400).json({ message: "Fournisseur introuvable ou inactif (voir Prestataires)." });
+      }
+      lot.fournisseurId = fournisseurFiche._id;
+      lot.fournisseur = fournisseurFiche.nom;
+    }
     if (dateReception) lot.dateReception = dateReception;
     if (numeroLot) lot.numeroLot = numeroLot;
     if (productId) lot.product = productId;

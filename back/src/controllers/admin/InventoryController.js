@@ -1,6 +1,8 @@
 const { LotStockFifo, MouvementStock } = require('../../models/stock');
 const PurchaseOrder = require('../../models/purchaseOrder');
 const Product = require('../../models/product');
+const { trouverFournisseur } = require('../../services/fournisseurService');
+const { echapperRegex } = require('../../utils/texte');
 
 /**
  * 1. ÉTAT DE L'INVENTAIRE GLOBAL & ALERTES
@@ -81,17 +83,23 @@ async function obtenirHistoriqueMouvements(req, res) {
  */
 async function creerBonCommande(req, res) {
   try {
-    const { fournisseur, items } = req.body;
+    const { fournisseurId, items } = req.body;
 
-    if (!fournisseur || !items || items.length === 0) {
+    if (!fournisseurId || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Données du bon de commande incomplètes." });
+    }
+
+    const fournisseurFiche = await trouverFournisseur(fournisseurId);
+    if (!fournisseurFiche) {
+      return res.status(400).json({ message: "Fournisseur introuvable ou inactif (voir Prestataires)." });
     }
 
     const numeroBon = `BC-${Date.now().toString().slice(-6)}`; // Identifiant court unique
 
     const nouveauBon = await PurchaseOrder.create({
       numeroBon,
-      fournisseur,
+      fournisseurId: fournisseurFiche._id,
+      fournisseur: fournisseurFiche.nom,
       items
     });
 
@@ -104,10 +112,15 @@ async function creerBonCommande(req, res) {
 
 async function modifierBonCommande(req, res) {
   try {
-    const { fournisseur, items } = req.body;
+    const { fournisseurId, items } = req.body;
+    const fournisseurFiche = await trouverFournisseur(fournisseurId);
+    if (!fournisseurFiche || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Fournisseur introuvable ou articles manquants." });
+    }
+
     const bon = await PurchaseOrder.findByIdAndUpdate(
       req.params.id,
-      { fournisseur, items },
+      { fournisseurId: fournisseurFiche._id, fournisseur: fournisseurFiche.nom, items },
       { new: true }
     ).populate('items.productId', 'name unit');
 
@@ -159,8 +172,8 @@ async function obtenirBonsCommande(req, res) {
     
     if (search) {
       query.$or = [
-        { numeroBon: { $regex: search, $options: 'i' } },
-        { fournisseur: { $regex: search, $options: 'i' } },
+        { numeroBon: { $regex: echapperRegex(search), $options: 'i' } },
+        { fournisseur: { $regex: echapperRegex(search), $options: 'i' } },
       ];
     }
 

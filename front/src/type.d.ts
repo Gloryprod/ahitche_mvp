@@ -97,3 +97,17 @@ export interface ProductSnapshot {
   totalPrice: number;
   isExtra: boolean; 
 }
+
+export type TypePrestataire = 'Fournisseur' | 'Livreur' | 'Autre'
+
+export interface Prestataire {
+  _id: string
+  nom: string
+  type: TypePrestataire
+  telephone: string
+  quartier: string
+  ifuRccm: string
+  modePaiement: 'Mobile Money' | 'Espèces' | 'Virement' | 'Chèque'
+  notes: string
+  actif: boolean
+}

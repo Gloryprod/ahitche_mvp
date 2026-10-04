@@ -9,6 +9,7 @@ const orderC = require('../controllers/admin/OrderController');
 const stockC = require('../controllers/admin/StockController');
 const invC = require('../controllers/admin/InventoryController');
 const postC = require('../controllers/admin/PostController');
+const partnerC = require('../controllers/admin/PartnerController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -24,6 +25,7 @@ router.use(['/commandes', '/orders'], acces(ACCES.commandes));
 router.use(['/categories', '/composition-rules', '/products', '/formulas'], acces(ACCES.donneesBase));
 router.use(['/posts', '/upload'], acces(ACCES.contenus));
 router.use(['/stock', '/inventory', '/mouvements', '/bons-commande'], acces(ACCES.stock));
+router.use('/prestataires', acces(ACCES.prestataires));
 
 // Users
 router.get('/users', userC.index);
@@ -92,6 +94,15 @@ router.post('/bons-commande', invC.creerBonCommande);
 router.get('/bons-commande', invC.obtenirBonsCommande);
 router.put('/bons-commande/:id', invC.modifierBonCommande);
 router.delete('/bons-commande/:id', invC.supprimerBonCommande);
+
+// Prestataires (fournisseurs, livreurs, autres)
+router.route('/prestataires')
+  .get(partnerC.listerPrestataires)
+  .post(partnerC.creerPrestataire);
+
+router.route('/prestataires/:id')
+  .put(partnerC.modifierPrestataire)
+  .delete(partnerC.supprimerPrestataire);
 
 module.exports = router;
         

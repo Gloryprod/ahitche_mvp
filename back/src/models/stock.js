@@ -32,10 +32,12 @@ const lotStockFifoSchema = new mongoose.Schema({
     default: Date.now, 
     required: true 
   }, // Très important pour le FIFO (savoir quel lot est le plus vieux)
+  // Fiche prestataire du fournisseur ; le nom est recopié pour garder l'historique lisible
+  fournisseurId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner', default: null },
   fournisseur: { 
     type: String, 
     required: true, 
-    enum: ['ETS EUROHI & FILS', 'AHOUANDJO DAVID', 'Hananim Distribution', 'Autre'] 
+    trim: true 
   },
   deletedAt: { type: Date, default: null }
 }, { timestamps: true });
