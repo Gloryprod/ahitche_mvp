@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import BaseButton from '../ui/BaseButton.vue'
-import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
+import { lienWhatsApp, MESSAGES_WHATSAPP, DELAI_LIVRAISON } from '@/config/contact'
 </script>
 
 <template>
@@ -25,7 +25,7 @@ import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
           </div>
           <h3 class="text-xl font-bold text-foret mb-3 font-body">Choisissez votre formule</h3>
           <p class="text-gris text-sm leading-relaxed">
-            Essentiel, Équilibré ou Confort selon la taille de votre foyer. Cliquez sur "Commander" — WhatsApp s'ouvre automatiquement.
+            Essentiel, Équilibré ou Confort selon la taille de votre foyer. Touchez « Commander » : WhatsApp s'ouvre avec votre message prêt.
           </p>
         </div>
 
@@ -36,11 +36,11 @@ import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
         <div class="flex-1 text-center max-w-sm">
           <div class="relative inline-block mb-4">
             <span class="absolute -top-2 -left-4 text-4xl font-display font-bold text-creme2 select-none z-0">02</span>
-            <span class="text-5xl relative z-10" aria-hidden="true">💳</span>
+            <span class="text-5xl relative z-10" aria-hidden="true">💬</span>
           </div>
-          <h3 class="text-xl font-bold text-foret mb-3 font-body">Payez en Mobile Money</h3>
+          <h3 class="text-xl font-bold text-foret mb-3 font-body">Confirmez sur WhatsApp</h3>
           <p class="text-gris text-sm leading-relaxed">
-            MTN MoMo ou Moov Money. Envoyez la capture d'écran sur WhatsApp. Confirmation en moins de 30 minutes.
+            Nous confirmons avec vous la formule, l'adresse de livraison et le créneau qui vous arrange.
           </p>
         </div>
 
@@ -53,9 +53,9 @@ import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
             <span class="absolute -top-2 -left-4 text-4xl font-display font-bold text-creme2 select-none z-0">03</span>
             <span class="text-5xl relative z-10" aria-hidden="true">🛵</span>
           </div>
-          <h3 class="text-xl font-bold text-foret mb-3 font-body">Recevez à domicile</h3>
+          <h3 class="text-xl font-bold text-foret mb-3 font-body">Recevez et payez à la livraison</h3>
           <p class="text-gris text-sm leading-relaxed">
-            Votre livreur vous appelle 30 minutes avant d'arriver. Livraison dans les 72h maximum. Zone Calavi Kpota &amp; environs.
+            Livraison sous {{ DELAI_LIVRAISON }} à Cotonou et Abomey-Calavi ; le livreur vous appelle avant d'arriver. Paiement MTN MoMo ou Moov Money à la réception.
           </p>
         </div>
 

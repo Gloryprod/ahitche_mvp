@@ -39,7 +39,7 @@ import { lienWhatsApp, WHATSAPP_AFFICHAGE } from '@/config/contact'
           <h3 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Zone de livraison</h3>
           <p class="text-gris text-sm leading-relaxed">
             Cotonou &amp; Abomey-Calavi<br />
-            <span class="text-savane font-medium">Calavi Kpota (zone prioritaire)</span>
+            <span class="text-savane font-medium">22 zones de livraison</span>
           </p>
         </div>
 

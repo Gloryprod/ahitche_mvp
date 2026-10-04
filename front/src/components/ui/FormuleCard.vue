@@ -49,7 +49,7 @@ const lienWhatsApp = computed(() => {
 
     <div>
       <div class="mb-6">
-        <span class="block text-sm text-gris-lt line-through">{{ formaterPrix(formule.ancienPrix) }} FCFA</span>
+        <span class="block text-sm text-gris"><span class="line-through">{{ formaterPrix(formule.ancienPrix) }} FCFA</span> · <span class="font-semibold text-savane">prix de lancement</span></span>
         <span class="text-3xl font-bold text-foret font-body">{{ formaterPrix(formule.prix) }} <small class="text-sm font-semibold">FCFA</small></span>
       </div>
       <BaseButton
