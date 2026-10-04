@@ -1,6 +1,7 @@
 const { LotStockFifo, MouvementStock } = require('../../models/stock');
 const { trouverFournisseur } = require('../../services/fournisseurService');
 const { echapperRegex } = require('../../utils/texte');
+const { creerDepenseAchat, mettreAJourDepenseAchat, annulerDepenseAchat } = require('../../services/depenseStockService');
 
 /**
  * 1. LIRE LES LOTS (GET /api/stock/lots) - Avec Pagination & Recherche
@@ -83,6 +84,9 @@ async function enregistrerEntreeStock(req, res) {
       motif: `Réception de marchandise auprès de ${fournisseur}`
     });
 
+    // Dépense d'achat à payer au fournisseur (section Finances)
+    await creerDepenseAchat(req, nouveauLot);
+
     return res.status(201).json({ message: "✅ Entrée enregistrée avec succès !", lot: nouveauLot });
   } catch (error) {
     if (error.code === 11000) return res.status(400).json({ message: "Ce numéro de lot existe déjà." });
@@ -125,6 +129,7 @@ async function modifierLotStock(req, res) {
     if (productId) lot.product = productId;
 
     await lot.save();
+    await mettreAJourDepenseAchat(req, lot);
 
     return res.status(200).json({ message: "Lot mis à jour avec succès !", lot });
   } catch (error) {
@@ -160,6 +165,8 @@ async function supprimerLotStock(req, res) {
       quantite: lotSupprime.quantiteRestante,
       motif: `Lot supprimé logiquement de l'inventaire (N° ${lotSupprime.numeroLot})`
     });
+
+    await annulerDepenseAchat(req, lotSupprime);
 
     return res.status(200).json({ message: "Le lot a été retiré de l'affichage avec succès (Soft Delete)." });
   } catch (error) {
