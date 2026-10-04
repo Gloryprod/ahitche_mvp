@@ -3,7 +3,6 @@ import { ref, onMounted, computed, reactive } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
-import Swal from 'sweetalert2';
 import api from '@/stores/api';
 import { 
   MapPinIcon, Edit3Icon, PhoneIcon, MailIcon, 
@@ -13,6 +12,7 @@ import {
 import { genererRecuPDF } from '@/services/pdfRecuCommande';
 import { ANNULABLES_PAR_CLIENT, classeStatut, type StatutCommande } from '@/config/commandes';
 import SuiviAlimentaire from '@/components/client/SuiviAlimentaire.vue';
+import { useDeconnexion } from '@/composables/useDeconnexion';
 
 interface Commande {
   id: string;
@@ -43,7 +43,6 @@ const formaterFCFA = (montant: number) => `${montant.toLocaleString('fr-FR')} FC
 
 // 1. Authentification et Routage
 const authStore = useAuthStore();
-const isLoading = ref(false);
 const router = useRouter();
 const toast = useToast();
 const estEnEdition = ref(false);
@@ -132,43 +131,8 @@ const fetchDashboardData = async () => {
   }
 };
 
-// Action de Déconnexion
-const handleLogout = async () => {
-  // 💡 Boîte de dialogue SweetAlert2 moderne et stylée
-  const result = await Swal.fire({
-    title: 'Êtes-vous sûr ?',
-    text: "Vous allez être déconnecté de votre espace.",
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#1e3a1f', // Adapte avec ta couleur "foret"
-    cancelButtonColor: '#d33',
-    confirmButtonText: 'Oui, me déconnecter',
-    cancelButtonText: 'Annuler',
-    background: '#ffffff',
-    customClass: {
-      popup: 'rounded-2xl font-body'
-    }
-  });
-
-  if (result.isConfirmed) {
-    isLoading.value = true;
-    try {
-      await authStore.logout();      
-      router.push('/login');
-      toast.success("À bientôt ! Déconnexion réussie.");
-    } catch (error) {
-      // 💡 Alerte SweetAlert2 en cas d'erreur serveur
-      Swal.fire({
-        title: 'Erreur',
-        text: 'Impossible de vous déconnecter pour le moment.',
-        icon: 'error',
-        confirmButtonColor: '#1e3a1f'
-      });
-    } finally {
-      isLoading.value = false;
-    }
-  }
-};
+// Déconnexion : confirmation, fermeture de la session puis retour à l'accueil du site
+const { seDeconnecter, deconnexionEnCours } = useDeconnexion();
 
 // Initialisation des Infos du formulaire
 const formFormulaire = reactive({
@@ -411,12 +375,12 @@ onMounted(async () => {
           </div>
         </div>
         <button 
-          @click="handleLogout" 
-          :disabled="isLoading"
+          @click="seDeconnecter" 
+          :disabled="deconnexionEnCours"
           class="cursor-pointer w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-200 text-gris hover:text-red-600 hover:bg-red-50 hover:border-red-100 font-semibold transition-all duration-200 text-sm disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <LogOutIcon class="w-4 h-4" />
-          <span>{{ isLoading ? 'Déconnexion...' : 'Déconnexion' }}</span>
+          <span>{{ deconnexionEnCours ? 'Déconnexion...' : 'Déconnexion' }}</span>
         </button>
       </div>
 

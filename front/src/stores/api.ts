@@ -15,8 +15,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      const authStore = useAuthStore();
-      authStore.logout();        // Nettoie l'état Pinia/LocalStorage
+      // Session expirée ou refusée par le serveur : on l'oublie côté navigateur (aucun appel réseau nécessaire)
+      useAuthStore().effacerSessionLocale();
       router.push('/login');     // Redirige sur-le-champ
     }
     return Promise.reject(error);

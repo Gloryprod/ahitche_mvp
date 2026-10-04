@@ -1,15 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch } from 'vue';
 import SideBarAdmin from '@/components/admin/layout/SideBarAdmin.vue';
-import { RouterView, useRoute, useRouter } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
 import { Menu, X } from 'lucide-vue-next'
-import { useAuthStore } from '@/stores/auth';
-import { useToast } from 'vue-toastification';
 
 const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const toast = useToast()
 
 // État pour contrôler l'ouverture du menu mobile
 const isMobileMenuOpen = ref(false);
@@ -19,20 +14,7 @@ watch(() => route.path, () => {
   isMobileMenuOpen.value = false
 })
 
-onMounted(async () => {
-  await authStore.checkSession();
-  
-  if (!authStore.isAuthenticated.value) {
-    // 💡 Toast d'avertissement si l'utilisateur tente de forcer l'accès
-    toast.error("Accès refusé. Veuillez vous connecter.");
-    authStore.logout();
-    router.push('/login');
-    return;
-  }
-  
-  // Si tout est bon, on affiche un toast de bienvenue chaleureux
-  // toast.info(`Ravi de vous revoir, ${authStore.user?.value?.username} ! ✨`);
-});
+// L'accès (session et rôle) est vérifié par le routeur avant l'affichage du back-office
 </script>
 
 <template>

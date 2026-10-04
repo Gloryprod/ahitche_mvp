@@ -53,12 +53,17 @@ export function useAuthStore() {
     return response.data;
   }
 
+  // Oublie la session côté navigateur, sans appel au serveur (session déjà refusée par le serveur : 401)
+  function effacerSessionLocale() {
+    user.value = null;
+  }
+
+  // Déconnexion volontaire : la session locale n'est effacée qu'une fois le cookie supprimé par le serveur.
+  // Si le réseau ne répond pas (délai de 15 s), l'erreur remonte au composant : sur un téléphone partagé,
+  // se croire déconnecté alors que le cookie est encore valide serait risqué.
   async function logout() {
-    try {
-      await axios.post('/api/auth/logout');
-    } finally {
-      user.value = null;
-    }
+    await axios.post('/api/auth/logout', null, { timeout: 15000 });
+    effacerSessionLocale();
   }
 
   async function forgotPassword(payload: { email: string }) {
@@ -80,5 +85,5 @@ export function useAuthStore() {
     }
   }
 
-  return { user, isInitialized, isAuthenticated, isAdmin, role, isEquipe, login, logout, checkSession, forgotPassword, resetPassword };
+  return { user, isInitialized, isAuthenticated, isAdmin, role, isEquipe, login, logout, effacerSessionLocale, checkSession, forgotPassword, resetPassword };
 }

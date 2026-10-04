@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth';
 import { 
   Users, 
@@ -15,9 +15,8 @@ import {
   Scale,
   LogOut
 } from 'lucide-vue-next'
-import { onMounted, ref, computed } from 'vue';
-import { useToast } from 'vue-toastification';
-import Swal from 'sweetalert2';
+import { computed } from 'vue';
+import { useDeconnexion } from '@/composables/useDeconnexion';
 import { peutLire, LIBELLES_ROLES, type Section } from '@/config/roles';
 
 
@@ -26,10 +25,7 @@ defineProps<{
 }>()
 
 const route = useRoute()
-const router = useRouter()
 const authStore = useAuthStore()
-const toast = useToast()
-const isLoading = ref(false);
 
 // Extraction de l'initiale du nom pour l'avatar
 const avatarInitiale = computed(() => {
@@ -96,41 +92,8 @@ const menuGroups = computed(() =>
 
 const libelleRole = computed(() => authStore.role.value ? LIBELLES_ROLES[authStore.role.value] : '')
 
-// Action de Déconnexion
-const handleLogout = async () => {
-  const result = await Swal.fire({
-    title: 'Êtes-vous sûr ?',
-    text: "Vous allez être déconnecté de votre espace.",
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#1e3a1f',
-    cancelButtonColor: '#d33',
-    confirmButtonText: 'Oui, me déconnecter',
-    cancelButtonText: 'Annuler',
-    background: '#ffffff',
-    customClass: {
-      popup: 'rounded-2xl font-body'
-    }
-  });
-
-  if (result.isConfirmed) {
-    isLoading.value = true;
-    try {
-      await authStore.logout();      
-      router.push('/login');
-      toast.success("À bientôt ! Déconnexion réussie.");
-    } catch (error) {
-      Swal.fire({
-        title: 'Erreur',
-        text: 'Impossible de vous déconnecter pour le moment.',
-        icon: 'error',
-        confirmButtonColor: '#1e3a1f'
-      });
-    } finally {
-      isLoading.value = false;
-    }
-  }
-};
+// Déconnexion : confirmation, fermeture de la session puis retour à l'accueil du site
+const { seDeconnecter, deconnexionEnCours } = useDeconnexion()
 
 </script>
 
@@ -145,10 +108,12 @@ const handleLogout = async () => {
       <div class=" flex items-center justify-between">
         <p class="text-xs font-semibold bg-foret/5 text-foret px-2.5 py-0.5 rounded-full m-1">Back Office · {{ libelleRole }}</p>
         <button 
-          @click="handleLogout"
+          @click="seDeconnecter"
+          :disabled="deconnexionEnCours"
           type="button"
           title="Déconnexion"
-          class="cursor-pointer p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 focus:outline-none group-hover:scale-105"
+          aria-label="Se déconnecter"
+          class="cursor-pointer p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 focus:outline-none group-hover:scale-105 disabled:opacity-50"
         >
           <LogOut class="w-4 h-4 stroke-2" />
         </button>
