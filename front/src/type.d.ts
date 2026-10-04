@@ -119,3 +119,31 @@ export interface Prestataire {
   notes: string
   actif: boolean
 }
+
+// Commande vue par la Logistique (GET /api/admin/logistique)
+export interface CommandeTerrain {
+  id: string
+  reference: string
+  statut: import('@/config/commandes').StatutCommande
+  formule: string
+  total: number
+  modePaiement: 'Mobile Money' | 'Espèces' | 'Acompte'
+  client: { nom: string; telephone: string; quartier: string; adresse: string; lienLocalisation: string }
+  zone: { code: string; nom: string; commune: string; prioritaire: boolean } | null
+  creneau: { date: string | null; periode: 'Matin' | 'Après-midi' | null }
+  livreur: { _id: string; nom: string; telephone: string } | null
+  produits: { nom: string; quantite: number; unite: string }[]
+  compensationRecue: { reference: string; motif: string } | null
+  enRetard: boolean
+}
+
+export interface ZoneLivraison {
+  _id?: string
+  code: string
+  commune: string
+  nom: string
+  quartiers: string[]
+  prioritaire: boolean
+  tarifCourse: number
+  actif: boolean
+}

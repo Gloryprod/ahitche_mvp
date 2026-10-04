@@ -6,7 +6,8 @@ import CommandeForm from '@/components/admin/CommandeForm.vue'
 import type { Client, Commande, Product } from '@/type'
 import { Eye, Edit2, Trash2, Search, CheckCircle } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
-import { STATUTS, TRANSITIONS, ETAPE_SUIVANTE, classeStatut, type StatutCommande } from '@/config/commandes'
+import { STATUTS, TRANSITIONS, classeStatut, type StatutCommande } from '@/config/commandes'
+import { useChangementStatut } from '@/composables/useChangementStatut'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
 
@@ -88,19 +89,7 @@ const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
 
 // --- MUTATIONS (ACTIONS DU TABLEAU) ---
 
-// 1. Mutation pour changer le statut (le serveur vérifie le passage autorisé, le paiement et le stock)
-const { mutate: changerStatut } = useMutation({
-  mutationFn: async ({ orderId, ...corps }: { orderId: string; statut: StatutCommande; referencePaiement?: string; notePaiement?: string }) => {
-    return await api.patch(`/api/admin/orders/${orderId}/status`, corps)
-  },
-  onSuccess: (response) => {
-    queryClient.invalidateQueries({ queryKey: ['orders'] })
-    showNotification(response.data.message, "success")
-  },
-  onError: (err: any) => showNotification(err.response?.data?.message || "Impossible de modifier le statut", "error")
-})
-
-// 2. Mutation pour supprimer la commande
+// Mutation pour supprimer (archiver) la commande
 const { mutate: deleteOrder } = useMutation({
   mutationFn: async (orderId: string) => {
     return await api.delete(`/api/admin/orders/${orderId}`)
@@ -132,46 +121,18 @@ const openEditMode = (cmd: Commande) => {
   isModalOpen.value = true
 }
 
+// Changement de statut guidé (paiement à la livraison), partagé avec l'écran Logistique
+const { choisirEtChanger } = useChangementStatut()
+
 const handleChangerStatut = async (cmd: Commande) => {
-  const possibles = TRANSITIONS[cmd.statut] || []
-  const choix = await Swal.fire({
-    title: `Commande ${cmd.reference}`,
-    text: `Statut actuel : ${cmd.statut}`,
-    input: 'select',
-    inputOptions: Object.fromEntries(possibles.map(s => [s, s])),
-    inputValue: ETAPE_SUIVANTE[cmd.statut] ?? possibles[0],
-    showCancelButton: true,
-    confirmButtonColor: '#1A5C38',
-    confirmButtonText: 'Valider',
-    cancelButtonText: 'Fermer',
-    customClass: { popup: 'rounded-2xl font-body' }
-  })
-  if (!choix.isConfirmed) return
-  const statut = choix.value as StatutCommande
-
-  // Paiement à la livraison : référence Mobile Money, ou note pour Espèces / Acompte
-  if (statut === 'Livrée') {
-    const mobileMoney = cmd.modePaiement === 'Mobile Money'
-    const paiement = await Swal.fire({
-      title: 'Paiement reçu',
-      text: mobileMoney ? 'Référence de la transaction Mobile Money' : `Paiement « ${cmd.modePaiement} » : précisez le cas`,
-      input: mobileMoney ? 'text' : 'textarea',
-      inputPlaceholder: mobileMoney ? 'Ex : MP241005.1234.A12345' : 'Ex : réglé en espèces au livreur',
-      inputValidator: (valeur: string) => (!valeur?.trim() ? 'Ce champ est obligatoire.' : null),
-      showCancelButton: true,
-      confirmButtonColor: '#1A5C38',
-      confirmButtonText: 'Marquer comme livrée',
-      cancelButtonText: 'Annuler',
-      customClass: { popup: 'rounded-2xl font-body' }
-    })
-    if (!paiement.isConfirmed) return
-    changerStatut(mobileMoney
-      ? { orderId: cmd.id, statut, referencePaiement: paiement.value }
-      : { orderId: cmd.id, statut, notePaiement: paiement.value })
-    return
+  try {
+    const message = await choisirEtChanger(cmd)
+    if (!message) return
+    queryClient.invalidateQueries({ queryKey: ['orders'] })
+    showNotification(message, 'success')
+  } catch (err: any) {
+    showNotification(err.response?.data?.message || 'Impossible de modifier le statut', 'error')
   }
-
-  changerStatut({ orderId: cmd.id, statut })
 }
 
 const handleDeleteClick = async(orderId: string) => {

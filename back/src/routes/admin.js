@@ -11,6 +11,7 @@ const invC = require('../controllers/admin/InventoryController');
 const postC = require('../controllers/admin/PostController');
 const partnerC = require('../controllers/admin/PartnerController');
 const zoneC = require('../controllers/ZoneController');
+const logistiqueC = require('../controllers/admin/LogistiqueController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -109,6 +110,10 @@ router.route('/prestataires/:id')
 // Zones de livraison (tarif de course, priorité, activation)
 router.get('/zones', zoneC.listerZonesAdmin);
 router.put('/zones/:code', zoneC.modifierZone);
+
+// Logistique : planning du jour et planification (créneau + livreur)
+router.get('/logistique', logistiqueC.obtenirPlanning);
+router.patch('/logistique/commandes/:id/planification', logistiqueC.planifierCommande);
 
 module.exports = router;
         

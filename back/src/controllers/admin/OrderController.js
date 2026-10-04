@@ -184,6 +184,11 @@ async function updateOrderStatus(req, res) {
     }
 
     if (statut === 'Confirmée') {
+      // Après un échec de livraison, la commande repart en planification (nouveau créneau, nouveau livreur)
+      if (order.statut === 'Échec') {
+        order.creneau = { date: null, periode: null };
+        order.livreurId = null;
+      }
       // Zone de livraison du client, et composition du pack pour les commandes passées par le client
       if (!order.zone) {
         const client = await User.findById(order.userId).select('zone').session(session);
