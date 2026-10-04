@@ -45,3 +45,26 @@ body {
   @apply bg-creme text-noir font-body antialiased overflow-x-hidden;
 }
 
+
+/* Apparition au défilement (directive v-apparition) : la classe n'est posée que si les animations sont autorisées */
+.apparition {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.apparition.apparition-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Frise « De la ferme à votre porte » : le tracé se dessine au fil du défilement (sans JavaScript).
+   Navigateurs sans animations liées au défilement, ou animations réduites : tracé plein d'emblée. */
+@keyframes tracerVertical { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes tracerHorizontal { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .frise-trace { animation-timing-function: linear; animation-fill-mode: both; animation-timeline: view(); animation-range: entry 20% cover 55%; }
+    .frise-trace-vertical { transform-origin: top; animation-name: tracerVertical; }
+    .frise-trace-horizontal { transform-origin: left; animation-name: tracerHorizontal; }
+  }
+}
