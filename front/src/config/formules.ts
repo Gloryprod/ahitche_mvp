@@ -10,14 +10,24 @@ export interface FormuleVitrine {
   heures: string // Ex : "2–4h"
   ancienPrix: number
   prix: number // Prix de vente en FCFA
+  joursCouverts: number // Durée couverte par un pack (« par mois » = 30) : sert au prix par jour
+  foyer: TailleFoyer // Taille de foyer pour laquelle la formule est conseillée
   recommandee?: boolean
 }
 
+// Tailles de foyer du comparateur de l'accueil
+export type TailleFoyer = '1' | '2-3' | '4-6'
+export const TAILLES_FOYER: { valeur: TailleFoyer; libelle: string }[] = [
+  { valeur: '1', libelle: '1 personne' },
+  { valeur: '2-3', libelle: '2–3 personnes' },
+  { valeur: '4-6', libelle: '4–6 personnes' },
+]
+
 // Formules ouvertes au lancement
 export const FORMULES: FormuleVitrine[] = [
-  { emoji: '🌿', nom: 'AHI ESSENTIEL', cible: '1 personne · par mois', accroche: 'Un suivi alimentaire simple, pour commencer.', repas: '20–30', heures: '2–4h', ancienPrix: 24000, prix: 10800 },
-  { emoji: '🌾', nom: 'AHI ÉQUILIBRÉ', cible: '2–3 personnes · par mois', accroche: 'Mieux manger sans compliquer votre quotidien.', repas: '35–50', heures: '4–6h', ancienPrix: 50000, prix: 22500, recommandee: true },
-  { emoji: '👑', nom: 'AHI CONFORT', cible: 'Famille 4–6 · par mois', accroche: 'Un ravitaillement complet, pensé pour toute la famille.', repas: '60–90', heures: '6–10h', ancienPrix: 110000, prix: 50300 },
+  { emoji: '🌿', nom: 'AHI ESSENTIEL', cible: '1 personne · par mois', accroche: 'Un suivi alimentaire simple, pour commencer.', repas: '20–30', heures: '2–4h', ancienPrix: 24000, prix: 10800, joursCouverts: 30, foyer: '1' },
+  { emoji: '🌾', nom: 'AHI ÉQUILIBRÉ', cible: '2–3 personnes · par mois', accroche: 'Mieux manger sans compliquer votre quotidien.', repas: '35–50', heures: '4–6h', ancienPrix: 50000, prix: 22500, joursCouverts: 30, foyer: '2-3', recommandee: true },
+  { emoji: '👑', nom: 'AHI CONFORT', cible: 'Famille 4–6 · par mois', accroche: 'Un ravitaillement complet, pensé pour toute la famille.', repas: '60–90', heures: '6–10h', ancienPrix: 110000, prix: 50300, joursCouverts: 30, foyer: '4-6' },
 ]
 
 // Prix de la formule la moins chère, repris dans le hero (« dès … FCFA »)
@@ -33,6 +43,9 @@ export const PRODUITS_INCLUS = [
 
 // Produits absents de la formule AHI Essentiel
 export const EXCLUS_ESSENTIEL = ['Huile de palme']
+
+// Prix moyen par jour, arrondi à la dizaine de FCFA
+export const prixParJour = (f: FormuleVitrine) => Math.round(f.prix / f.joursCouverts / 10) * 10
 
 // Montant en FCFA avec espaces de milliers (« 10 800 »)
 export const formaterPrix = (montant: number) => montant.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
