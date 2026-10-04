@@ -76,7 +76,7 @@ Deux onglets :
    - achats (chaque entrée de stock crée automatiquement une dépense rattachée au fournisseur) ;
    - coûts logistiques et marges.
 
-- **Taux USD/FCFA :** 571 au départ, modifiable avec historique (`ExchangeRate`). Le taux appliqué est figé sur chaque dépense.
+- **Taux USD/FCFA :** 571 par défaut, soit le taux de la Convention N°171 sur lequel la subvention a été accordée. Il est affiché sur le tableau de bord (« · convention » quand il s'applique) et reste modifiable par l'admin et le comptable, depuis le tableau de bord (un clic sur le taux) ou dans Finances > Taux & journal. Chaque changement est historisé (`ExchangeRate`) et inscrit au journal, et un bouton permet de revenir au taux de la convention en un clic. Le taux appliqué est figé sur chaque dépense au moment de sa saisie.
 - **Devises :** tout en FCFA, sauf le budget de la subvention, en USD et en FCFA.
 - **Exports :** CSV des dépenses et synthèse PDF pour l'audit.
 - **Historique :** journal « qui a modifié quoi, et quand » sur les finances et les prix.

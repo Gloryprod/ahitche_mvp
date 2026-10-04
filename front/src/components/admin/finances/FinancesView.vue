@@ -36,7 +36,7 @@ const { data: synthese, isLoading } = useQuery({
 })
 const { data: taux } = useQuery({
   queryKey: ['finances', 'taux'],
-  queryFn: async () => (await api.get('/api/admin/finances/taux')).data as { courant: number; historique: { _id: string; tauxUsdFcfa: number; createdAt: string; creePar?: { username: string } }[] },
+  queryFn: async () => (await api.get('/api/admin/finances/taux')).data as { courant: number; convention: number; historique: { _id: string; tauxUsdFcfa: number; createdAt: string; creePar?: { username: string } }[] },
   enabled: computed(() => onglet.value === 'taux'),
 })
 const pageJournal = ref(1)
@@ -65,9 +65,9 @@ const executionBudget = computed(() => {
 
 // --- Taux ---
 const nouveauTaux = ref<number | null>(null)
-async function enregistrerTaux() {
+async function enregistrerTaux(valeur: number | null = nouveauTaux.value) {
   try {
-    const response = await api.post('/api/admin/finances/taux', { tauxUsdFcfa: nouveauTaux.value })
+    const response = await api.post('/api/admin/finances/taux', { tauxUsdFcfa: valeur })
     notifier(response.data.message, 'success')
     nouveauTaux.value = null
     queryClient.invalidateQueries({ queryKey: ['finances'] })
@@ -172,10 +172,13 @@ const exporterPdf = () => synthese.value && genererSynthesePDF(lignes.value ?? [
     <template v-if="onglet === 'taux'">
       <div class="bg-white rounded-2xl border border-creme2 p-4 space-y-3">
         <h2 class="font-bold text-sm">Taux USD/FCFA : 1 USD = {{ taux?.courant ?? '…' }} FCFA</h2>
-        <p class="text-xs text-gris">Chaque dépense garde le taux en vigueur au moment de sa saisie. Changer le taux ne modifie pas les dépenses existantes.</p>
-        <form v-if="ecriture" @submit.prevent="enregistrerTaux" class="flex flex-wrap items-end gap-2">
+        <p class="text-xs text-gris">Taux de la convention de subvention Next Impact : {{ taux?.convention ?? '…' }} FCFA. Chaque dépense garde le taux en vigueur au moment de sa saisie : changer le taux ne modifie pas les dépenses existantes.</p>
+        <form v-if="ecriture" @submit.prevent="enregistrerTaux()" class="flex flex-wrap items-end gap-2">
           <label class="text-[10px] font-bold uppercase text-gris">Nouveau taux<input v-model.number="nouveauTaux" required type="number" min="1" step="0.01" class="mt-1 block w-36 px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal" /></label>
           <button type="submit" class="cursor-pointer px-3 py-2 rounded-xl bg-foret text-white text-xs font-bold">Enregistrer</button>
+          <button v-if="taux && taux.courant !== taux.convention" type="button" @click="enregistrerTaux(taux.convention)" class="cursor-pointer px-3 py-2 rounded-xl border border-foret text-foret text-xs font-bold">
+            Revenir à {{ taux.convention }} (convention)
+          </button>
         </form>
         <ul class="text-xs divide-y divide-creme2">
           <li v-for="t in taux?.historique" :key="t._id" class="py-2 flex justify-between gap-2">

@@ -4,7 +4,9 @@ import { useQuery, keepPreviousData, useQueries } from '@tanstack/vue-query'
 import api from '@/stores/api'
 import { classeStatut } from '@/config/commandes'
 import { useAuthStore } from '@/stores/auth'
-import { peutLire } from '@/config/roles'
+import { peutLire, peutEcrire } from '@/config/roles'
+import { useTauxChange } from '@/composables/useTauxChange'
+import { useToast } from 'vue-toastification'
 import type { Commande } from '@/type'
 import { 
   AlertTriangle, 
@@ -81,12 +83,27 @@ const stockAlerts = computed(() => inventaireRaw.value.filter(item => item.enAle
 
 // Taux USD/FCFA en vigueur (section Finances), affiché seulement aux rôles qui y ont accès
 const authStore = useAuthStore()
+const toast = useToast()
 const { data: tauxData } = useQuery({
   queryKey: ['finances', 'taux'],
-  queryFn: async () => (await api.get('/api/admin/finances/taux')).data as { courant: number },
+  queryFn: async () => (await api.get('/api/admin/finances/taux')).data as { courant: number; convention: number },
   enabled: computed(() => peutLire(authStore.role.value, 'finances')),
 })
 const tauxUsd = computed(() => tauxData.value?.courant)
+const tauxConvention = computed(() => tauxData.value?.convention)
+
+// Admin et comptable : le taux se modifie d'un clic (nouveau taux ou retour au taux de la convention)
+const tauxModifiable = computed(() => peutEcrire(authStore.role.value, 'finances'))
+const { modifierTaux } = useTauxChange()
+const changerTaux = async () => {
+  if (!tauxData.value) return
+  try {
+    const message = await modifierTaux(tauxData.value.courant, tauxData.value.convention)
+    if (message) toast.success(message)
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Modification du taux impossible')
+  }
+}
 
 // --- 4. GESTION DES RENOUVELLEMENTS ---
 // Relance si le client ne se manifeste pas : 14 jours après la livraison (Essentiel, Fraîcheur) ou 30 jours
@@ -281,9 +298,17 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
           <RefreshCw :class="['w-4 h-4 text-gray-600', isLoadingOrders || isLoadingStock ? 'animate-spin' : '']" />
         </button>
 
-        <div v-if="tauxUsd" class="bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 font-mono text-[11px]">
+        <component
+          :is="tauxModifiable ? 'button' : 'div'"
+          v-if="tauxUsd"
+          :type="tauxModifiable ? 'button' : undefined"
+          @click="tauxModifiable && changerTaux()"
+          :title="tauxModifiable ? 'Modifier le taux USD/FCFA' : undefined"
+          :class="['bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 font-mono text-[11px]', tauxModifiable ? 'cursor-pointer hover:border-foret' : '']"
+        >
           1 USD = <span class="font-bold text-noir">{{ tauxUsd }} FCFA</span>
-        </div>
+          <span v-if="tauxUsd === tauxConvention" class="font-body text-savane"> · convention</span>
+        </component>
       </div>
     </div>
 

@@ -29,7 +29,8 @@ function lirePeriode(query) {
 async function obtenirTaux(req, res) {
   try {
     const historique = await ExchangeRate.find().sort({ createdAt: -1 }).limit(50).populate('creePar', 'username').lean();
-    return res.status(200).json({ courant: historique[0]?.tauxUsdFcfa ?? TAUX_CONVENTION, historique });
+    // convention : taux sur lequel la subvention Next Impact a été accordée (571), proposé comme valeur de retour
+    return res.status(200).json({ courant: historique[0]?.tauxUsdFcfa ?? TAUX_CONVENTION, convention: TAUX_CONVENTION, historique });
   } catch (error) {
     console.error("Erreur obtenirTaux:", error);
     return res.status(500).json({ message: "Erreur lors du chargement du taux." });
