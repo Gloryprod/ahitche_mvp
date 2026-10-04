@@ -132,7 +132,7 @@ const router = createRouter({
 })
 
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore();
 
   // Si l'application vient d'être rechargée, on attend impérativement
@@ -143,16 +143,16 @@ router.beforeEach(async (to, from, next) => {
   
   // Vérification de l'authentification requise
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return next({ path: '/login' });
+    return { path: '/login' };
   }
 
   // Vérification des restrictions de rôle
   if (to.meta.roles && !authStore.isAdmin) {
     // Redirige vers l'accueil ou une page 403 si le rôle ne correspond pas
-    return next({ path: '/' });
+    return { path: '/' };
   }
 
-  next();
+  return true;
 });
 
 export default router
