@@ -51,7 +51,7 @@ Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`,
 ## Conventions
 - Le code, les commentaires et les messages sont en français. On garde le style existant (`async function` + `module.exports` côté back, `<script setup lang="ts">` côté front).
 - La commande se fait principalement par WhatsApp (`wa.me/22998136635`) avec un message pré-rempli.
-- Les prix des packs sont définis à deux endroits : dans le tableau `formules` de `NosFormules.vue` (vitrine) et en base (`Formule`, référentiel dans `back/src/scripts/createFormules.js`). Toute modification de prix doit être faite aux deux endroits.
+- Les prix des packs sont définis à deux endroits : dans `front/src/config/formules.ts` (vitrine : cartes et prix d'appel du hero) et en base (`Formule`, référentiel dans `back/src/scripts/createFormules.js`). Toute modification de prix doit être faite aux deux endroits.
 - Prix de vente = `prixCommercial` s'il est fixé par l'admin, sinon `prixActuel`. `GET /api/admin/formulas/:pack` est en lecture seule et renvoie la valeur issue du catalogue dans `prixCalcule`.
 - Une commande client est enregistrée par le serveur, qui fixe lui-même le prix et la référence `CMD-xxx` (`orderReferenceService`). Les packs `bientotDisponible` (Réserve, Fraîcheur) sont visibles mais ne peuvent pas être commandés.
 - Liste commune : 17 produits de base. L'Essentiel exclut l'huile de palme. Les quantités par pack ne sont pas affichées.

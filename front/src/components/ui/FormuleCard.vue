@@ -2,23 +2,9 @@
 import { computed } from 'vue'
 import BaseButton from './BaseButton.vue'
 import { lienWhatsApp as lienWa } from '@/config/contact'
-
-export interface FormuleVitrine {
-  emoji: string
-  nom: string // Ex : "AHI ESSENTIEL"
-  cible: string // Ex : "1 personne · par mois"
-  accroche: string
-  repas: string // Ex : "20–30"
-  heures: string // Ex : "2–4h"
-  ancienPrix: number
-  prix: number
-  recommandee?: boolean
-}
+import { formaterPrix, type FormuleVitrine } from '@/config/formules'
 
 const props = defineProps<{ formule: FormuleVitrine }>()
-
-// Séparateur de milliers en espace simple (« 10 800 »), identique dans la carte et le message WhatsApp
-const formaterPrix = (montant: number) => montant.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 
 const lienWhatsApp = computed(() => {
   const { nom, prix } = props.formule

@@ -1,24 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import FormuleCard, { type FormuleVitrine } from '../ui/FormuleCard.vue'
-
-// Formules ouvertes au lancement (prix de vente en FCFA, identiques au référentiel createFormules.js)
-const formules: FormuleVitrine[] = [
-  { emoji: '🌿', nom: 'AHI ESSENTIEL', cible: '1 personne · par mois', accroche: 'Un suivi alimentaire simple, pour commencer.', repas: '20–30', heures: '2–4h', ancienPrix: 24000, prix: 10800 },
-  { emoji: '🌾', nom: 'AHI ÉQUILIBRÉ', cible: '2–3 personnes · par mois', accroche: 'Mieux manger sans compliquer votre quotidien.', repas: '35–50', heures: '4–6h', ancienPrix: 50000, prix: 22500, recommandee: true },
-  { emoji: '👑', nom: 'AHI CONFORT', cible: 'Famille 4–6 · par mois', accroche: 'Un ravitaillement complet, pensé pour toute la famille.', repas: '60–90', heures: '6–10h', ancienPrix: 110000, prix: 50300 },
-]
-
-// 17 produits de base ; les quantités varient selon la formule et ne sont pas affichées
-const produitsInclus = ref([
-  "Riz local", "Haricots", "Coquillettes", "Spaghetti",
-  "Couscous", "Gari", "Tapioca", "Farine de maïs", "Huile végétale",
-  "Tomates", "Oignons", "Sucre", "Lait concentré",
-  "Œufs", "Épices Ahitché", "Assaisonnement", "Huile de palme"
-])
-
-// Produits absents de la formule AHI Essentiel
-const exclusEssentiel = ["Huile de palme"]
+import FormuleCard from '../ui/FormuleCard.vue'
+import { FORMULES as formules, PRODUITS_INCLUS as produitsInclus, EXCLUS_ESSENTIEL as exclusEssentiel } from '@/config/formules'
 </script>
 
 <template>
