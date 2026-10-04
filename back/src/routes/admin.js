@@ -10,6 +10,7 @@ const stockC = require('../controllers/admin/StockController');
 const invC = require('../controllers/admin/InventoryController');
 const postC = require('../controllers/admin/PostController');
 const partnerC = require('../controllers/admin/PartnerController');
+const zoneC = require('../controllers/ZoneController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -26,6 +27,7 @@ router.use(['/categories', '/composition-rules', '/products', '/formulas'], acce
 router.use(['/posts', '/upload'], acces(ACCES.contenus));
 router.use(['/stock', '/inventory', '/mouvements', '/bons-commande'], acces(ACCES.stock));
 router.use('/prestataires', acces(ACCES.prestataires));
+router.use(['/zones', '/logistique'], acces(ACCES.logistique));
 
 // Users
 router.get('/users', userC.index);
@@ -103,6 +105,10 @@ router.route('/prestataires')
 router.route('/prestataires/:id')
   .put(partnerC.modifierPrestataire)
   .delete(partnerC.supprimerPrestataire);
+
+// Zones de livraison (tarif de course, priorité, activation)
+router.get('/zones', zoneC.listerZonesAdmin);
+router.put('/zones/:code', zoneC.modifierZone);
 
 module.exports = router;
         

@@ -19,6 +19,8 @@ interface User {
   quartier: string;
   telephone: string;
   formuleHabituelle: string;
+  zone?: string | null; // Code de la zone de livraison (null : « Autre quartier »)
+  lienLocalisation?: string;
 }
 
 // Les variables restent en mémoire globale (très sécurisé)

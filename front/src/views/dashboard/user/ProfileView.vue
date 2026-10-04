@@ -57,8 +57,26 @@ const clientInfos = ref({
   quartier: '',
   adresse: '',
   formuleHabituelle: '',
-  telephone:''
+  telephone:'',
+  zone: null as string | null,
+  lienLocalisation: ''
 });
+
+// Zones de livraison (arrondissements de Cotonou et d'Abomey-Calavi) pour le choix du quartier
+interface ZoneLivraison {
+  code: string;
+  commune: string;
+  nom: string;
+  quartiers: string[];
+  prioritaire: boolean;
+}
+const zones = ref<ZoneLivraison[]>([]);
+const AUTRE_QUARTIER = '__autre__';
+
+const nomZone = (code: string | null) => {
+  const zone = zones.value.find(z => z.code === code);
+  return zone ? `${zone.nom}, ${zone.commune}` : '';
+};
 
 // Extraction de l'initiale du nom pour l'avatar
 const avatarInitiale = computed(() => {
@@ -77,14 +95,18 @@ const fetchDashboardData = async () => {
     adresse: authStore.user?.value?.adresse || '',
     telephone: authStore.user?.value?.telephone || '',
     formuleHabituelle: authStore.user?.value?.formuleHabituelle || 'AHI ÉQUILIBRÉ',
+    zone: authStore.user?.value?.zone || null,
+    lienLocalisation: authStore.user?.value?.lienLocalisation || '',
   };
   chargementInfos.value = false;
 
   try {
-    const [commandesRes,formulesRes] = await Promise.all([
+    const [commandesRes, formulesRes, zonesRes] = await Promise.all([
       api.get('/api/auth/my-orders', { withCredentials: true }),  // Récupère l'historique de ses commandes
-      api.get('/api/auth/formules')                                     // Récupère la liste des formules actives
+      api.get('/api/auth/formules'),                                    // Récupère la liste des formules actives
+      api.get('/api/public/zones')                                      // Quartiers proposés pour l'adresse
     ]);
+    zones.value = zonesRes.data;
 
     // 2. Assignation de l'historique des commandes
     commandes.value = commandesRes.data.map((cmd : Commande) => ({
@@ -149,35 +171,52 @@ const handleLogout = async () => {
 // Initialisation des Infos du formulaire
 const formFormulaire = reactive({
   telephone: '',
-  quartier: '',
-  adresse: ''
+  choixQuartier: '', // "code-zone|Quartier" ou AUTRE_QUARTIER
+  quartierLibre: '',
+  adresse: '',
+  lienLocalisation: ''
 });
 
 // Activer le mode édition en pré-remplissant avec les infos existantes
 const activerEdition = () => {
   formFormulaire.telephone = clientInfos.value.telephone || '';
-  formFormulaire.quartier = clientInfos.value.quartier || '';
+  const { zone, quartier } = clientInfos.value;
+  formFormulaire.choixQuartier = zone ? `${zone}|${quartier}` : (quartier ? AUTRE_QUARTIER : '');
+  formFormulaire.quartierLibre = zone ? '' : quartier || '';
   formFormulaire.adresse = clientInfos.value.adresse || '';
+  formFormulaire.lienLocalisation = clientInfos.value.lienLocalisation || '';
   estEnEdition.value = true;
 };
 
 // Fonction pour sauvegarder les infos (Appel API vers ton back Express)
 const sauvegarderInfos = async () => {
+  const autre = formFormulaire.choixQuartier === AUTRE_QUARTIER;
+  const [zone, quartierListe] = autre ? [null, ''] : formFormulaire.choixQuartier.split('|');
+  const payload = {
+    telephone: formFormulaire.telephone,
+    quartier: autre ? formFormulaire.quartierLibre : quartierListe,
+    zone,
+    adresse: formFormulaire.adresse,
+    lienLocalisation: formFormulaire.lienLocalisation
+  };
+
   enCoursDeSauvegarde.value = true;
   try {
-    // Remplacer par ton appel axios réel, ex:
-    const response = await api.post('/api/auth/user/delivery-info', formFormulaire);
-    
-    // Simulation de réussite : on met à jour l'affichage principal
-    clientInfos.value.telephone = formFormulaire.telephone;
-    clientInfos.value.quartier = formFormulaire.quartier;
-    clientInfos.value.adresse = formFormulaire.adresse;
-    
+    const response = await api.post('/api/auth/user/delivery-info', payload);
+
+    // On met à jour l'affichage principal avec ce que le serveur a enregistré
+    const enregistre = response.data.user;
+    clientInfos.value.telephone = enregistre.telephone;
+    clientInfos.value.quartier = enregistre.quartier;
+    clientInfos.value.adresse = enregistre.adresse;
+    clientInfos.value.zone = enregistre.zone;
+    clientInfos.value.lienLocalisation = enregistre.lienLocalisation;
+
     estEnEdition.value = false; // On ferme le formulaire
     toast.success(response.data.message)
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur lors de l'enregistrement des infos", error);
-    toast.error(error);
+    toast.error(error.response?.data?.message || "Impossible d'enregistrer vos informations de livraison.");
   } finally {
     enCoursDeSauvegarde.value = false;
   }
@@ -201,8 +240,10 @@ const genererLienWhatsApp = (commande?: { reference: string; total: number }) =>
   // Si les infos de livraison sont remplies, on les greffe proprement au message
   if (clientInfos.value.quartier || clientInfos.value.telephone) {
     message += `📍 *Infos de livraison :*\n`;
-    message += `- *Quartier :* ${clientInfos.value.quartier || 'Non spécifié'}\n`;
+    const zone = nomZone(clientInfos.value.zone);
+    message += `- *Quartier :* ${clientInfos.value.quartier || 'Non spécifié'}${zone ? ` (${zone})` : ''}\n`;
     message += `- *Repères/Maison :* ${clientInfos.value.adresse || 'Non spécifié'}\n`;
+    if (clientInfos.value.lienLocalisation) message += `- *Localisation :* ${clientInfos.value.lienLocalisation}\n`;
     message += `- *Contact de livraison :* ${clientInfos.value.telephone || 'Non spécifié'}`;
   } else {
     message += `⚠️ _Je n'ai pas encore renseigné mes détails de livraison, nous ferons le point ici._`;
@@ -412,7 +453,11 @@ onMounted(async () => {
             <div v-else-if="!estEnEdition" class="">
               <div v-if="clientInfos.telephone || clientInfos.quartier" class="p-4 rounded-xl border border-gray-100/50">
                 <p class="font-bold text-foret text-base mb-1">{{ clientInfos.quartier || "" }}</p>
+                <p v-if="nomZone(clientInfos.zone)" class="text-xs text-gris mb-1">{{ nomZone(clientInfos.zone) }}</p>
                 <p class="text-gris text-sm leading-relaxed mb-3 font-medium">{{ clientInfos.adresse || "" }}</p>
+                <a v-if="clientInfos.lienLocalisation" :href="clientInfos.lienLocalisation" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs font-semibold text-savane underline mb-3">
+                  <MapPinIcon class="w-3.5 h-3.5" /> Voir ma localisation
+                </a>
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-sm font-semibold shadow-2xl">
                   <PhoneIcon class="w-4 h-4 text-foret opacity-80" />
                   <span>{{ clientInfos.telephone }}</span>
@@ -437,11 +482,28 @@ onMounted(async () => {
               </div>
 
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Quartier / Ville</label>
-                <input 
-                  v-model="formFormulaire.quartier" 
-                  type="text" 
-                  placeholder="Ex: Akassato, Calavi" 
+                <label for="livraison-quartier" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Quartier</label>
+                <select
+                  id="livraison-quartier"
+                  v-model="formFormulaire.choixQuartier"
+                  required
+                  class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium"
+                >
+                  <option value="" disabled>Choisissez votre quartier</option>
+                  <optgroup v-for="zone in zones" :key="zone.code" :label="`${zone.nom} · ${zone.commune}`">
+                    <option v-for="q in zone.quartiers" :key="q" :value="`${zone.code}|${q}`">{{ q }}</option>
+                  </optgroup>
+                  <option :value="AUTRE_QUARTIER">Autre quartier (je le saisis)</option>
+                </select>
+              </div>
+
+              <div v-if="formFormulaire.choixQuartier === AUTRE_QUARTIER">
+                <label for="livraison-quartier-libre" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Nom du quartier</label>
+                <input
+                  id="livraison-quartier-libre"
+                  v-model="formFormulaire.quartierLibre"
+                  type="text"
+                  placeholder="Ex : Calavi Kpota"
                   required
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium"
                 />
@@ -452,10 +514,23 @@ onMounted(async () => {
                 <textarea 
                   v-model="formFormulaire.adresse" 
                   rows="2"
-                  placeholder="Ex: Maison verte en face de la pharmacie..." 
+                  placeholder="Ex: Maison verte en face de la pharmacie..."
                   required
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium resize-none"
                 ></textarea>
+              </div>
+
+              <div>
+                <label for="livraison-lien" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Lien de localisation (facultatif)</label>
+                <input
+                  id="livraison-lien"
+                  v-model="formFormulaire.lienLocalisation"
+                  type="url"
+                  inputmode="url"
+                  placeholder="https://maps.app.goo.gl/…"
+                  class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium"
+                />
+                <p class="text-[11px] text-gris mt-1">Lien Google Maps ou position partagée sur WhatsApp : votre livreur vous trouve plus vite.</p>
               </div>
 
               <div class="flex items-center gap-3 pt-2">

@@ -7,6 +7,8 @@ const User = require('../models/user');
 const Partner = require('../models/partner');
 const PurchaseOrder = require('../models/purchaseOrder');
 const { LotStockFifo } = require('../models/stock');
+const Zone = require('../models/zone');
+const { normaliser } = require('../utils/texte');
 
 dotenv.config();
 
@@ -46,9 +48,55 @@ async function migrerFournisseurs() {
   if (sansFiche) console.log(`  ⚠ ${sansFiche} lot(s) « Autre » sans fiche : à rattacher à la main si besoin`);
 }
 
+// Étape 3 : zones de livraison (référentiel data/zones-livraison.json), puis rattachement
+// des quartiers saisis en texte libre par les clients. Le tarif de course et l'activation
+// réglés dans l'admin ne sont jamais écrasés.
+async function migrerZones() {
+  const { zones } = require('../data/zones-livraison.json');
+  for (const z of zones) {
+    const res = await Zone.updateOne(
+      { code: z.id },
+      { $set: { commune: z.commune, nom: z.nom, quartiers: z.quartiers }, $setOnInsert: { prioritaire: z.prioritaire } },
+      { upsert: true }
+    );
+    if (res.upsertedCount) console.log(`  ✔ Zone créée : ${z.nom} (${z.commune})`);
+  }
+
+  // Index quartier normalisé -> [{ code de zone, nom officiel du quartier }]
+  // (un même nom peut exister dans deux arrondissements)
+  const index = new Map();
+  for (const z of await Zone.find()) {
+    for (const q of z.quartiers) {
+      // « Kpota (Calavi Kpota) » se retrouve aussi sous « Kpota » et « Calavi Kpota »
+      const variantes = new Set([q, q.replace(/\s*\(.*\)\s*$/, ''), (/\((.*)\)/.exec(q) || [])[1]].filter(Boolean).map(normaliser));
+      for (const cle of variantes) {
+        const trouves = index.get(cle) || [];
+        if (!trouves.some(t => t.code === z.code)) index.set(cle, [...trouves, { code: z.code, quartier: q }]);
+      }
+    }
+  }
+
+  let rattaches = 0, ambigus = 0, inconnus = 0;
+  const clients = await User.find({ role: 'user', zone: null, quartier: { $nin: [null, ''] } });
+  for (const client of clients) {
+    const trouves = index.get(normaliser(client.quartier)) || [];
+    if (trouves.length === 1) {
+      // Nom officiel du quartier : il correspond ainsi à une option du formulaire d'adresse
+      client.zone = trouves[0].code;
+      client.quartier = trouves[0].quartier;
+      await client.save();
+      rattaches++;
+    } else if (trouves.length > 1) ambigus++;
+    else inconnus++;
+  }
+  console.log(`  ✔ Clients : ${rattaches} rattaché(s) à une zone, ${ambigus} quartier(s) présent(s) dans plusieurs zones, ${inconnus} quartier(s) hors liste`);
+  if (ambigus || inconnus) console.log('  ⚠ Ces clients restent en « Autre quartier » : leur zone se choisit à la prochaine mise à jour de leur adresse');
+}
+
 const ETAPES = [
   ['Index du téléphone', migrerIndexTelephone],
   ['Fournisseurs vers Prestataires', migrerFournisseurs],
+  ['Zones de livraison', migrerZones],
 ];
 
 async function migrer() {

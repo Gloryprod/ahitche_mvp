@@ -8,7 +8,9 @@ const userSchema = new mongoose.Schema({
     role: { type: String, enum: ROLES, required: true, default: 'user' }, // client ('user') ou membre de l'équipe, voir config/roles.js
     telephone: { type: String, required: false }, // unique seulement s'il est renseigné (index plus bas)
     quartier: { type: String, required: false },
-    adresse: { type: String, required: false },
+    adresse: { type: String, required: false }, // Repères (maison, rue…)
+    zone: { type: String, default: null }, // Code de la zone de livraison (null : « Autre quartier »)
+    lienLocalisation: { type: String, default: '' }, // Lien Google Maps ou position WhatsApp, facultatif
     formuleHabituelle: { type: String, required: false },
     resetPasswordToken: {
         type: String,
