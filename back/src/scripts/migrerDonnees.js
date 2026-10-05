@@ -30,25 +30,32 @@ async function migrerIndexTelephone() {
   console.log('  ✔ Index du téléphone : unique seulement quand il est renseigné');
 }
 
-// Étape 2 : les 3 fournisseurs de la liste figée deviennent des fiches Prestataires,
-// et les lots de stock et bons de commande existants sont reliés à leur fiche
-const FOURNISSEURS_HISTORIQUES = ['ETS EUROHI & FILS', 'AHOUANDJO DAVID', 'Hananim Distribution'];
+// Étape 2 : les fournisseurs saisis en texte sur les lots de stock et les bons de commande deviennent des
+// fiches Prestataires, et ces lots et bons sont reliés à leur fiche. Aucun nom n'est écrit dans le code :
+// ils sont lus dans la base (les noms de fournisseurs sont confidentiels).
+const SANS_FICHE = ['', 'Autre', 'Production interne'];
 
 async function migrerFournisseurs() {
-  for (const nom of FOURNISSEURS_HISTORIQUES) {
+  const noms = new Set([
+    ...await LotStockFifo.distinct('fournisseur', { fournisseurId: null, deletedAt: null }),
+    ...await PurchaseOrder.distinct('fournisseur', { fournisseurId: null, deletedAt: null }),
+  ].map(n => String(n || '').trim()).filter(n => !SANS_FICHE.includes(n)));
+
+  for (const nom of noms) {
     let fiche = await Partner.findOne({ nom, type: 'Fournisseur', deletedAt: null });
     if (!fiche) {
-      fiche = await Partner.create({ nom, type: 'Fournisseur', notes: 'Créé par la migration (ancienne liste de fournisseurs).' });
-      console.log(`  ✔ Fiche créée : ${nom}`);
+      fiche = await Partner.create({ nom, type: 'Fournisseur', notes: 'Créé par la migration (fournisseur saisi en texte).' });
+      console.log('  ✔ Fiche fournisseur créée');
     }
     const lots = await LotStockFifo.updateMany({ fournisseur: nom, fournisseurId: null }, { $set: { fournisseurId: fiche._id } });
     const bons = await PurchaseOrder.updateMany({ fournisseur: nom, fournisseurId: null }, { $set: { fournisseurId: fiche._id } });
     if (lots.modifiedCount || bons.modifiedCount) {
-      console.log(`  ✔ ${nom} : ${lots.modifiedCount} lot(s) et ${bons.modifiedCount} bon(s) de commande reliés`);
+      console.log(`  ✔ ${lots.modifiedCount} lot(s) et ${bons.modifiedCount} bon(s) de commande reliés à leur fiche`);
     }
   }
-  const sansFiche = await LotStockFifo.countDocuments({ fournisseurId: null, deletedAt: null });
-  if (sansFiche) console.log(`  ⚠ ${sansFiche} lot(s) « Autre » sans fiche : à rattacher à la main si besoin`);
+  if (!noms.size) console.log('  ✔ Aucun fournisseur en texte à rattacher');
+  const sansFiche = await LotStockFifo.countDocuments({ fournisseurId: null, deletedAt: null, fournisseur: { $nin: ['Production interne'] } });
+  if (sansFiche) console.log(`  ⚠ ${sansFiche} lot(s) sans fiche fournisseur : à rattacher à la main si besoin`);
 }
 
 // Étape 3 : zones de livraison (référentiel data/zones-livraison.json), puis rattachement

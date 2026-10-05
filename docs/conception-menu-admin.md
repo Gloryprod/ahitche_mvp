@@ -49,7 +49,7 @@ En attente -> Confirmée -> En préparation -> En livraison -> Livrée (paiement
 - **Types :** Fournisseur, Livreur, Autre (nutritionniste, emballage…).
 - **Fiche :** nom, type, téléphone/WhatsApp, quartier, IFU/RCCM (facultatif), mode de paiement, notes, actif/inactif.
 - **Livreurs :** rémunérés par course, avec un tarif par zone. Ils n'ont pas de compte en v1 et reçoivent leur tournée sur WhatsApp.
-- **Migration :** les 3 fournisseurs principaux (`ETS EUROHI & FILS`, `AHOUANDJO DAVID`, `Hananim Distribution`) deviennent des fiches. Les lots de stock et les bons de commande passent d'un texte figé à une référence vers ces fiches.
+- **Migration :** les fournisseurs saisis en texte sur les lots et les bons de commande deviennent des fiches. Les lots de stock et les bons de commande passent d'un texte figé à une référence vers ces fiches. Les noms de fournisseurs sont confidentiels : ils ne figurent ni dans le code ni dans cette documentation.
 - **Liens :** bons de commande, entrées de stock, dépenses (`Expense.partenaireId`), affectation des livreurs.
 
 ### Logistique (`/dashboard/admin/logistique`), conçue d'abord pour le téléphone
