@@ -49,14 +49,21 @@ export interface CompositionRule {
   createdAt?: string
 }
 
+export type PackType = 'essentiel' | 'equilibre' | 'confort' | 'reserve' | 'fraicheur'
+
 export interface Product {
   _id: string
+  reference: string | null
   name: string
-  category: Category
-  compositionRule: CompositionRule
-  baseQuantity: number
+  category: Category | null
+  compositionRule: CompositionRule | null // Libellé seulement (les quantités par pack font foi)
+  type: 'base fixe' | 'extra'
+  statut: 'disponible' | 'indisponible'
+  quantites: Record<PackType, number | null> // Vide = absent du pack
   unit: string
-  priceUnit: number
+  priceUnit: number | null // Vide = à renseigner
+  seuilAlerte: number | null
+  commentaire: string
 }
 
 export interface Formule {
@@ -86,13 +93,16 @@ export interface Formule {
 
 export interface ProductItem {
   productId: string;
+  reference: string | null;
   name: string;
   category: string;
+  regle: string;
   unit: string;
-  priceUnit: number;
-  appliedMultiplier: number;
+  priceUnit: number | null; // Vide = prix à renseigner
   quantity: number;
-  totalPrice: number;
+  totalPrice: number | null;
+  indisponible: boolean;
+  commentaire: string;
 }
 
 export interface ProductSnapshot {
@@ -101,8 +111,8 @@ export interface ProductSnapshot {
   name: string;
   quantity: number;
   unit: string;
-  unitPrice: number;
-  totalPrice: number;
+  unitPrice: number | null;
+  totalPrice: number | null;
   isExtra: boolean; 
 }
 

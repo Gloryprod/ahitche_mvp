@@ -22,11 +22,10 @@ async function obtenirInventaireGlobal(req, res) {
       }
     ]);
 
-    // Remplir les détails des produits et vérifier les seuils d'alerte
-    // Note : On suppose que ton modèle Product possède un champ 'seuilAlerte' (ex: 10 kg)
+    // Seuil d'alerte propre à chaque produit, dans son unité ; vide = pas d'alerte (seuil à renseigner)
     const inventaireComplet = await Promise.all(etatStock.map(async (item) => {
-      const produit = await Product.findById(item._id).select('name unit seuilAlerte');
-      const seuil = produit?.seuilAlerte || 15; // Seuil par défaut si non défini
+      const produit = await Product.findById(item._id).select('name unit seuilAlerte reference');
+      const seuil = produit?.seuilAlerte ?? null;
 
       return {
         productId: item._id,
@@ -35,7 +34,8 @@ async function obtenirInventaireGlobal(req, res) {
         stockTotal: item.stockTotal,
         nbLotsActifs: item.nbLotsActifs,
         seuilAlerte: seuil,
-        enAlerte: item.stockTotal <= seuil // Flag pour l'affichage UI (badge rouge)
+        reference: produit?.reference || null,
+        enAlerte: seuil !== null && item.stockTotal <= seuil // Badge rouge ; jamais d'alerte sur un seuil inconnu
       };
     }));
 

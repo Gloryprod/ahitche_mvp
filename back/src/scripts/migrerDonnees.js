@@ -4,6 +4,8 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const User = require('../models/user');
+const Product = require('../models/product');
+require('../models/compositionRule'); // Pour peupler la règle des anciens produits
 const Partner = require('../models/partner');
 const PurchaseOrder = require('../models/purchaseOrder');
 const { LotStockFifo } = require('../models/stock');
@@ -150,6 +152,26 @@ async function migrerAdminPrincipal() {
   console.log(`  ✔ Admin principal désigné (plus ancien compte admin) : ${admin.email}`);
 }
 
+// Étape 7 : catalogue à quantités explicites par pack (décision D-14). Les produits de l'ancien catalogue
+// (sans quantités) reçoivent celles que donnait l'ancienne règle, marquées « à vérifier » ; le catalogue du
+// référentiel v4 les remplacera à l'import.
+async function migrerQuantitesProduits() {
+  const anciens = await Product.find({ deletedAt: null, 'quantites.essentiel': null, 'quantites.equilibre': null, 'quantites.confort': null, baseQuantity: { $gt: 0 } }).populate('compositionRule');
+  for (const p of anciens) {
+    const base = p.baseQuantity;
+    p.quantites = {
+      essentiel: base,
+      equilibre: base * (p.compositionRule?.multiplierEquilibre ?? 2), // Valeurs par défaut de l'ancien calcul
+      confort: base * (p.compositionRule?.multiplierConfort ?? 5),
+      reserve: null,
+      fraicheur: null
+    };
+    p.commentaire = [p.commentaire, 'Quantités reprises de l\'ancienne règle : à vérifier'].filter(Boolean).join(' ; ');
+    await p.save();
+  }
+  console.log(anciens.length ? `  ⚠ ${anciens.length} produit(s) de l'ancien catalogue : quantités reprises de l'ancienne règle, à vérifier` : '  ✔ Aucun produit sans quantités par pack');
+}
+
 const ETAPES = [
   ['Index du téléphone', migrerIndexTelephone],
   ['Fournisseurs vers Prestataires', migrerFournisseurs],
@@ -157,6 +179,7 @@ const ETAPES = [
   ['Statuts des commandes', migrerStatutsCommandes],
   ['Taux USD/FCFA', migrerTaux],
   ['Admin principal', migrerAdminPrincipal],
+  ['Quantités des produits par pack', migrerQuantitesProduits],
 ];
 
 async function migrer() {

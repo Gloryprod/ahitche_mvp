@@ -1,42 +1,44 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
-import { Search, Plus, Edit2, Trash2, Eye, X } from 'lucide-vue-next'
+import { ref, watch, onMounted, computed } from 'vue'
+import { Search, Plus, Edit2, Trash2, X, Wand2 } from 'lucide-vue-next'
 import api from '@/stores/api'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
-import type { Product } from '@/type'
-import type { CompositionRule } from '@/type'
-import type { Category } from '@/type'
+import type { Product, CompositionRule, Category, PackType } from '@/type'
 
-// --- ÉTATS ---
+// Catalogue du référentiel packs v4 : produits fixes (base des packs) et produits variables (extras).
+// Les quantités par pack font foi (D-14) ; la règle sert seulement à proposer les quantités d'un nouveau produit.
+// Une valeur vide reste vide et s'affiche « à renseigner ».
+const PACKS: { cle: PackType; libelle: string }[] = [
+  { cle: 'essentiel', libelle: 'Essentiel' },
+  { cle: 'equilibre', libelle: 'Équilibré' },
+  { cle: 'confort', libelle: 'Confort' },
+  { cle: 'reserve', libelle: 'Réserve' },
+  { cle: 'fraicheur', libelle: 'Fraîcheur' },
+]
+
 const page = ref(1)
 const search = ref('')
 const debouncedSearch = ref('')
+const filtreType = ref<'' | 'base fixe' | 'extra'>('')
 const isSubmitting = ref(false)
 const notification = ref({ text: '', type: '' })
 const queryClient = useQueryClient()
-
 const showFormPanel = ref(false)
 const isEditing = ref(false)
-const showDetailPanel = ref(false)
-const selectedProduct = ref<Product | null>(null)
 
-// Listes pour les sélections du formulaire
 const categoriesList = ref<Category[]>([])
 const rulesList = ref<CompositionRule[]>([])
 
-// Structure du formulaire
-const form = ref({
-  _id: '',
-  name: '',
-  category: '',
-  compositionRule: '',
-  baseQuantity: 1,
-  unit: 'kg',
-  priceUnit: 0
+type Quantites = Record<PackType, number | null>
+const quantitesVides = (): Quantites => ({ essentiel: null, equilibre: null, confort: null, reserve: null, fraicheur: null })
+const formVide = () => ({
+  _id: '', reference: '', name: '', category: '', compositionRule: '', type: 'base fixe' as Product['type'],
+  statut: 'disponible' as Product['statut'], unit: 'kg', priceUnit: null as number | null, seuilAlerte: null as number | null,
+  commentaire: '', quantites: quantitesVides(),
 })
+const form = ref(formVide())
 
-// Chargement initial des utilitaires pour les listes déroulantes
 onMounted(async () => {
   try {
     const [catRes, ruleRes] = await Promise.all([
@@ -45,283 +47,256 @@ onMounted(async () => {
     ])
     categoriesList.value = catRes.data.categories || []
     rulesList.value = ruleRes.data.rules || []
-  } catch (err) {
-    showNotification("Erreur lors du chargement des options de formulaire", "error")
+  } catch {
+    showNotification('Erreur lors du chargement des catégories et des règles', 'error')
   }
 })
 
-// Debounce pour la recherche
 let timeoutId: ReturnType<typeof setTimeout>
-watch(search, (newValue) => {
+watch(search, (valeur) => {
   clearTimeout(timeoutId)
-  timeoutId = setTimeout(() => {
-    debouncedSearch.value = newValue
-    page.value = 1
-  }, 400)
+  timeoutId = setTimeout(() => { debouncedSearch.value = valeur; page.value = 1 }, 400)
 })
-
-// --- TANSTACK QUERY ---
-const fetchProducts = async ({ queryKey }: { queryKey: any }) => {
-  const [_, currentPage, currentSearch] = queryKey
-  const response = await api.get('/api/admin/products', {
-    params: { page: currentPage, search: currentSearch, limit: 10 }
-  })
-  return response.data
-}
+watch(filtreType, () => { page.value = 1 })
 
 const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
-  queryKey: ['products', page, debouncedSearch],
-  queryFn: fetchProducts,
+  queryKey: ['products', page, debouncedSearch, filtreType],
+  queryFn: async () => (await api.get('/api/admin/products', {
+    params: { page: page.value, search: debouncedSearch.value, type: filtreType.value || undefined, limit: 20 }
+  })).data,
   placeholderData: keepPreviousData,
 })
 
-// --- ACTIONS ---
-const openCreateMode = () => {
+const aRenseigner = 'à renseigner'
+const prix = (n: number | null) => n === null || n === undefined ? aRenseigner : `${n.toLocaleString('fr-FR')} F`
+const quantite = (n: number | null | undefined) => n === null || n === undefined ? '—' : n.toLocaleString('fr-FR')
+
+function openCreateMode() {
   isEditing.value = false
-  showDetailPanel.value = false
-  form.value = { _id: '', name: '', category: '', compositionRule: '', baseQuantity: 1, unit: 'kg', priceUnit: 0 }
+  form.value = formVide()
   showFormPanel.value = true
 }
 
-const openEditMode = (product: Product) => {
+function openEditMode(p: Product) {
   isEditing.value = true
-  showDetailPanel.value = false
   form.value = {
-    _id: product._id,
-    name: product.name,
-    category: product.category?._id || '',
-    compositionRule: product.compositionRule?._id || '',
-    baseQuantity: product.baseQuantity,
-    unit: product.unit,
-    priceUnit: product.priceUnit
+    _id: p._id, reference: p.reference || '', name: p.name, category: p.category?._id || '',
+    compositionRule: p.compositionRule?._id || '', type: p.type, statut: p.statut, unit: p.unit,
+    priceUnit: p.priceUnit, seuilAlerte: p.seuilAlerte, commentaire: p.commentaire || '',
+    quantites: { ...quantitesVides(), ...(p.quantites || {}) },
   }
   showFormPanel.value = true
 }
 
-const openDetailMode = (product: Product) => {
-  selectedProduct.value = product
-  showFormPanel.value = false
-  showDetailPanel.value = true
+// Proposition à partir de la règle (nouveau produit) : Équilibré et Confort = Essentiel × multiplicateurs
+const regleChoisie = computed(() => rulesList.value.find(r => r._id === form.value.compositionRule))
+function proposerQuantites() {
+  const base = form.value.quantites.essentiel
+  if (!regleChoisie.value || base === null) return
+  form.value.quantites.equilibre = Math.round(base * regleChoisie.value.multiplierEquilibre * 100) / 100
+  form.value.quantites.confort = Math.round(base * regleChoisie.value.multiplierConfort * 100) / 100
 }
 
-const closePanels = () => {
-  showFormPanel.value = false
-  showDetailPanel.value = false
-  selectedProduct.value = null
-}
+// Un champ numérique vidé vaut '' : on l'envoie comme vide (null), jamais comme 0
+const versNombre = (v: unknown) => (v === '' || v === null || v === undefined ? null : Number(v))
 
-const handleSubmit = async () => {
+async function handleSubmit() {
   isSubmitting.value = true
+  const charge = {
+    ...form.value,
+    priceUnit: versNombre(form.value.priceUnit),
+    seuilAlerte: versNombre(form.value.seuilAlerte),
+    quantites: Object.fromEntries(PACKS.map(p => [p.cle, versNombre(form.value.quantites[p.cle])])),
+  }
   try {
     if (isEditing.value) {
-      await api.put(`/api/admin/products/${form.value._id}`, form.value)
-      showNotification("Produit modifié avec succès !", "success")
+      await api.put(`/api/admin/products/${form.value._id}`, charge)
+      showNotification('Produit modifié.', 'success')
     } else {
-      await api.post('/api/admin/products', form.value)
-      showNotification("Nouveau produit créé !", "success")
+      await api.post('/api/admin/products', charge)
+      showNotification('Produit ajouté au catalogue.', 'success')
     }
     queryClient.invalidateQueries({ queryKey: ['products'] })
-    closePanels()
+    showFormPanel.value = false
   } catch (err: any) {
-    showNotification(err.response?.data?.message || "Une erreur est survenue", "error")
+    showNotification(err.response?.data?.message || 'Une erreur est survenue', 'error')
   } finally {
     isSubmitting.value = false
   }
 }
 
-const deleteProduct = async (id: string) => {
+async function deleteProduct(p: Product) {
   const result = await Swal.fire({
-    title: 'Supprimer ce produit ?',
-    text: "Il ne sera plus disponible pour les futures compositions de packs.",
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#1e3a1f',
-    cancelButtonColor: '#d33',
-    confirmButtonText: 'Oui, supprimer',
-    cancelButtonText: 'Annuler',
+    title: `Supprimer « ${p.name} » ?`,
+    text: 'Il ne sera plus utilisé dans les compositions de packs.',
+    icon: 'warning', showCancelButton: true, confirmButtonColor: '#1A5C38',
+    confirmButtonText: 'Supprimer', cancelButtonText: 'Annuler',
     customClass: { popup: 'rounded-2xl font-body' }
-  });
-
-  if (result.isConfirmed) {
-    try {
-      await api.delete(`/api/admin/products/${id}`)
-      showNotification("Produit supprimé", "success")
-      queryClient.invalidateQueries({ queryKey: ['products'] })
-      if (selectedProduct.value?._id === id) closePanels()
-    } catch (err) {
-      showNotification("Impossible de supprimer le produit", "error")
-    }
+  })
+  if (!result.isConfirmed) return
+  try {
+    await api.delete(`/api/admin/products/${p._id}`)
+    showNotification('Produit supprimé.', 'success')
+    queryClient.invalidateQueries({ queryKey: ['products'] })
+  } catch {
+    showNotification('Impossible de supprimer le produit', 'error')
   }
 }
 
-const showNotification = (text: string, type: string) => {
+function showNotification(text: string, type: string) {
   notification.value = { text, type }
   setTimeout(() => notification.value = { text: '', type: '' }, 4000)
 }
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gray-600">
-    
-    <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
-      <h1 class="font-display font-bold text-xl text-noir">Référentiel des Produits</h1>
-      <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-        <div class="relative w-full sm:w-60">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 stroke-[2.5]" />
-          <input v-model="search" type="text" placeholder="Rechercher un produit..." class="w-full pl-9 pr-4 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret focus:bg-white transition-all" />
+  <div class="space-y-6 text-xs font-medium text-gris">
+    <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-creme2">
+      <div>
+        <h1 class="font-display font-bold text-xl text-noir">Catalogue des produits</h1>
+        <p class="text-[11px] text-gris">Référentiel packs v4 · quantités par pack, dans l'unité du produit (« — » = absent du pack)</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="relative w-full sm:w-56">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris-lt" />
+          <input v-model="search" type="search" placeholder="Nom ou référence..." aria-label="Rechercher un produit" class="w-full pl-9 pr-3 py-2 bg-creme border border-creme2 rounded-xl text-xs text-noir focus:outline-none focus:border-foret" />
         </div>
-        <button @click="openCreateMode" class="cursor-pointer flex items-center gap-1.5 px-4 py-2 bg-foret text-white text-xs font-bold rounded-xl hover:bg-opacity-95 transition-all shadow-sm shrink-0">
-          <Plus class="w-3.5 h-3.5 stroke-3" /> Ajouter
+        <select v-model="filtreType" aria-label="Filtrer par type" class="px-3 py-2 rounded-xl border border-creme2 bg-creme text-xs text-noir">
+          <option value="">Tous les produits</option>
+          <option value="base fixe">Base fixe des packs</option>
+          <option value="extra">Extras (variables)</option>
+        </select>
+        <button @click="openCreateMode" class="cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 bg-foret text-white text-xs font-bold rounded-xl">
+          <Plus class="w-3.5 h-3.5" /> Ajouter
         </button>
       </div>
     </div>
 
-    <div v-if="notification.text" :class="[notification.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200', 'p-4 rounded-xl border text-xs font-semibold shadow-2xs fixed top-4 right-4 z-50 max-w-sm']">
+    <div v-if="notification.text" role="status" :class="[notification.type === 'success' ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200', 'p-4 rounded-xl border text-xs font-semibold fixed top-4 right-4 z-50 max-w-sm']">
       {{ notification.text }}
     </div>
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 bg-white p-4 rounded-2xl shadow-2xs">
-      <div class="flex items-center gap-2 text-xs font-semibold text-gray-500">
-        <span>Produits enregistrés au catalogue</span>
-        <span class="px-2.5 py-1 bg-foret/10 text-foret rounded-full font-bold text-[11px]">{{ data?.total || 0 }}</span>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-      
-      <div :class="[showFormPanel || showDetailPanel ? 'lg:col-span-2' : 'lg:col-span-3', 'bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden transition-all']">
-        <div v-if="isLoading" class="text-sm font-medium text-gray-500 p-6 text-center">Chargement du catalogue...</div>
-        <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl m-4 border">Erreur: {{ error?.message }}</div>
-
-        <div v-else class="p-4 overflow-x-auto">
-          <table class="w-full text-left border-collapse min-w-162.5">
-            <thead>
-              <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                <th class="py-3 px-4">Produit</th>
-                <th class="py-3 px-4">Catégorie</th>
-                <th class="py-3 px-4">Règle liée</th>
-                <th class="py-3 px-4 text-right">Essentiel (Base)</th>
-                <th class="py-3 px-4 text-right">P.U (FCFA)</th>
-                <th class="py-3 px-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-50 text-noir">
-              <tr v-for="prod in data?.products" :key="prod._id" class="hover:bg-gray-50/50 transition-colors">
-                <td class="py-3 px-4 font-bold">{{ prod.name }}</td>
-                <td class="py-3 px-4"><span class="px-2 py-0.5 bg-gray-100 rounded-md text-[11px] font-medium">{{ prod.category?.name || 'Non classé' }}</span></td>
-                <td class="py-3 px-4 text-gray-500 italic">{{ prod.compositionRule?.name || 'Aucune' }}</td>
-                <td class="py-3 px-4 text-right font-semibold">{{ prod.baseQuantity }} {{ prod.unit }}</td>
-                <td class="py-3 px-4 text-right font-mono text-gray-700">{{ prod.priceUnit.toLocaleString() }} F</td>
-                <td class="py-3 px-4">
-                  <div class="flex items-center justify-center gap-2">
-                    <button @click="openDetailMode(prod)" class="cursor-pointer p-1.5 text-gray-400 hover:text-noir hover:bg-gray-100 rounded-lg transition-colors"><Eye class="w-3.5 h-3.5" /></button>
-                    <button @click="openEditMode(prod)" class="cursor-pointerp-1.5 text-gray-400 hover:text-savane hover:bg-amber-50 rounded-lg transition-colors"><Edit2 class="w-3.5 h-3.5" /></button>
-                    <button @click="deleteProduct(prod._id)" class="cursor-pointer p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 class="w-3.5 h-3.5" /></button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-4">
-            <button :disabled="page === 1 || isPlaceholderData" @click="page--" class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 transition-all">← Précédent</button>
-            <span class="bg-gray-100 px-3 py-1.5 rounded-lg text-noir font-bold">Page {{ page }}</span>
-            <button :disabled="!data?.hasMore || isPlaceholderData" @click="page++" class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 transition-all">Suivant →</button>
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+      <div :class="[showFormPanel ? 'xl:col-span-2' : 'xl:col-span-3', 'bg-white rounded-2xl border border-creme2 overflow-hidden']">
+        <div v-if="isLoading" class="p-6 text-center">Chargement du catalogue...</div>
+        <div v-else-if="isError" class="p-4 m-4 bg-red-50 text-red-800 rounded-xl border">Erreur : {{ error?.message }}</div>
+        <div v-else class="p-4">
+          <p class="mb-3 font-semibold">Produits au catalogue : <span class="px-2 py-0.5 bg-foret/10 text-foret rounded-full font-bold">{{ data?.total || 0 }}</span></p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-200">
+              <thead>
+                <tr class="border-b border-creme2 text-[10px] font-bold uppercase tracking-wider text-gris">
+                  <th class="py-2 pr-2">Réf.</th>
+                  <th class="py-2 pr-2">Produit</th>
+                  <th class="py-2 pr-2 text-right">P.U.</th>
+                  <th v-for="p in PACKS" :key="p.cle" class="py-2 px-1 text-right">{{ p.libelle }}</th>
+                  <th class="py-2 px-1 text-right">Seuil</th>
+                  <th class="py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-creme2 text-noir">
+                <tr v-for="prod in data?.products" :key="prod._id" :class="prod.statut === 'indisponible' ? 'opacity-60' : ''">
+                  <td class="py-2.5 pr-2 font-mono font-bold">{{ prod.reference || '—' }}</td>
+                  <td class="py-2.5 pr-2">
+                    <span class="font-bold">{{ prod.name }}</span>
+                    <span class="block text-[10px] text-gris">
+                      {{ prod.category?.name || 'Catégorie à renseigner' }} · {{ prod.type === 'extra' ? 'extra' : 'base fixe' }} · {{ prod.unit }}
+                      <span v-if="prod.statut === 'indisponible'" class="ml-1 px-1.5 rounded bg-red-50 text-red-800 font-bold">indisponible</span>
+                    </span>
+                  </td>
+                  <td class="py-2.5 pr-2 text-right font-mono" :class="prod.priceUnit === null ? 'text-amber-800' : ''">{{ prix(prod.priceUnit) }}</td>
+                  <td v-for="p in PACKS" :key="p.cle" class="py-2.5 px-1 text-right tabular-nums">{{ quantite(prod.quantites?.[p.cle]) }}</td>
+                  <td class="py-2.5 px-1 text-right tabular-nums" :class="prod.seuilAlerte === null ? 'text-amber-800' : ''">{{ prod.seuilAlerte === null ? aRenseigner : quantite(prod.seuilAlerte) }}</td>
+                  <td class="py-2.5 text-right whitespace-nowrap">
+                    <button @click="openEditMode(prod)" class="cursor-pointer p-1.5 text-gris hover:text-foret" :aria-label="`Modifier ${prod.name}`"><Edit2 class="w-3.5 h-3.5" /></button>
+                    <button @click="deleteProduct(prod)" class="cursor-pointer p-1.5 text-gris hover:text-red-700" :aria-label="`Supprimer ${prod.name}`"><Trash2 class="w-3.5 h-3.5" /></button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex items-center justify-between pt-4 mt-2 border-t border-creme2">
+            <button :disabled="page === 1 || isPlaceholderData" @click="page--" class="px-4 py-2 border border-creme2 rounded-xl disabled:opacity-50">← Précédent</button>
+            <span class="font-bold text-noir">Page {{ page }}</span>
+            <button :disabled="!data?.hasMore || isPlaceholderData" @click="page++" class="px-4 py-2 border border-creme2 rounded-xl disabled:opacity-50">Suivant →</button>
           </div>
         </div>
       </div>
 
-      <div v-if="showFormPanel || showDetailPanel" class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 animate-fadeIn sticky top-6">
-        
-        <div class="flex items-center justify-between border-b pb-2.5">
-          <h3 class="font-bold text-noir text-sm">
-            <span v-if="showFormPanel">{{ isEditing ? 'Modifier le produit' : 'Ajouter au catalogue' }}</span>
-            <span v-else>Fiche Technique Produit</span>
-          </h3>
-          <button @click="closePanels" class="p-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-400"><X class="w-3.5 h-3.5" /></button>
+      <div v-if="showFormPanel" class="bg-white p-5 rounded-2xl border border-creme2 space-y-4 xl:sticky xl:top-6">
+        <div class="flex items-center justify-between border-b border-creme2 pb-2.5">
+          <h3 class="font-bold text-noir text-sm">{{ isEditing ? 'Modifier le produit' : 'Ajouter au catalogue' }}</h3>
+          <button @click="showFormPanel = false" class="p-1 rounded-lg bg-creme" aria-label="Fermer"><X class="w-3.5 h-3.5" /></button>
         </div>
 
-        <form v-if="showFormPanel" @submit.prevent="handleSubmit" class="space-y-4">
-          <div>
-            <label class="block mb-1 font-bold text-noir text-[10px] uppercase">Nom du produit</label>
-            <input v-model="form.name" type="text" placeholder="ex: Riz local, Huile végétale..." class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" required />
+        <form @submit.prevent="handleSubmit" class="space-y-3">
+          <div class="grid grid-cols-3 gap-2">
+            <label class="block text-[10px] font-bold uppercase text-gris">Réf.
+              <input id="produit-reference" v-model="form.reference" type="text" placeholder="P01" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
+            </label>
+            <label class="col-span-2 block text-[10px] font-bold uppercase text-gris">Nom du produit
+              <input id="produit-nom" v-model="form.name" type="text" required class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
+            </label>
           </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block mb-1 font-bold text-noir text-[10px] uppercase">Catégorie</label>
-              <select v-model="form.category" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" required>
-                <option value="" disabled>Sélectionner...</option>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="block text-[10px] font-bold uppercase text-gris">Type
+              <select id="produit-type" v-model="form.type" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case">
+                <option value="base fixe">Base fixe des packs</option>
+                <option value="extra">Extra (variable)</option>
+              </select>
+            </label>
+            <label class="block text-[10px] font-bold uppercase text-gris">Statut
+              <select id="produit-statut" v-model="form.statut" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case">
+                <option value="disponible">Disponible</option>
+                <option value="indisponible">Indisponible</option>
+              </select>
+            </label>
+            <label class="block text-[10px] font-bold uppercase text-gris">Catégorie
+              <select id="produit-categorie" v-model="form.category" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case">
+                <option value="">À renseigner</option>
                 <option v-for="cat in categoriesList" :key="cat._id" :value="cat._id">{{ cat.name }}</option>
               </select>
-            </div>
-            <div>
-              <label class="block mb-1 font-bold text-noir text-[10px] uppercase">Règle composition</label>
-              <select v-model="form.compositionRule" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" required>
-                <option value="" disabled>Sélectionner...</option>
-                <option v-for="rule in rulesList" :key="rule._id" :value="rule._id">{{ rule.name }}</option>
-              </select>
-            </div>
+            </label>
+            <label class="block text-[10px] font-bold uppercase text-gris">Unité
+              <input id="produit-unite" v-model="form.unit" type="text" required placeholder="kg, L, lot, boîte…" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
+            </label>
+            <label class="block text-[10px] font-bold uppercase text-gris">Prix unitaire (FCFA)
+              <input id="produit-prix" v-model="form.priceUnit" type="number" min="0" step="any" placeholder="à renseigner" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
+            </label>
+            <label class="block text-[10px] font-bold uppercase text-gris">Seuil d'alerte
+              <input id="produit-seuil" v-model="form.seuilAlerte" type="number" min="0" step="any" placeholder="à renseigner" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
+            </label>
           </div>
 
-          <div class="grid grid-cols-3 gap-2">
-            <div class="col-span-2">
-              <label class="block mb-1 font-bold text-noir text-[10px] uppercase">Quantité Essentiel</label>
-              <input v-model.number="form.baseQuantity" type="number" step="0.1" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" required />
+          <fieldset class="p-3 rounded-xl border border-creme2 space-y-2">
+            <legend class="px-1 text-[10px] font-bold uppercase text-gris">Quantités par pack ({{ form.unit || 'unité' }}) · vide = absent</legend>
+            <div class="grid grid-cols-5 gap-1.5">
+              <label v-for="p in PACKS" :key="p.cle" class="block text-[9px] font-bold uppercase text-gris text-center">{{ p.libelle }}
+                <input :id="`produit-quantite-${p.cle}`" v-model="form.quantites[p.cle]" type="number" min="0" step="any" class="mt-1 w-full px-1.5 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal text-center" />
+              </label>
             </div>
-            <div>
-              <label class="block mb-1 font-bold text-noir text-[10px] uppercase">Unité</label>
-              <input v-model="form.unit" type="text" placeholder="kg, litre, boîte..." class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" required />
+            <div class="flex flex-wrap items-end gap-2">
+              <label class="flex-1 block text-[10px] font-bold uppercase text-gris">Règle (libellé)
+                <select id="produit-regle" v-model="form.compositionRule" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case">
+                  <option value="">Aucune</option>
+                  <option v-for="rule in rulesList" :key="rule._id" :value="rule._id">{{ rule.name }}</option>
+                </select>
+              </label>
+              <button type="button" :disabled="!regleChoisie || form.quantites.essentiel === null" @click="proposerQuantites" class="cursor-pointer inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-foret/30 text-foret font-bold disabled:opacity-40" title="Équilibré et Confort calculés depuis Essentiel avec la règle choisie">
+                <Wand2 class="w-3.5 h-3.5" /> Proposer
+              </button>
             </div>
-          </div>
+          </fieldset>
 
-          <div>
-            <label class="block mb-1 font-bold text-noir text-[10px] uppercase">Prix Unitaire (FCFA)</label>
-            <input v-model.number="form.priceUnit" type="number" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" required />
-          </div>
+          <label class="block text-[10px] font-bold uppercase text-gris">Commentaire
+            <textarea id="produit-commentaire" v-model="form.commentaire" rows="2" maxlength="500" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case"></textarea>
+          </label>
 
-          <button type="submit" :disabled="isSubmitting" class="cursor-ponter w-full py-2.5 bg-foret text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-50">
+          <button type="submit" :disabled="isSubmitting" class="cursor-pointer w-full py-2.5 bg-foret text-white text-xs font-bold rounded-xl disabled:opacity-50">
             {{ isSubmitting ? 'Enregistrement...' : (isEditing ? 'Enregistrer les modifications' : 'Ajouter le produit') }}
           </button>
         </form>
-
-        <div v-if="showDetailPanel && selectedProduct" class="space-y-4 text-xs">
-          <div class="p-3 bg-gray-50 rounded-xl space-y-2 border">
-            <span class="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">Caractéristiques de base</span>
-            <div class="flex justify-between"><strong>Nom :</strong> <span class="text-noir font-bold">{{ selectedProduct.name }}</span></div>
-            <div class="flex justify-between"><strong>Catégorie :</strong> <span>{{ selectedProduct.category?.name }}</span></div>
-            <div class="flex justify-between"><strong>Prix de base :</strong> <span class="font-mono">{{ selectedProduct.priceUnit }} FCFA / {{ selectedProduct.unit }}</span></div>
-          </div>
-
-          <div class="space-y-2">
-            <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">Simulation des compositions (V2)</span>
-            <div class="divide-y border rounded-xl overflow-hidden bg-white">
-              
-              <div class="p-2.5 flex justify-between items-center bg-gray-50/50">
-                <div><span class="font-bold text-noir block">Dotation Essentiel</span><span class="text-[10px] text-gray-400">Quantité Pivot</span></div>
-                <div class="text-right"><span class="font-bold text-noir text-sm">{{ selectedProduct.baseQuantity }} {{ selectedProduct.unit }}</span><span class="block text-[10px] text-gray-500 font-mono">{{ (selectedProduct.baseQuantity * selectedProduct.priceUnit).toLocaleString() }} F</span></div>
-              </div>
-
-              <div class="p-2.5 flex justify-between items-center">
-                <div><span class="font-bold text-foret block">Dotation Équilibré</span><span class="text-[10px] text-gray-400">Coeff appliqué : ×{{ selectedProduct.compositionRule?.multiplierEquilibre || 2 }}</span></div>
-                <div class="text-right"><span class="font-bold text-foret text-sm">{{ selectedProduct.baseQuantity * (selectedProduct.compositionRule?.multiplierEquilibre || 2) }} {{ selectedProduct.unit }}</span><span class="block text-[10px] text-gray-500 font-mono">{{ (selectedProduct.baseQuantity * (selectedProduct.compositionRule?.multiplierEquilibre || 2) * selectedProduct.priceUnit).toLocaleString() }} F</span></div>
-              </div>
-
-              <div class="p-2.5 flex justify-between items-center">
-                <div><span class="font-bold text-savane block">Dotation Confort</span><span class="text-[10px] text-gray-400">Coeff appliqué : ×{{ selectedProduct.compositionRule?.multiplierConfort || 5 }}</span></div>
-                <div class="text-right"><span class="font-bold text-savane text-sm">{{ selectedProduct.baseQuantity * (selectedProduct.compositionRule?.multiplierConfort || 5) }} {{ selectedProduct.unit }}</span><span class="block text-[10px] text-gray-500 font-mono">{{ (selectedProduct.baseQuantity * (selectedProduct.compositionRule?.multiplierConfort || 5) * selectedProduct.priceUnit).toLocaleString() }} F</span></div>
-              </div>
-
-            </div>
-          </div>
-
-          <button @click="openEditMode(selectedProduct!)" class="cursor-pointer w-full py-2 bg-amber-50 text-savane font-bold rounded-xl border border-amber-200 transition-colors flex items-center justify-center gap-1">
-            <Edit2 class="w-3 h-3" /> Modifier la fiche
-          </button>
-        </div>
-
       </div>
-
     </div>
   </div>
 </template>

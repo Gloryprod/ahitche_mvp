@@ -154,29 +154,28 @@ const getPeriodText = computed(() => {
               <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
                 <th class="py-3 px-4">Produit</th>
                 <th class="py-3 px-4">Catégorie</th>
-                <th class="py-3 px-4 text-center">Coefficient (virtuel)</th>
+                <th class="py-3 px-4">Règle (libellé)</th>
                 <th class="py-3 px-4 text-right">Quantité Pack</th>
                 <th class="py-3 px-4 text-right">Sous-total Prix</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50 text-noir">
-              <tr v-for="item in data?.items" :key="item.productId" :class="[item.quantity === 0 ? 'opacity-40 bg-gray-50/50' : '', 'hover:bg-gray-50/30 transition-colors']">
+              <tr v-for="item in data?.items" :key="item.productId" class="hover:bg-gray-50/30 transition-colors">
                 <td class="py-3 px-4 font-bold">
-                  {{ item.name }}
-                  <span v-if="item.quantity === 0" class="text-[9px] font-semibold text-red-500 px-1.5 py-0.2 bg-red-50 rounded border border-red-100 ml-1">Absent</span>
+                  <span v-if="item.reference" class="font-mono text-gray-500 mr-1">{{ item.reference }}</span>{{ item.name }}
+                  <span v-if="item.indisponible" class="text-[9px] font-semibold text-red-700 px-1.5 bg-red-50 rounded border border-red-100 ml-1">Indisponible</span>
+                  <span v-if="item.commentaire" class="block text-[10px] font-normal text-gray-500">{{ item.commentaire }}</span>
                 </td>
                 <td class="py-3 px-4">
                   <span class="px-2 py-0.5 bg-gray-100 rounded-md text-[10px] text-gray-500">{{ item.category }}</span>
                 </td>
-                <td class="py-3 px-4 text-center font-mono text-gray-500">
-                  <span v-if="['reserve', 'fraicheur'].includes(activePack)">—</span>
-                  <span v-else>×{{ item.appliedMultiplier }}</span>
-                </td>
+                <td class="py-3 px-4 text-gray-500 italic">{{ item.regle || '—' }}</td>
                 <td class="py-3 px-4 text-right font-bold text-noir">
                   {{ item.quantity }} {{ item.unit }}
                 </td>
                 <td class="py-3 px-4 text-right font-mono text-gray-700 font-semibold">
-                  {{ item.totalPrice.toLocaleString() }} F
+                  <span v-if="item.totalPrice === null" class="text-amber-800">prix à renseigner</span>
+                  <span v-else>{{ item.totalPrice.toLocaleString('fr-FR') }} F</span>
                 </td>
               </tr>
             </tbody>

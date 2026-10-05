@@ -63,15 +63,15 @@ async function simulerPack(req, res) {
         unite: i.unit,
         quantite: i.quantity,
         prixCatalogue: i.priceUnit,
-        coutCatalogue: arrondir(i.totalPrice),
+        coutCatalogue: i.totalPrice === null ? null : arrondir(i.totalPrice),
         prixAchatReel: reel !== undefined ? arrondir(reel) : null,
         // Sans achat enregistré, le coût réel reprend le prix catalogue (signalé à l'écran)
-        coutReel: arrondir(i.quantity * (reel ?? i.priceUnit))
+        coutReel: (reel ?? i.priceUnit) === null ? null : arrondir(i.quantity * (reel ?? i.priceUnit))
       };
     });
 
-    const coutCatalogue = lignes.reduce((s, l) => s + l.coutCatalogue, 0);
-    const coutReel = lignes.reduce((s, l) => s + l.coutReel, 0);
+    const coutCatalogue = lignes.reduce((s, l) => s + (l.coutCatalogue ?? 0), 0);
+    const coutReel = lignes.reduce((s, l) => s + (l.coutReel ?? 0), 0);
     const margeCatalogue = prixVente - coutCatalogue - totalFrais;
     const margeReelle = prixVente - coutReel - totalFrais;
 
@@ -79,6 +79,7 @@ async function simulerPack(req, res) {
       formule: { nom: composition.formule.nom, slug: composition.formule.slug, prixVente },
       lignes,
       produitsSansAchat: lignes.filter(l => l.prixAchatReel === null).length,
+      prixManquants: lignes.filter(l => l.coutCatalogue === null).length, // Prix à renseigner : coût incomplet
       frais,
       totaux: {
         coutCatalogue, coutReel, frais: totalFrais,

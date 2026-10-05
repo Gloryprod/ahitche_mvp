@@ -161,7 +161,8 @@ const addExtraProduct = () => {
   if (isReadOnly.value || !selectedExtraProductId.value) return
   
   const prod = props.allProducts.find(p => String(p._id) === String(selectedExtraProductId.value))
-  if (prod) {
+  // Un produit sans prix (à renseigner) ou indisponible ne peut pas être ajouté : il compterait pour 0 FCFA
+  if (prod && prod.priceUnit !== null && prod.statut !== 'indisponible') {
     adjustedItems.value.push({
       productId: prod._id,
       name: prod.name,
@@ -298,8 +299,8 @@ const submitOrder = async () => {
             <div class="flex gap-2">
               <select v-model="selectedExtraProductId" class="flex-1 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-noir focus:outline-none focus:border-foret">
                 <option value="">— Choisir un produit du catalogue —</option>
-                <option v-for="p in availableExtras" :key="p._id" :value="p._id">
-                  {{ p.name }} ({{ p.priceUnit }} F / {{ p.unit || 'u' }})
+                <option v-for="p in availableExtras" :key="p._id" :value="p._id" :disabled="p.priceUnit === null || p.statut === 'indisponible'">
+                  {{ p.name }} ({{ p.priceUnit === null ? 'prix à renseigner' : `${p.priceUnit} F` }} / {{ p.unit || 'u' }}){{ p.statut === 'indisponible' ? ' · indisponible' : '' }}
                 </option>
               </select>
               <button type="button" @click="addExtraProduct" :disabled="!selectedExtraProductId" class="cursor-pointer px-3 bg-foret text-white rounded-lg disabled:opacity-40 flex items-center justify-center">
