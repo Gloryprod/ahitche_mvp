@@ -140,6 +140,12 @@ router.route('/finances/lignes/:id')
   .put(financeC.modifierLigne)
   .delete(financeC.supprimerLigne);
 router.get('/finances/depenses/export', financeC.exporterDepenses);
+// Registres obligatoires (livre de caisse, factures, achats) et clôture mensuelle
+router.get('/finances/registres/caisse', financeC.exporterLivreCaisse);
+router.get('/finances/registres/factures', financeC.exporterRegistreFactures);
+router.get('/finances/registres/achats', financeC.exporterRegistreAchats);
+router.get('/finances/clotures', financeC.listerClotures);
+router.post('/finances/clotures/:mois', financeC.changerCloture);
 router.route('/finances/depenses')
   .get(financeC.listerDepenses)
   .post(financeC.creerDepense);

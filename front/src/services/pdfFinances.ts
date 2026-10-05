@@ -33,10 +33,9 @@ export function genererSynthesePDF(lignes: LigneBudget[], synthese: SyntheseFina
   doc.text('1. Budget Next Impact : exécution par ligne', 14, 36)
   autoTable(doc, {
     startY: 39,
-    head: [['Ligne', 'Libellé', 'Prévu', 'Réalisé', 'Exécution']],
-    body: lignes.map(l => [l.code, l.libelle, `${fcfa(l.montantPrevuFcfa)}\n${usd(l.montantPrevuUsd)}`, `${fcfa(l.reelFcfa)}\n${usd(l.reelUsd)}`, `${String(l.tauxExecution).replace('.', ',')} %`]),
-    foot: [['', 'Total', `${fcfa(synthese.budget.prevuFcfa)}\n${usd(synthese.budget.prevuUsd)}`, `${fcfa(synthese.budget.reelFcfa)}\n${usd(synthese.budget.reelUsd)}`,
-      synthese.budget.prevuFcfa ? `${String(Math.round((synthese.budget.reelFcfa / synthese.budget.prevuFcfa) * 1000) / 10).replace('.', ',')} %` : '-']],
+    head: [['Ligne', 'Libellé', 'Prévu', 'Engagé', 'Justifié', 'Reste']],
+    body: lignes.map(l => [l.code, l.libelle, `${fcfa(l.montantPrevuFcfa)}\n${usd(l.montantPrevuUsd)}`, `${fcfa(l.engageFcfa)}\n${String(l.tauxExecution).replace('.', ',')} %`, `${fcfa(l.justifieFcfa)}\n${usd(l.justifieUsd)}`, l.depassementFcfa ? `Dépassement\n${fcfa(l.depassementFcfa)}` : fcfa(l.resteFcfa)]),
+    foot: [['', 'Total', `${fcfa(synthese.budget.prevuFcfa)}\n${usd(synthese.budget.prevuUsd)}`, `${fcfa(synthese.budget.engageFcfa)}\n${String(synthese.budget.absorption).replace('.', ',')} %`, `${fcfa(synthese.budget.justifieFcfa)}\n${usd(synthese.budget.justifieUsd)}`, fcfa(synthese.budget.soldeFcfa)]],
     headStyles: { fillColor: COULEUR_FORET },
     footStyles: { fillColor: [240, 235, 225], textColor: [26, 26, 26] },
     styles: { fontSize: 8, valign: 'top' },
@@ -44,7 +43,7 @@ export function genererSynthesePDF(lignes: LigneBudget[], synthese: SyntheseFina
   doc.setFont('Helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(120, 120, 120)
-  doc.text("Réalisé : dépenses effectuées, justificatif joint, retenues pour l'audit.", 14, (doc as any).lastAutoTable.finalY + 5)
+  doc.text("Engagé : dépenses payées et prévues. Justifié : dépenses payées dont toutes les pièces exigées sont jointes.", 14, (doc as any).lastAutoTable.finalY + 5)
 
   // 2. Exploitation sur la période
   const e = synthese.exploitation

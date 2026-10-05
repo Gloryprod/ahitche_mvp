@@ -168,11 +168,17 @@ export interface LigneBudget {
   libelle: string
   montantPrevuUsd: number
   montantPrevuFcfa: number
-  engageFcfa: number
-  reelFcfa: number
-  reelUsd: number
+  categorieAd: 1 | 2 | null // Catégorie de la convention : pièces exigées
+  passation: string
+  engageFcfa: number // Payé (réel) + prévu non payé
+  payeFcfa: number
+  justifieFcfa: number // Payé et retenu pour l'audit (pièces complètes)
+  justifieUsd: number
+  resteFcfa: number
+  depassementFcfa: number // Alerte sans blocage (D-20)
   nbDepenses: number
-  tauxExecution: number
+  tauxExecution: number // Engagé / prévu
+  tauxJustifie: number
 }
 
 export interface Justificatif {
@@ -192,8 +198,22 @@ export interface Depense {
   libelle: string
   partenaireId: { _id: string; nom: string; type: string } | null
   lotStockId: string | null
-  montantPrevuUsd: number
-  montantPrevuFcfa: number
+  montantPrevuUsd: number | null // Vide : non fixé avant l'achat
+  montantPrevuFcfa: number | null
+  numeroPiece: string
+  numeroAutorisation: string
+  sousLigne: string
+  modePaiement: string
+  detailPaiement: string
+  referencePaiement: string
+  sourceFinancement: string
+  moisProjet: string // M1… : mois du projet (du 26 au 25)
+  categorieAd: 1 | 2 | null
+  piecesManquantes: string
+  fichiersAttendus: string[]
+  commentaire: string
+  pieces: { attendues: string[]; facultatives: string[]; presentes: string[]; manquantes: string[] }
+  horsPeriode: boolean
   montantReelUsd: number
   montantReelFcfa: number
   tauxApplique: number
@@ -206,6 +226,16 @@ export interface Depense {
   createdAt: string
 }
 
+export interface ClotureMois {
+  mois: string
+  du: string
+  au: string
+  close: boolean
+  engageFcfa: number
+  nbDepenses: number
+  historique: { action: 'Clôture' | 'Réouverture'; le: string; motif: string; par?: { username: string } }[]
+}
+
 export interface SyntheseFinances {
   periode: { du: string; au: string }
   exploitation: {
@@ -215,6 +245,17 @@ export interface SyntheseFinances {
     marge: number
     livraisonsEnRetard: number
   }
-  budget: { prevuFcfa: number; prevuUsd: number; reelFcfa: number; reelUsd: number }
+  budget: {
+    prevuFcfa: number
+    prevuUsd: number
+    engageFcfa: number
+    justifieFcfa: number
+    justifieUsd: number
+    soldeFcfa: number
+    absorption: number
+    parMois: { mois: string; engageFcfa: number }[]
+    sansMois: number
+    alertes: { type: 'depassement' | 'horsPeriode'; ligne: string; montantFcfa: number; message: string }[]
+  }
   taux: number
 }

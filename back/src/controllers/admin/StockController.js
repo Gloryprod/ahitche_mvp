@@ -7,6 +7,7 @@ const { echapperRegex } = require('../../utils/texte');
 const { rattacherDepenseAchat, mettreAJourDepenseAchat, annulerDepenseAchat } = require('../../services/depenseStockService');
 const { consommerStockFIFO } = require('../../services/stockService');
 const { journaliser } = require('../../services/journalService');
+const BudgetLine = require('../../models/budgetLine');
 
 // Motifs d'une correction saisie à la main (Q 6.5) ; « Comptage » est réservé à la confirmation d'un lot à compter
 const RAISONS_SAISIE = ['Perte', 'Péremption', 'Erreur de saisie'];
@@ -134,7 +135,11 @@ async function enregistrerEntreeStock(req, res) {
       commentaire: texte(req.body.commentaire, 500)
     });
 
-    const { depense, creee } = await rattacherDepenseAchat(req, lot, { creerDepense: req.body.creerDepense !== false });
+    const ligneBudgetaire = texte(req.body.ligneBudgetaire, 20);
+    if (ligneBudgetaire && !await BudgetLine.exists({ code: ligneBudgetaire, deletedAt: null })) {
+      return res.status(400).json({ message: `La ligne budgétaire ${ligneBudgetaire} n'existe pas.` });
+    }
+    const { depense, creee } = await rattacherDepenseAchat(req, lot, { creerDepense: req.body.creerDepense !== false, ligneBudgetaire });
     await lot.save();
 
     if (quantite !== null) {

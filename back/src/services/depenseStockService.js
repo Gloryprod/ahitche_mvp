@@ -1,5 +1,6 @@
 const Expense = require('../models/expense');
 const Product = require('../models/product');
+const BudgetLine = require('../models/budgetLine');
 const { journaliser, tauxCourant } = require('./journalService');
 
 // Une seule dépense par achat (Q 6.3) : une entrée de stock se rattache à la dépense qui porte son numéro
@@ -31,7 +32,7 @@ async function depenseDeLaPiece(numeroPiece, session = null) {
  * Rattache le lot à la dépense de sa pièce, ou crée la dépense si demandé.
  * Renvoie { depense, creee } ; le lot reçoit depenseId (à enregistrer par l'appelant).
  */
-async function rattacherDepenseAchat(req, lot, { creerDepense = true, session = null } = {}) {
+async function rattacherDepenseAchat(req, lot, { creerDepense = true, ligneBudgetaire = '', session = null } = {}) {
   const existante = await depenseDeLaPiece(lot.numeroPiece, session);
   if (existante) {
     lot.depenseId = existante._id;
@@ -42,9 +43,13 @@ async function rattacherDepenseAchat(req, lot, { creerDepense = true, session = 
   const montant = montantLot(lot);
   if (montant === null) return { depense: null, creee: false };
   const taux = await tauxCourant();
+  // Imputation : ligne du budget de la convention (achat financé par la subvention), sinon exploitation
+  const ligne = ligneBudgetaire ? await BudgetLine.findOne({ code: ligneBudgetaire, deletedAt: null }).session(session).lean() : null;
+  const imputation = ligne
+    ? { categorie: 'Budget', referenceLigne: ligne.code, typeExploitation: null, sourceFinancement: 'Subvention N°171', categorieAd: ligne.categorieAd ?? null, estValidePourAudit: false }
+    : { categorie: 'Exploitation', typeExploitation: 'Achat stock' };
   const [depense] = await Expense.create([{
-    categorie: 'Exploitation',
-    typeExploitation: 'Achat stock',
+    ...imputation,
     libelle: await libelleAchat(lot),
     partenaireId: lot.fournisseurId || null,
     lotStockId: lot._id,

@@ -75,7 +75,8 @@ const formVide = () => ({
   lotFournisseur: '',
   conditionnement: '',
   commentaire: '',
-  creerDepense: true
+  creerDepense: true,
+  ligneBudgetaire: '' // Achat financé par la subvention : ligne du budget (ex : L5), sinon dépense d'exploitation
 })
 const form = ref(formVide())
 const comptage = ref({ quantite: null as number | null, commentaire: '' })
@@ -215,7 +216,8 @@ const handleSubmit = () => {
     quantiteRecue: f.aCompter ? null : f.quantiteRecue,
     prixAchatUnitaire: f.aCompter ? null : f.prixAchatUnitaire,
     valeurFcfa: f.valeurFcfa,
-    creerDepense: f.creerDepense
+    creerDepense: f.creerDepense,
+    ligneBudgetaire: f.creerDepense ? f.ligneBudgetaire.trim() : ''
   }), 'Entrée enregistrée.')
 }
 
@@ -453,6 +455,10 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
             <input v-model="form.creerDepense" type="checkbox" class="mt-0.5 accent-foret" />
             <span>Créer la dépense d'achat si aucune dépense ne porte ce n° de pièce (sinon le lot s'y rattache, sans seconde dépense).</span>
           </label>
+          <div v-if="!isEditing && form.creerDepense">
+            <label :class="etiquette" for="stock-ligne">Ligne budgétaire (achat financé par la subvention)</label>
+            <input id="stock-ligne" v-model="form.ligneBudgetaire" type="text" placeholder="Ex : L5 ; vide : dépense d'exploitation" :class="[champ, 'font-mono']" />
+          </div>
 
           <button type="submit" :disabled="isSubmitting" class="cursor-pointer w-full py-2.5 bg-foret text-white text-xs font-bold rounded-xl hover:bg-opacity-95 shadow-sm disabled:opacity-50">
             {{ isSubmitting ? 'Enregistrement…' : (isEditing ? 'Enregistrer les modifications' : 'Valider l\'entrée de stock') }}

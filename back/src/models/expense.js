@@ -1,5 +1,6 @@
 // models/Expense.js
 const mongoose = require('mongoose');
+const { SOURCES_FINANCEMENT, MODES_PAIEMENT_DEPENSE } = require('../config/convention');
 
 // Deux familles de dépenses (docs/conception-menu-admin.md, Finances) :
 //  - Budget : lignes de la convention Next Impact (prévu / réel, USD et FCFA, audit)
@@ -53,16 +54,20 @@ const expenseSchema = new mongoose.Schema({
   },
   // Numéro de la facture ou du reçu : les lots d'un même achat s'y rattachent (une seule dépense par achat, Q 6.3)
   numeroPiece: { type: String, trim: true, default: '' },
-  montantPrevuUsd: {
-    type: Number,
-    required: true,
-    default: 0
-  },
-  montantPrevuFcfa: {
-    type: Number,
-    required: true,
-    default: 0
-  },
+  numeroAutorisation: { type: String, trim: true, default: '' }, // Autorisation de décaissement (ex : 171_01)
+  sousLigne: { type: String, trim: true, default: '' }, // Ex : L2a, L5b (bons de commande)
+  modePaiement: { type: String, enum: [...MODES_PAIEMENT_DEPENSE, ''], default: '' },
+  detailPaiement: { type: String, trim: true, default: '' }, // Ex : « Flooz »
+  referencePaiement: { type: String, trim: true, default: '' }, // Ex : référence de la transaction Mobile Money
+  sourceFinancement: { type: String, enum: [...SOURCES_FINANCEMENT, ''], default: '' },
+  moisProjet: { type: String, default: '', match: /^(M\d{1,2})?$/ }, // Mois du projet (du 26 au 25) de l'imputation
+  categorieAd: { type: Number, enum: [1, 2, null], default: null }, // Catégorie de la convention : pièces exigées (Q 9.3)
+  piecesManquantes: { type: String, trim: true, default: '' }, // Constat écrit (import, contrôle) en plus de la liste automatique
+  fichiersAttendus: [{ type: String, trim: true }], // Noms des fichiers justificatifs à téléverser (import)
+  commentaire: { type: String, trim: true, default: '' },
+  // Montant prévu : vide s'il n'a pas été fixé avant l'achat (dépenses importées)
+  montantPrevuUsd: { type: Number, default: null },
+  montantPrevuFcfa: { type: Number, default: null },
   montantReelUsd: {
     type: Number,
     default: 0
