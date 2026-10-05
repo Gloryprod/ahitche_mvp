@@ -15,6 +15,9 @@ interface Commande {
   whatsapp: string
   formule: 'AHI ESSENTIEL' | 'AHI EQUILIBRE' | 'AHI CONFORT' | 'AHI RESERVE' | 'AHI FRAÎCHEUR'
   total: number
+  prixFormule: number | null
+  montantExtras: number
+  remise: { montant: number; motif: string; statut: 'Aucune' | 'À valider' | 'Validée' | 'Refusée' }
   date: string
   formuleSlug: string
   modePaiement: 'Mobile Money' | 'Espèces' | 'Acompte'

@@ -13,6 +13,18 @@ import { peutEcrire } from '@/config/roles'
 
 const authStore = useAuthStore()
 const ecriture = computed(() => peutEcrire(authStore.role.value, 'commandes'))
+const estAdmin = computed(() => authStore.role.value === 'admin')
+
+// Remise en attente (D-10) : seul l'admin la valide ou la refuse
+async function deciderRemise(cmd: Commande, decision: 'valider' | 'refuser') {
+  try {
+    const { message } = (await api.patch(`/api/admin/orders/${cmd.id}/remise`, { decision })).data
+    queryClient.invalidateQueries({ queryKey: ['orders'] })
+    showNotification(message, 'success')
+  } catch (err: any) {
+    showNotification(err.response?.data?.message || 'Décision impossible', 'error')
+  }
+}
 
 interface PaginatedCommandesResponse {
   orders: Commande[]
@@ -250,7 +262,17 @@ const handleOrderSuccess = () => {
                     {{ cmd.formule }}
                 </span>
               </td>
-              <td class="py-3.5 px-2 text-noir font-semibold">{{ cmd.total.toLocaleString('fr-FR') }} F</td>
+              <td class="py-3.5 px-2 text-noir font-semibold whitespace-nowrap">
+                {{ cmd.total.toLocaleString('fr-FR') }} F
+                <span v-if="cmd.remise?.statut === 'Validée'" class="block text-[9px] font-bold text-savane" :title="cmd.remise.motif">remise − {{ cmd.remise.montant.toLocaleString('fr-FR') }} F</span>
+                <span v-else-if="cmd.remise?.statut === 'À valider'" class="block text-[9px] font-bold text-amber-800" :title="cmd.remise.motif">
+                  remise à valider : {{ cmd.remise.montant.toLocaleString('fr-FR') }} F
+                  <template v-if="estAdmin">
+                    <button type="button" @click="deciderRemise(cmd, 'valider')" class="cursor-pointer underline ml-1">valider</button>
+                    <button type="button" @click="deciderRemise(cmd, 'refuser')" class="cursor-pointer underline ml-1">refuser</button>
+                  </template>
+                </span>
+              </td>
               <td class="py-3.5 px-2">
                 <span :class="['inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold border', paiementStyles[cmd.modePaiement] || 'bg-gray-50 text-gray-600 border-gray-200']">
                   {{ cmd.modePaiement }}

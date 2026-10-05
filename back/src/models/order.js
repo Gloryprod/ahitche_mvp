@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 // En attente -> Confirmée -> En préparation -> En livraison -> Livrée (paiement effectué) ou Échec ; Annulée.
 const STATUTS = ['En attente', 'Confirmée', 'En préparation', 'En livraison', 'Livrée', 'Échec', 'Annulée'];
 const PERIODES = ['Matin', 'Après-midi'];
+// D-06 : Mobile Money ou espèces à la livraison ; « Acompte » ne reste que pour l'historique
 const MODES_PAIEMENT = ['Mobile Money', 'Espèces', 'Acompte'];
 
 const orderSchema = new mongoose.Schema({
@@ -27,7 +28,18 @@ const orderSchema = new mongoose.Schema({
   },
   total: {
     type: Number,
-    required: true // Ex: 22500
+    required: true // Ex: 22500 ; fixé par le serveur (prix de la formule + extras − remise validée)
+  },
+  prixFormule: { type: Number, default: null }, // Prix de la formule au moment de la commande
+  montantExtras: { type: Number, default: 0 }, // Extras au prix du catalogue
+  // Remise (décision D-10) : motif obligatoire ; appliquée au total seulement une fois validée par l'admin
+  remise: {
+    montant: { type: Number, default: 0, min: 0 },
+    motif: { type: String, default: '' },
+    statut: { type: String, enum: ['Aucune', 'À valider', 'Validée', 'Refusée'], default: 'Aucune' },
+    demandeePar: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    valideePar: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    valideeLe: { type: Date, default: null }
   },
   modePaiement: {
     type: String,

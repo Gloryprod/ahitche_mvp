@@ -37,3 +37,9 @@ export const CLASSES_STATUT: Record<StatutCommande, string> = {
 
 export const classeStatut = (statut: string) =>
   CLASSES_STATUT[statut as StatutCommande] ?? 'bg-gray-100 text-gris border border-gray-200'
+
+// Créneaux de livraison (décision D-09) : horaires à confirmer par DAVID
+export const HORAIRES_CRENEAUX = { 'Matin': '8 h – 13 h', 'Après-midi': '14 h – 18 h' } as const
+
+// Modes de paiement des nouvelles commandes (décision D-06) ; « Acompte » ne reste que sur les anciennes
+export const MODES_PAIEMENT = ['Mobile Money', 'Espèces'] as const

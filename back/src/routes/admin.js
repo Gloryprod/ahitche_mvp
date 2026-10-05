@@ -44,6 +44,7 @@ router.get('/commandes', userC.getOrders)
 router.post('/orders', orderC.createAdminOrder);
 router.put('/orders/:id', orderC.updateAdminOrder);
 router.patch('/orders/:id/status', orderC.updateOrderStatus);
+router.patch('/orders/:id/remise', orderC.deciderRemise); // Admin seulement (contrôlé dans le contrôleur)
 router.delete('/orders/:id', orderC.deleteAdminOrder);
 
 // Category

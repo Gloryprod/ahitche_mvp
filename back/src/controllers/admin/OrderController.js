@@ -8,23 +8,31 @@ const { STATUTS } = require('../../models/order');
 const User = require('../../models/user');
 const Zone = require('../../models/zone');
 const { TRANSITIONS, estEnRetard, appliquerCompensationEnAttente, libererCompensation, genererCompositionSiAbsente } = require('../../services/commandeService');
+const { MODES_PAIEMENT_ACCEPTES, calculerPrixCommande } = require('../../services/prixCommandeService');
+const { journaliser } = require('../../services/journalService');
+
+const formaterFcfa = (n) => `${Math.round(n).toLocaleString('fr-FR')} FCFA`;
 
 
 async function createAdminOrder(req, res) {
   try {
-    // 💡 Récupération de productsSnapshot envoyé par le client Vue
-    const { client, formuleSlug, modePaiement, notes, totalPrice, productsSnapshot } = req.body;
+    // Le prix envoyé par le formulaire est ignoré : le serveur impose le prix de la formule (D-10)
+    const { client, formuleSlug, modePaiement, notes, productsSnapshot, remise } = req.body;
 
-    // 1. Validations de base
-    if (!client || !formuleSlug || !totalPrice || !productsSnapshot || !Array.isArray(productsSnapshot)) {
-      return res.status(400).json({ message: "Données manquantes ou panier invalide (client, formuleSlug, total, productsSnapshot)." });
+    if (!client || !mongoose.isValidObjectId(client) || typeof formuleSlug !== 'string' || !Array.isArray(productsSnapshot) || !productsSnapshot.length) {
+      return res.status(400).json({ message: "Données manquantes ou panier invalide (client, formule, produits)." });
+    }
+    if (!MODES_PAIEMENT_ACCEPTES.includes(modePaiement)) {
+      return res.status(400).json({ message: "Mode de paiement invalide (Mobile Money ou Espèces)." });
     }
 
-    // 2. Récupérer le nom de la formule configurée
-    const formuleInfo = await Formule.findOne({ slug: formuleSlug });
+    const formuleInfo = await Formule.findOne({ slug: formuleSlug, statut: 'actif' });
     if (!formuleInfo) {
       return res.status(404).json({ message: `La formule '${formuleSlug}' n'existe pas en base.` });
     }
+
+    const prix = await calculerPrixCommande({ formule: formuleInfo, lignes: productsSnapshot, remise, utilisateur: { id: req.user.id, role: req.user.role } });
+    if (prix.erreur) return res.status(400).json({ message: prix.erreur });
 
     // 3. Générer la référence incrémentale automatique (ex: CMD-001)
     const orderReference = await genererReferenceCommande();
@@ -32,17 +40,8 @@ async function createAdminOrder(req, res) {
     // 💡 Création anticipée de l'ID de la commande pour lier les snapshots
     const orderId = new mongoose.Types.ObjectId();
 
-    // 4. Préparer et insérer les snapshots de produits en base de données
-    const snapshotsToCreate = productsSnapshot.map(item => ({
-      orderId: orderId,
-      productId: item.productId,
-      name: item.name,
-      quantity: item.quantity,
-      unit: item.unit,
-      unitPrice: item.unitPrice,
-      totalPrice: item.totalPrice,
-      isExtra: !!item.isExtra
-    }));
+    // 4. Composition de la commande, avec les prix du catalogue (jamais ceux du formulaire)
+    const snapshotsToCreate = prix.snapshots.map(item => ({ ...item, orderId }));
 
     // Enregistrement en masse des snapshots
     const savedSnapshots = await OrderProductSnapshot.insertMany(snapshotsToCreate);
@@ -57,9 +56,12 @@ async function createAdminOrder(req, res) {
       reference: orderReference,
       formuleSlug: formuleSlug,
       formule: formuleInfo.nom,
-      total: totalPrice,
+      total: prix.total,
+      prixFormule: prix.prixFormule,
+      montantExtras: prix.montantExtras,
+      remise: prix.remise,
       modePaiement: modePaiement,
-      notes: notes,
+      notes: typeof notes === 'string' ? notes : '',
       productsSnapshot: snapshotIds, // 🔗 Stockage des IDs référencés
       statut: 'En attente',
       historique: [{ statut: 'En attente', date: new Date(), par: req.user.id }]
@@ -68,6 +70,10 @@ async function createAdminOrder(req, res) {
     // Compensation d'une livraison en retard : remise avec cette commande
     await appliquerCompensationEnAttente(newOrder);
     await newOrder.save();
+    await journaliser(req, {
+      action: 'Création', entite: 'Commande', entiteId: newOrder._id,
+      resume: `Commande ${newOrder.reference} saisie dans l'admin : ${formaterFcfa(newOrder.total)}${prix.remise.montant ? ` (remise de ${formaterFcfa(prix.remise.montant)} ${prix.remise.statut === 'Validée' ? 'validée' : 'à valider'} : ${prix.remise.motif})` : ''}`
+    });
 
     return res.status(201).json({
       message: "Commande enregistrée avec succès !",
@@ -83,11 +89,13 @@ async function createAdminOrder(req, res) {
 async function updateAdminOrder(req, res) {
   try {
     const { id } = req.params; // L'ID de la commande envoyé dans l'URL
-    const { client, formuleSlug, modePaiement, notes, totalPrice, productsSnapshot } = req.body;
+    const { client, formuleSlug, modePaiement, notes, productsSnapshot, remise } = req.body;
 
-    // 1. Validation de base
-    if (!client || !formuleSlug || !totalPrice || !productsSnapshot || !Array.isArray(productsSnapshot)) {
+    if (!client || !mongoose.isValidObjectId(client) || typeof formuleSlug !== 'string' || !Array.isArray(productsSnapshot) || !productsSnapshot.length) {
       return res.status(400).json({ message: "Données manquantes ou panier invalide." });
+    }
+    if (!MODES_PAIEMENT_ACCEPTES.includes(modePaiement)) {
+      return res.status(400).json({ message: "Mode de paiement invalide (Mobile Money ou Espèces)." });
     }
 
     // 2. Vérifier si la commande existe
@@ -102,39 +110,39 @@ async function updateAdminOrder(req, res) {
       return res.status(404).json({ message: `La formule '${formuleSlug}' n'existe pas en base.` });
     }
 
-    // 3. Générer la référence incrémentale automatique (ex: CMD-001)
-    const orderReference = await genererReferenceCommande();
+    if (['Livrée', 'Annulée'].includes(order.statut) || order.paiement?.statut === 'Payé') {
+      return res.status(400).json({ message: "Une commande livrée, payée ou annulée ne se modifie plus." });
+    }
 
-    // 4. Nettoyer les anciens snapshots associés à cette commande
+    const prix = await calculerPrixCommande({
+      formule: formuleInfo, lignes: productsSnapshot, remise,
+      utilisateur: { id: req.user.id, role: req.user.role },
+      remiseExistante: order.remise?.toObject ? order.remise.toObject() : order.remise
+    });
+    if (prix.erreur) return res.status(400).json({ message: prix.erreur });
+
+    // 4. Remplacer la composition par celle du panier mis à jour (prix du catalogue)
     await OrderProductSnapshot.deleteMany({ orderId: id });
-
-    // 5. Préparer et insérer les nouveaux snapshots du panier mis à jour
-    const snapshotsToCreate = productsSnapshot.map(item => ({
-      orderId: id,
-      productId: item.productId,
-      name: item.name,
-      quantity: item.quantity,
-      unit: item.unit,
-      unitPrice: item.unitPrice,
-      totalPrice: item.totalPrice,
-      isExtra: !!item.isExtra
-    }));
+    const snapshotsToCreate = prix.snapshots.map(item => ({ ...item, orderId: id }));
 
     const savedSnapshots = await OrderProductSnapshot.insertMany(snapshotsToCreate);
     const newSnapshotIds = savedSnapshots.map(snap => snap._id);
 
     // 6. Mettre à jour la commande principale
     order.userId = client;
-    order.reference = order.reference || orderReference; // On garde l'ancienne référence si elle existe
+    order.reference = order.reference || await genererReferenceCommande();
     order.formuleSlug = formuleSlug;
     order.formule = formuleInfo.nom;
-    order.total = totalPrice;
+    order.total = prix.total;
+    order.prixFormule = prix.prixFormule;
+    order.montantExtras = prix.montantExtras;
+    order.remise = prix.remise;
     order.modePaiement = modePaiement;
-    order.notes = notes;
+    order.notes = typeof notes === 'string' ? notes : '';
     order.productsSnapshot = newSnapshotIds;
-    order.deletedAt = order.deletedAt ? null : null; // Réactive la commande si elle était supprimée
 
     await order.save();
+    await journaliser(req, { action: 'Modification', entite: 'Commande', entiteId: order._id, resume: `Commande ${order.reference} modifiée : ${formaterFcfa(order.total)}` });
 
     return res.status(200).json({
       message: "Commande mise à jour avec succès !",
@@ -302,7 +310,37 @@ async function deleteAdminOrder(req, res) {
   }
 }
 
+// PATCH /api/admin/orders/:id/remise  { decision: "valider" | "refuser" } : réservé à l'admin (D-10)
+async function deciderRemise(req, res) {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Seul l'admin valide ou refuse une remise." });
+    const decision = req.body?.decision;
+    if (!['valider', 'refuser'].includes(decision)) return res.status(400).json({ message: "Décision invalide (valider ou refuser)." });
+
+    const order = await Order.findOne({ _id: req.params.id, deletedAt: null });
+    if (!order) return res.status(404).json({ message: "Commande introuvable." });
+    if (order.remise?.statut !== 'À valider') return res.status(400).json({ message: "Aucune remise en attente sur cette commande." });
+    if (order.paiement?.statut === 'Payé') return res.status(400).json({ message: "La commande est déjà payée." });
+
+    const brut = (order.prixFormule ?? order.total) + (order.montantExtras || 0);
+    order.remise.statut = decision === 'valider' ? 'Validée' : 'Refusée';
+    order.remise.valideePar = req.user.id;
+    order.remise.valideeLe = new Date();
+    order.total = brut - (decision === 'valider' ? order.remise.montant : 0);
+    await order.save();
+    await journaliser(req, {
+      action: 'Validation', entite: 'Commande', entiteId: order._id,
+      resume: `Remise de ${formaterFcfa(order.remise.montant)} ${decision === 'valider' ? 'validée' : 'refusée'} sur ${order.reference} (${order.remise.motif}) : total ${formaterFcfa(order.total)}`
+    });
+    return res.status(200).json({ message: decision === 'valider' ? 'Remise validée.' : 'Remise refusée.', order });
+  } catch (error) {
+    console.error("Erreur deciderRemise:", error);
+    return res.status(500).json({ message: "Erreur lors de la décision sur la remise." });
+  }
+}
+
 module.exports = {
+  deciderRemise,
   createAdminOrder,
   getAllOrders,
   updateAdminOrder,

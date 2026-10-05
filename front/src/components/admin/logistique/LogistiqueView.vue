@@ -6,7 +6,7 @@ import api from '@/stores/api'
 import type { CommandeTerrain, Prestataire, ZoneLivraison } from '@/type'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
-import { ETAPE_SUIVANTE, classeStatut, type StatutCommande } from '@/config/commandes'
+import { ETAPE_SUIVANTE, HORAIRES_CRENEAUX, classeStatut, type StatutCommande } from '@/config/commandes'
 import { useChangementStatut } from '@/composables/useChangementStatut'
 import { genererPreparationPDF, genererTourneePDF, messageTournee } from '@/services/pdfLogistique'
 
@@ -214,7 +214,7 @@ const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
         </p>
 
         <div v-for="t in tournees" :key="t.periode" class="space-y-3">
-          <h2 class="font-display font-bold text-lg">{{ t.periode }} <span class="text-gris text-sm font-body">· {{ t.total }} livraison(s)</span></h2>
+          <h2 class="font-display font-bold text-lg">{{ t.periode }} <span class="text-gris text-sm font-body">({{ HORAIRES_CRENEAUX[t.periode] }})</span> <span class="text-gris text-sm font-body">· {{ t.total }} livraison(s)</span></h2>
 
           <div v-for="g in t.groupes" :key="g.livreur?._id ?? 'sans'" class="bg-white rounded-2xl border border-creme2 overflow-hidden">
             <div class="flex items-center justify-between gap-2 px-4 py-3 bg-creme/60 border-b border-creme2">
@@ -288,7 +288,7 @@ const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
             <label class="col-span-2 sm:col-span-1 text-[10px] font-bold uppercase text-gris">
               Créneau
               <select v-model="planifs[c.id]!.periode" class="mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal normal-case">
-                <option v-for="p in PERIODES" :key="p" :value="p">{{ p }}</option>
+                <option v-for="p in PERIODES" :key="p" :value="p">{{ p }} ({{ HORAIRES_CRENEAUX[p] }})</option>
               </select>
             </label>
             <label class="col-span-2 text-[10px] font-bold uppercase text-gris">
