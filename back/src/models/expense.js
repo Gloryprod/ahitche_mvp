@@ -51,6 +51,8 @@ const expenseSchema = new mongoose.Schema({
     ref: 'LotStockFifo', // Dépense créée automatiquement par une entrée de stock
     default: null
   },
+  // Numéro de la facture ou du reçu : les lots d'un même achat s'y rattachent (une seule dépense par achat, Q 6.3)
+  numeroPiece: { type: String, trim: true, default: '' },
   montantPrevuUsd: {
     type: Number,
     required: true,
@@ -103,6 +105,8 @@ const expenseSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+expenseSchema.index({ numeroPiece: 1 }, { partialFilterExpression: { numeroPiece: { $gt: '' } } });
 
 module.exports = mongoose.model('Expense', expenseSchema);
 module.exports.CATEGORIES_DEPENSE = CATEGORIES_DEPENSE;

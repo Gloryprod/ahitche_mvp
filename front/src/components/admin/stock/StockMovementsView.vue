@@ -6,6 +6,18 @@ import { useQuery, keepPreviousData } from '@tanstack/vue-query'
 import type { Product } from '@/type'
 
 // --- INTERFACES TYPES ---
+type TypeMouvement = 'entree' | 'sortie' | 'correction_positive' | 'correction_negative' | 'transformation_sortie' | 'transformation_entree' | 'essai'
+// Sens du mouvement : + entre dans le stock, − en sort
+const ENTRANTS: TypeMouvement[] = ['entree', 'correction_positive', 'transformation_entree']
+const LIBELLES: Record<TypeMouvement, string> = {
+  entree: 'Entrée',
+  sortie: 'Sortie (livraison)',
+  correction_positive: 'Correction +',
+  correction_negative: 'Correction −',
+  transformation_sortie: 'Transformation (matière)',
+  transformation_entree: 'Transformation (produit)',
+  essai: 'Essai'
+}
 interface LotId {
   _id: string
   numeroLot: string
@@ -15,9 +27,12 @@ interface MouvementStock {
   _id: string
   product: Product
   lotId: LotId
-  type: 'entree' | 'sortie' | 'correction_negative'
+  type: TypeMouvement
   quantite: number
+  raison: string | null
   motif: string
+  rendement: number | null
+  responsable: string
   createdAt: string
 }
 
@@ -86,7 +101,9 @@ const formatDateHeure = (dateStr: string) => {
           <option value="">Tous les flux</option>
           <option value="entree">📥 Entrées de stock</option>
           <option value="sortie">📤 Sorties de stock (FIFO)</option>
-          <option value="correction_negative">⚠️ Corrections / Suppressions</option>
+          <option value="correction">⚠️ Corrections / Suppressions</option>
+          <option value="transformation">🏭 Transformations</option>
+          <option value="essai">🧪 Essais</option>
         </select>
       </div>
     </div>
@@ -123,10 +140,10 @@ const formatDateHeure = (dateStr: string) => {
                 
                 <!-- Icône d'indicateur visuel de flux -->
                 <td class="py-3 px-4 text-center">
-                  <span v-if="mvt.type === 'entree'" class="inline-flex p-1.5 bg-green-50 text-green-700 rounded-lg border border-green-100" title="Entrée de stock">
+                  <span v-if="ENTRANTS.includes(mvt.type)" class="inline-flex p-1.5 bg-green-50 text-green-700 rounded-lg border border-green-100" title="Entrée de stock">
                     <ArrowDownLeft class="w-3.5 h-3.5 stroke-[2.5]" />
                   </span>
-                  <span v-else-if="mvt.type === 'sortie'" class="inline-flex p-1.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100" title="Sortie FIFO">
+                  <span v-else-if="mvt.type === 'sortie' || mvt.type === 'transformation_sortie'" class="inline-flex p-1.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100" title="Sortie FIFO">
                     <ArrowUpRight class="w-3.5 h-3.5 stroke-[2.5]" />
                   </span>
                   <span v-else class="inline-flex p-1.5 bg-amber-50 text-savane rounded-lg border border-amber-100" title="Ajustement / Correction">
@@ -154,12 +171,8 @@ const formatDateHeure = (dateStr: string) => {
 
                 <!-- Volume quantitatif avec couleur conditionnelle -->
                 <td class="py-3 px-4 text-right font-mono font-bold text-sm">
-                  <span :class="[
-                    mvt.type === 'entree' ? 'text-green-600' : '',
-                    mvt.type === 'sortie' ? 'text-gray-700' : '',
-                    mvt.type === 'correction_negative' ? 'text-amber-600' : ''
-                  ]">
-                    {{ mvt.type === 'entree' ? '+' : '-' }}{{ mvt.quantite }}
+                  <span :class="ENTRANTS.includes(mvt.type) ? 'text-green-600' : (mvt.type === 'sortie' || mvt.type === 'transformation_sortie' ? 'text-gray-700' : 'text-amber-600')">
+                    {{ ENTRANTS.includes(mvt.type) ? '+' : '−' }}{{ mvt.quantite }}
                   </span>
                   <span class="text-[10px] text-gray-400 font-sans font-medium ml-1">
                     {{ mvt.product ? mvt.product.unit : '' }}
@@ -167,8 +180,10 @@ const formatDateHeure = (dateStr: string) => {
                 </td>
 
                 <!-- Description / Traçabilité de l'action -->
-                <td class="py-3 px-4 max-w-xs text-gray-500 font-normal pl-8 truncate" :title="mvt.motif">
-                  {{ mvt.motif }}
+                <td class="py-3 px-4 max-w-xs text-gray-500 font-normal pl-8" :title="mvt.motif">
+                  <span class="block text-[10px] font-bold uppercase tracking-wide text-noir">{{ LIBELLES[mvt.type] || mvt.type }}<template v-if="mvt.raison"> · {{ mvt.raison }}</template></span>
+                  <span class="block truncate">{{ mvt.motif }}</span>
+                  <span v-if="mvt.responsable" class="block text-[10px] text-gray-400">par {{ mvt.responsable }}</span>
                 </td>
 
               </tr>

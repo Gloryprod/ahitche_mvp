@@ -9,9 +9,13 @@ interface InventoryItem {
   productId: string
   nom: string
   unite: string
+  reference: string | null
   stockTotal: number
   nbLotsActifs: number
-  seuilAlerte: number
+  lotsACompter: number // Lots dont la quantité n'est pas encore comptée : stock incomplet
+  lotsAConfirmer: number
+  valeurFcfa: number
+  seuilAlerte: number | null // Vide : seuil à renseigner, pas d'alerte
   enAlerte: boolean
 }
 
@@ -54,6 +58,9 @@ const filteredInventory = computed(() => {
   )
 })
 
+const totalACompter = computed(() => (inventaireRaw.value ?? []).reduce((n, i) => n + (i.lotsAConfirmer || 0), 0))
+const formatFcfa = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
+
 const totalAlertes = computed(() => {
   if (!inventaireRaw.value) return 0
   return inventaireRaw.value.filter(item => item.enAlerte).length
@@ -94,6 +101,10 @@ const closePanels = () => {
       <AlertTriangle class="w-4 h-4 text-red-600 shrink-0" />
       <span>Attention : {{ totalAlertes }} produit(s) requiert(ent) un réapprovisionnement immédiat auprès de vos grossistes.</span>
     </div>
+
+    <RouterLink v-if="totalACompter > 0" to="/dashboard/admin/saveStock" class="block bg-amber-50 text-amber-900 border border-amber-200 p-4 rounded-xl font-semibold">
+      {{ totalACompter }} lot(s) à compter ou à vérifier : les quantités affichées sont incomplètes. Voir les entrées de stock →
+    </RouterLink>
 
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 bg-white p-4 rounded-2xl shadow-2xs">
         <div v-if="!filteredInventory || filteredInventory.length === 0" class="text-center py-2 text-sm text-gris">
@@ -147,10 +158,12 @@ const closePanels = () => {
                 
                 <td class="py-3 px-4 text-right font-mono font-bold" :class="item.enAlerte ? 'text-red-600' : 'text-gray-700'">
                   {{ item.stockTotal }} <span class="text-[10px] text-gray-400 font-sans font-medium">{{ item.unite }}</span>
+                  <span v-if="item.lotsACompter" class="block text-[10px] font-sans font-semibold text-amber-800">+ {{ item.lotsACompter }} lot(s) à compter</span>
                 </td>
                 
                 <td class="py-3 px-4 text-right font-mono text-gray-400 hidden md:table-cell">
-                  {{ item.seuilAlerte }} <span class="text-[10px] font-sans">{{ item.unite }}</span>
+                  <template v-if="item.seuilAlerte !== null">{{ item.seuilAlerte }} <span class="text-[10px] font-sans">{{ item.unite }}</span></template>
+                  <span v-else class="text-[10px] font-sans">à renseigner</span>
                 </td>
 
                 <td class="py-3 px-4 text-center hidden sm:table-cell">
@@ -160,7 +173,10 @@ const closePanels = () => {
                 </td>
 
                 <td class="py-3 px-4 text-center">
-                  <span v-if="item.enAlerte" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-red-100 text-red-700 border border-red-200 uppercase tracking-wide">
+                  <span v-if="item.lotsACompter" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-amber-50 text-amber-800 border border-amber-200 uppercase tracking-wide">
+                    À compter
+                  </span>
+                  <span v-else-if="item.enAlerte" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-red-100 text-red-700 border border-red-200 uppercase tracking-wide">
                     Rupture proche
                   </span>
                   <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-green-50 text-green-700 border border-green-100 uppercase tracking-wide">
@@ -222,8 +238,14 @@ const closePanels = () => {
             <div class="bg-[#f9f9fb] p-3 rounded-xl border border-gray-100">
               <span class="text-[9px] uppercase font-bold text-gray-400 block">Seuil critique</span>
               <p class="text-gray-700 font-mono font-bold text-base mt-0.5">
-                {{ selectedItem.seuilAlerte }} <span class="text-xs font-sans font-medium text-gray-400">{{ selectedItem.unite }}</span>
+                <template v-if="selectedItem.seuilAlerte !== null">{{ selectedItem.seuilAlerte }} <span class="text-xs font-sans font-medium text-gray-400">{{ selectedItem.unite }}</span></template>
+                <span v-else class="text-xs font-sans">à renseigner</span>
               </p>
+            </div>
+            <div class="bg-[#f9f9fb] p-3 rounded-xl border border-gray-100 col-span-2">
+              <span class="text-[9px] uppercase font-bold text-gray-400 block">Valeur au prix d'achat</span>
+              <p class="text-noir font-mono font-bold text-base mt-0.5">{{ formatFcfa(selectedItem.valeurFcfa) }}</p>
+              <p v-if="selectedItem.lotsACompter" class="text-[10px] text-amber-800">Dont {{ selectedItem.lotsACompter }} lot(s) à compter, à leur valeur facturée</p>
             </div>
           </div>
 

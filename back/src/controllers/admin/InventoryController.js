@@ -10,14 +10,18 @@ const { echapperRegex } = require('../../utils/texte');
  */
 async function obtenirInventaireGlobal(req, res) {
   try {
-    // Agrégation Mongoose pour grouper le stock restant par produit
+    // Stock restant par produit ; les lots à compter (quantité vide) et à vérifier sont signalés à part
     const etatStock = await LotStockFifo.aggregate([
-      { $match: { deletedAt: null, quantiteRestante: { $gt: 0 } } },
+      { $match: { deletedAt: null, $or: [{ quantiteRestante: { $gt: 0 } }, { quantiteRestante: null }, { aConfirmer: { $gt: '' } }] } },
       {
         $group: {
           _id: "$product",
-          stockTotal: { $sum: "$quantiteRestante" },
-          nbLotsActifs: { $sum: 1 }
+          stockTotal: { $sum: { $ifNull: ["$quantiteRestante", 0] } },
+          nbLotsActifs: { $sum: { $cond: [{ $gt: [{ $ifNull: ["$quantiteRestante", 0] }, 0] }, 1, 0] } },
+          lotsACompter: { $sum: { $cond: [{ $eq: [{ $ifNull: ["$quantiteRestante", null] }, null] }, 1, 0] } },
+          lotsAConfirmer: { $sum: { $cond: [{ $gt: [{ $ifNull: ["$aConfirmer", ''] }, ''] }, 1, 0] } },
+          // Valeur au prix d'achat ; un lot à compter compte pour sa valeur facturée
+          valeurFcfa: { $sum: { $cond: [{ $eq: [{ $ifNull: ["$quantiteRestante", null] }, null] }, { $ifNull: ["$valeurFcfa", 0] }, { $multiply: ["$quantiteRestante", { $ifNull: ["$prixAchatUnitaire", 0] }] }] } }
         }
       }
     ]);
@@ -33,6 +37,9 @@ async function obtenirInventaireGlobal(req, res) {
         unite: produit ? produit.unit : "unité",
         stockTotal: item.stockTotal,
         nbLotsActifs: item.nbLotsActifs,
+        lotsACompter: item.lotsACompter,
+        lotsAConfirmer: item.lotsAConfirmer,
+        valeurFcfa: Math.round(item.valeurFcfa),
         seuilAlerte: seuil,
         reference: produit?.reference || null,
         enAlerte: seuil !== null && item.stockTotal <= seuil // Badge rouge ; jamais d'alerte sur un seuil inconnu
@@ -58,12 +65,14 @@ async function obtenirHistoriqueMouvements(req, res) {
     const skip = (page - 1) * limit;
 
     let filtre = {};
-    if (type) filtre.type = type; // 'entree', 'sortie', 'correction_negative'
+    if (type === 'correction') filtre.type = { $in: ['correction_positive', 'correction_negative'] };
+    else if (type === 'transformation') filtre.type = { $in: ['transformation_sortie', 'transformation_entree'] };
+    else if (typeof type === 'string' && type) filtre.type = type;
     if (productId) filtre.product = productId;
 
     const mouvements = await MouvementStock.find(filtre)
       .populate('product', 'name unit')
-      .populate('lotId', 'numeroLot')
+      .populate('lotId', 'numeroLot fournisseur')
       .sort({ createdAt: -1 }) // Du plus récent au plus ancien
       .skip(skip)
       .limit(limit + 1);

@@ -94,6 +94,10 @@ router.route('/stock/lots')
 router.route('/stock/lots/:id')
   .put(stockC.modifierLotStock)
   .delete(stockC.supprimerLotStock);
+router.post('/stock/lots/:id/comptage', stockC.compterLot);
+router.post('/stock/lots/:id/correction', stockC.corrigerLot);
+router.post('/stock/essais', stockC.enregistrerEssai);
+router.post('/stock/transformations', stockC.enregistrerTransformation);
 
 // État et Historique
 router.get('/inventory/global', invC.obtenirInventaireGlobal);

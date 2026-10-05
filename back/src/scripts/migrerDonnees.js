@@ -172,6 +172,22 @@ async function migrerQuantitesProduits() {
   console.log(anciens.length ? `  ⚠ ${anciens.length} produit(s) de l'ancien catalogue : quantités reprises de l'ancienne règle, à vérifier` : '  ✔ Aucun produit sans quantités par pack');
 }
 
+// Étape 8 : l'index unique des numéros de lot était mal déclaré et n'a jamais protégé contre les doublons.
+// Les doublons éventuels sont signalés (jamais renommés) ; l'index n'est créé que s'il n'y en a aucun.
+async function migrerIndexLots() {
+  const doublons = await LotStockFifo.aggregate([
+    { $match: { deletedAt: null } },
+    { $group: { _id: '$numeroLot', n: { $sum: 1 } } },
+    { $match: { n: { $gt: 1 } } }
+  ]);
+  if (doublons.length) {
+    console.log(`  ⚠ ${doublons.length} numéro(s) de lot en double, à corriger à la main avant l'index : ${doublons.map(d => d._id).join(', ')}`);
+    return;
+  }
+  await LotStockFifo.createIndexes();
+  console.log('  ✔ Numéros de lot uniques (index en place)');
+}
+
 const ETAPES = [
   ['Index du téléphone', migrerIndexTelephone],
   ['Fournisseurs vers Prestataires', migrerFournisseurs],
@@ -180,6 +196,7 @@ const ETAPES = [
   ['Taux USD/FCFA', migrerTaux],
   ['Admin principal', migrerAdminPrincipal],
   ['Quantités des produits par pack', migrerQuantitesProduits],
+  ['Numéros de lot uniques', migrerIndexLots],
 ];
 
 async function migrer() {
