@@ -3,10 +3,26 @@ const Formule = require('../models/formules');
 const { genererReferenceCommande } = require('../services/orderReferenceService');
 const { ANNULABLES_PAR_CLIENT, appliquerCompensationEnAttente, libererCompensation } = require('../services/commandeService');
 
+const CHAMPS_CLIENT = 'reference formule formuleSlug total modePaiement statut creneau dateLivraison paiement.statut createdAt';
+
+// Même sélection pour une commande déjà chargée (réponse à la création)
+function versClient(order) {
+    const o = order.toObject();
+    return {
+        _id: o._id, reference: o.reference, formule: o.formule, formuleSlug: o.formuleSlug, total: o.total,
+        modePaiement: o.modePaiement, statut: o.statut, creneau: o.creneau, dateLivraison: o.dateLivraison,
+        paiement: { statut: o.paiement?.statut }, createdAt: o.createdAt
+    };
+}
+
 async function index(req, res){
 
     try {
-        const orders = await Order.find({ userId: req.user.id, deletedAt: null }).sort({ createdAt: -1 });        
+        // Seuls les champs utiles au client : jamais le coût interne de la course, le livreur, les notes
+        // internes ni l'historique avec les identifiants de l'équipe
+        const orders = await Order.find({ userId: req.user.id, deletedAt: null })
+            .select(CHAMPS_CLIENT)
+            .sort({ createdAt: -1 });
         res.status(200).json(orders);
     } catch (error) {
         res.status(500).json({ message: "Erreur lors de la récupération des commandes" });
@@ -61,7 +77,7 @@ async function saveOrder(req, res){
 
         return res.status(201).json({
             message: "Commande enregistrée avec succès !",
-            commande: nouvelleCommande
+            commande: versClient(nouvelleCommande)
         });
     } catch (error) {
         console.error("Erreur lors de la création de la commande :", error);
