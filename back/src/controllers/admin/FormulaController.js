@@ -1,6 +1,7 @@
 const Formule = require('../../models/formules');
 const { TYPES_PACK, calculerCompositionPack } = require('../../services/compositionService');
 const { journaliser } = require('../../services/journalService');
+const { lienWhatsAppFormule } = require('../../services/formuleService');
 
 // Composition et valeur catalogue d'un pack (lecture seule, voir services/compositionService.js)
 async function getPackDetails(req, res) {
@@ -32,7 +33,7 @@ async function updateFormulaPrice(req, res) {
 
     const type = packType.toLowerCase();
 
-    if (prixFixe === undefined || prixFixe < 0) {
+    if (typeof prixFixe !== 'number' || !Number.isFinite(prixFixe) || prixFixe < 0) {
       return res.status(400).json({ 
         success: false, 
         message: 'Le prix proposé est invalide' 
@@ -48,8 +49,9 @@ async function updateFormulaPrice(req, res) {
       return res.status(404).json({ success: false, message: 'Formule introuvable' });
     }
 
-    const ancienPrix = updatedFormula.prixCommercial ?? updatedFormula.prixActuel;
+    const ancienPrix = updatedFormula.prixCommercial ?? updatedFormula.prixActuel ?? 'à définir';
     updatedFormula.prixCommercial = prixFixe;
+    updatedFormula.lienWhatsApp = lienWhatsAppFormule(updatedFormula);
     await updatedFormula.save();
 
     // Journal des modifications : qui a changé le prix de vente, et quand

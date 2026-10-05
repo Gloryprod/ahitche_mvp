@@ -32,14 +32,14 @@ interface Formule {
   slug: string;
   nom: string;
   emoji: string;
-  prixActuel: number;
+  prixActuel: number | null; // Vide : prix à définir
   prixCommercial?: number | null;
   bientotDisponible?: boolean;
   cible: string;
 }
 
 // Prix de vente affiché et facturé : prix commercial fixé par l'admin, sinon prix officiel
-const prixDeVente = (formule: Formule) => formule.prixCommercial ?? formule.prixActuel;
+const prixDeVente = (formule: Formule) => formule.prixCommercial ?? formule.prixActuel ?? null;
 const formaterFCFA = (montant: number) => `${montant.toLocaleString('fr-FR')} FCFA`;
 
 // 1. Authentification et Routage
@@ -565,7 +565,7 @@ onMounted(async () => {
                   <span class="text-2xl filter drop-shadow-sm select-none" aria-hidden="true">{{ formule.emoji }}</span>
                   <div>
                     <p class="font-bold text-sm" :class="clientInfos.formuleHabituelle === formule.nom ? 'text-foret' : 'text-noir'">{{ formule.nom }}</p>
-                    <p class="text-xs text-gris font-medium mt-0.5">{{ formaterFCFA(prixDeVente(formule)) }} · {{ formule.cible.split('·')[0] }}</p>
+                    <p class="text-xs text-gris font-medium mt-0.5">{{ prixDeVente(formule) === null ? 'Prix à définir' : formaterFCFA(prixDeVente(formule)!) }} · {{ formule.cible.split('·')[0] }}</p>
                   </div>
                 </div>
 

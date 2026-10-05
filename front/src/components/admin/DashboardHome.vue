@@ -212,11 +212,11 @@ const recentOrders = computed(() => {
 
 // Configuration des 5 formules
 const PACKS_CONFIG = [
-  { key: 'essentiel', label: 'ESSENTIEL', defaultLaunchPrice: 10800 },
-  { key: 'equilibre', label: 'ÉQUILIBRÉ', defaultLaunchPrice: 21600 },
-  { key: 'confort', label: 'CONFORT', defaultLaunchPrice: 35000 },
-  { key: 'reserve', label: 'RÉSERVE', defaultLaunchPrice: 0 },
-  { key: 'fraicheur', label: 'FRAÎCHEUR', defaultLaunchPrice: 0 }
+  { key: 'essentiel', label: 'ESSENTIEL' },
+  { key: 'equilibre', label: 'ÉQUILIBRÉ' },
+  { key: 'confort', label: 'CONFORT' },
+  { key: 'reserve', label: 'RÉSERVE' },
+  { key: 'fraicheur', label: 'FRAÎCHEUR' }
 ]
 
 // Exécution parallèle des requêtes pour chaque formule
@@ -241,7 +241,7 @@ const grossMargins = computed(() => {
     const data = query?.data
 
     // Prix de vente (ou depuis l'API si disponible)
-    const launchPrice = data?.formule?.prixCommercial ?? data?.formule?.prixActuel ?? pack.defaultLaunchPrice
+    const launchPrice: number | null = data?.formule?.prixCommercial ?? data?.formule?.prixActuel ?? null // Vide : prix à définir
 
     // Calcul du coût réel de la dotation (somme des sous-totaux des produits)
     const realCost = data?.items
@@ -249,7 +249,7 @@ const grossMargins = computed(() => {
       : 0
 
     // Marge brute = Prix de vente - Coût réel
-    const margin = launchPrice - realCost
+    const margin = launchPrice === null ? null : launchPrice - realCost
 
     return {
       formula: pack.label,
@@ -448,7 +448,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                     
                     <!-- Prix Lancement / Vente -->
                     <td class="py-2.5 px-3 text-right font-semibold">
-                        <span v-if="item.launchPrice === 0" class="text-gray-400 font-body text-[10px]">Variable / Pilote</span>
+                        <span v-if="item.launchPrice === null" class="text-gray-400 font-body text-[10px]">Prix à définir</span>
                         <span v-else>{{ item.launchPrice.toLocaleString('fr-FR') }} F</span>
                     </td>
 
@@ -459,7 +459,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
 
                     <!-- Marge Brute Calculated -->
                     <td class="py-2.5 px-3 text-right">
-                        <span v-if="item.launchPrice === 0" class="text-gray-400 font-body text-[10px]">
+                        <span v-if="item.margin === null" class="text-gray-400 font-body text-[10px]">
                         N/A
                         </span>
                         <span 

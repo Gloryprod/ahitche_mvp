@@ -72,17 +72,17 @@ export interface Formule {
   nom: string;
   emoji: string;
   cible: string;
-  phraseAccroche: string;
-  estimationRepas: {
-    min: number;
-    max: number;
-  };
-  heuresEconomisees: {
-    min: number;
-    max: number;
-  };
-  ancienPrix: number;  // Prix barré dynamique recalculé par le backend
-  prixActuel: number;  // Valeur réelle calculée à la volée en fonction du catalogue
+  phraseAccroche: string; // Vide : à valider (D-05)
+  promesse: string;
+  foyersCibles: string;
+  logiqueCommande: string;
+  changementsMax: number | null;
+  variationQuantitePct: number | null;
+  cycleJours: number;
+  bientotDisponible: boolean;
+  estimationRepas: { min: number | null; max: number | null };
+  heuresEconomisees: { min: number | null; max: number | null };
+  prixActuel: number | null;  // Prix affiché du référentiel v4 ; vide = à définir (Fraîcheur)
   prixCommercial: number | null;  // Valeur personnalisée définie par l'admin
   estRecommandee: boolean;
   statut: 'actif' | 'inactif';

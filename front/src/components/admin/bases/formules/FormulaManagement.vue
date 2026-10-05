@@ -9,7 +9,8 @@ interface PackDetailsResponse {
   formule: Formule;
   itemCount: number;
   items: ProductItem[];
-  prixCalcule: number; // Valeur du pack calculée depuis le catalogue (le prix de vente reste formule.prixActuel)
+  prixCalcule: number; // Coût des matières aux prix du catalogue (le prix de vente reste formule.prixActuel)
+  prixManquants: number; // Produits dont le prix est à renseigner : coût incomplet
 }
 
 const queryClient = useQueryClient()
@@ -37,7 +38,7 @@ const { data, isLoading, isError, error } = useQuery({
 watch(data, (newData) => {
   if (newData?.formule) {
     // Si la formule a un prix fixé personnalisé, on l'utilise, sinon le prix généré
-    customPrice.value = newData.formule.prixCommercial ? newData.formule.prixCommercial : newData.formule.prixActuel
+    customPrice.value = newData.formule.prixCommercial ?? newData.formule.prixActuel ?? null
   }
 }, { immediate: true })
 
@@ -80,10 +81,12 @@ const getPackColorClass = (pack: string) => {
 }
 
 // 3. Texte dynamique pour la période couverte
+// Logique de commande et cycle : lus dans la formule (référentiel packs v4)
 const getPeriodText = computed(() => {
-  if (activePack.value === 'reserve') return 'Commande Volumétrique (Mensuelle / Bi-mensuelle)'
-  if (activePack.value === 'fraicheur') return 'Base de départ minimale (Modulable par le client)'
-  return '1 Personne / 1 Semaine'
+  const f = data.value?.formule
+  if (!f) return ''
+  const cycle = f.cycleJours === 7 ? 'chaque semaine' : `tous les ${f.cycleJours} jours`
+  return `${f.logiqueCommande || 'à renseigner'} · cycle : ${cycle}`
 })
 </script>
 
@@ -194,11 +197,12 @@ const getPeriodText = computed(() => {
           
           <!-- Prix système généré -->
           <div>
-            <span class="text-[10px] block opacity-70">VALEUR FINANCIÈRE DU PACK (GÉNÉRÉE)</span>
+            <span class="text-[10px] block opacity-70">COÛT DES MATIÈRES (PRIX DU CATALOGUE)</span>
             <h2 class="text-2xl font-black tracking-tight font-mono">
-              <span v-if="activePack === 'fraicheur' && data?.prixCalcule === 0" class="text-lg">À définir après pilote</span>
-              <span v-else>{{ data?.prixCalcule?.toLocaleString() }} <span class="text-sm font-bold">FCFA</span></span>
+              {{ data?.prixCalcule?.toLocaleString('fr-FR') }} <span class="text-sm font-bold">FCFA</span>
             </h2>
+            <p v-if="data?.prixManquants" class="text-[10px] font-bold text-amber-800">Coût incomplet : {{ data.prixManquants }} produit(s) sans prix</p>
+            <p class="text-[10px] mt-1">Prix de vente : <strong>{{ data?.formule?.prixCommercial ?? data?.formule?.prixActuel ?? 'à définir' }}</strong><span v-if="(data?.formule?.prixCommercial ?? data?.formule?.prixActuel) !== null && (data?.formule?.prixCommercial ?? data?.formule?.prixActuel) !== undefined"> FCFA</span></p>
           </div>
 
           <!-- NOUVEAU : Champ d'édition du Prix Général par l'Admin -->
@@ -241,7 +245,7 @@ const getPeriodText = computed(() => {
           <div class="border-t border-black/10 pt-3 space-y-2 text-[11px]">
             <div class="flex justify-between">
               <span>Produits actifs inclus :</span>
-              <strong class="font-bold">{{ data?.itemCount }} / {{ activePack === 'reserve' || activePack === 'fraicheur' ? '11' : '16' }}</strong>
+              <strong class="font-bold">{{ data?.itemCount }}</strong>
             </div>
             <div class="flex justify-between">
               <span>Période / Logistique :</span>
@@ -252,19 +256,17 @@ const getPeriodText = computed(() => {
 
         <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
           <h4 class="font-bold text-noir text-xs flex items-center gap-1.5">
-            <CheckCircle class="w-3.5 h-3.5 text-foret" /> Note de conformité technique (V4)
+            <CheckCircle class="w-3.5 h-3.5 text-foret" /> Référentiel packs v4 (30/06/2026)
           </h4>
-          <p class="text-gray-400 text-[11px] leading-relaxed">
-            <span v-if="activePack === 'reserve'">
-              Ce pack applique la règle de stockage de volume à cycle libre. L'oignon y est comptabilisé au panier (3 000 FCFA brute) au lieu de lots hebdomadaires.
-            </span>
-            <span v-else-if="activePack === 'fraicheur'">
-              Ce pack affiche la configuration minimale d'aromates et produits frais[cite: 2]. Les quantités définitives de vente seront validées au cours du pilote à Calavi Kpota[cite: 2].
-            </span>
-            <span v-else>
-              Ce pack applique automatiquement les règles de l'écosystème Ahitché du référentiel officiel du <span class="font-semibold text-gray-500">30/06/2026</span>[cite: 2]. Les plafonnements sur les féculents sont audités et calculés dynamiquement[cite: 2].
-            </span>
+          <p class="text-gray-500 text-[11px] leading-relaxed">
+            Les quantités de chaque produit dans ce pack sont celles du catalogue (écran Produits) ; un produit sans quantité est absent du pack.
           </p>
+          <dl v-if="data?.formule" class="text-[11px] space-y-1">
+            <div v-if="data.formule.promesse"><dt class="inline font-bold text-noir">Promesse : </dt><dd class="inline">{{ data.formule.promesse }}</dd></div>
+            <div v-if="data.formule.foyersCibles"><dt class="inline font-bold text-noir">Foyers cibles : </dt><dd class="inline">{{ data.formule.foyersCibles }}</dd></div>
+            <div><dt class="inline font-bold text-noir">Personnalisation : </dt><dd class="inline">{{ data.formule.changementsMax ?? 'à renseigner' }} changement(s), ±{{ data.formule.variationQuantitePct ?? '…' }} % sur les quantités</dd></div>
+            <div v-if="data.formule.bientotDisponible"><dd class="inline font-bold text-amber-800">Bientôt disponible : non commandable</dd></div>
+          </dl>
         </div>
 
       </div>

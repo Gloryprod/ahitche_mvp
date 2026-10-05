@@ -2,6 +2,7 @@ const Order = require('../models/order');
 const Formule = require('../models/formules');
 const { genererReferenceCommande } = require('../services/orderReferenceService');
 const { ANNULABLES_PAR_CLIENT, appliquerCompensationEnAttente, libererCompensation } = require('../services/commandeService');
+const { prixDeVente } = require('../services/formuleService');
 
 const CHAMPS_CLIENT = 'reference formule formuleSlug total modePaiement statut creneau dateLivraison paiement.statut createdAt';
 
@@ -55,7 +56,10 @@ async function saveOrder(req, res){
         }
 
         // Prix de vente : prix commercial fixé par l'admin, sinon prix officiel
-        const total = formuleInfo.prixCommercial ?? formuleInfo.prixActuel;
+        const total = prixDeVente(formuleInfo);
+        if (total === null) {
+            return res.status(400).json({ message: "Le prix de cette formule n'est pas encore fixé." });
+        }
 
         if (!total || total <= 0) {
             return res.status(409).json({ message: "Le prix de cette formule n'est pas encore défini. Contactez-nous sur WhatsApp." });
