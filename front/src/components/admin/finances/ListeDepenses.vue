@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import { Plus, CheckCircle2, Trash2, Paperclip, X, Upload } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
 import api from '@/stores/api'
-import type { Depense, LigneBudget, Prestataire } from '@/type'
+import type { Depense, Justificatif, LigneBudget, Prestataire } from '@/type'
 
 // Liste des dépenses d'une catégorie (Budget ou Exploitation) : ajout, paiement avec justificatif, audit
 const props = defineProps<{
@@ -65,29 +65,44 @@ async function ajouter() {
   }
 }
 
-// --- Paiement : montant réel, date et justificatif ---
+// --- Paiement : montant réel, date et justificatifs (stockage privé, joints directement à la dépense) ---
 const aPayer = ref<Depense | null>(null)
-const paiement = ref({ montantReelFcfa: null as number | null, datePaiement: '', urlPieceJointe: '' })
+const paiement = ref({ montantReelFcfa: null as number | null, datePaiement: '' })
+const pieces = ref<Justificatif[]>([])
 const televersement = ref(false)
 
 function ouvrirPaiement(d: Depense) {
   aPayer.value = d
-  paiement.value = { montantReelFcfa: d.montantPrevuFcfa, datePaiement: new Date().toISOString().slice(0, 10), urlPieceJointe: '' }
+  pieces.value = [...(d.justificatifs ?? [])]
+  paiement.value = { montantReelFcfa: d.montantPrevuFcfa, datePaiement: new Date().toISOString().slice(0, 10) }
 }
 
 async function joindre(evenement: Event) {
-  const fichier = (evenement.target as HTMLInputElement).files?.[0]
-  if (!fichier) return
+  const champ = evenement.target as HTMLInputElement
+  const fichier = champ.files?.[0]
+  champ.value = ''
+  if (!fichier || !aPayer.value) return
   if (fichier.size > 10 * 1024 * 1024) return emit('notifier', 'Fichier trop lourd (10 Mo maximum).', 'error')
   const donnees = new FormData()
   donnees.append('fichier', fichier)
   televersement.value = true
   try {
-    paiement.value.urlPieceJointe = (await api.post('/api/admin/finances/justificatifs', donnees)).data.url
+    pieces.value.push((await api.post(`/api/admin/finances/depenses/${aPayer.value._id}/justificatifs`, donnees)).data)
+    rafraichir()
   } catch (err: any) {
     emit('notifier', err.response?.data?.message || 'Téléversement impossible (PDF, JPG ou PNG).', 'error')
   } finally {
     televersement.value = false
+  }
+}
+
+// Consultation : lien signé et temporaire demandé à l'API (aucune adresse publique)
+async function ouvrirPiece(depenseId: string, piece: Justificatif) {
+  try {
+    const { url } = (await api.get(`/api/admin/finances/depenses/${depenseId}/justificatifs/${piece._id}/lien`)).data
+    window.open(url, '_blank', 'noopener')
+  } catch (err: any) {
+    emit('notifier', err.response?.data?.message || "Impossible d'ouvrir le justificatif", 'error')
   }
 }
 
@@ -216,7 +231,8 @@ const totalAffiche = computed(() => data.value?.total ?? 0)
             <td class="py-2.5 pr-2 whitespace-nowrap">
               <span v-if="d.estEffectue" class="inline-flex items-center gap-1 text-green-800 font-semibold"><CheckCircle2 class="w-3.5 h-3.5" /> {{ dateCourte(d.datePaiement) }}</span>
               <span v-else class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[10px]">À payer</span>
-              <a v-if="d.urlPieceJointe" :href="d.urlPieceJointe" target="_blank" rel="noopener" class="ml-1 inline-flex text-savane" aria-label="Voir le justificatif"><Paperclip class="w-3.5 h-3.5" /></a>
+              <button v-for="(p, i) in d.justificatifs" :key="p._id" type="button" @click="ouvrirPiece(d._id, p)" class="cursor-pointer ml-1 inline-flex items-center text-savane" :aria-label="`Ouvrir le justificatif ${i + 1} : ${p.typePiece || p.nom}`" :title="p.typePiece || p.nom"><Paperclip class="w-3.5 h-3.5" /></button>
+              <span v-if="d.urlPieceJointe" class="ml-1 text-[10px] font-bold text-amber-800" title="Ancien justificatif à adresse publique : à téléverser de nouveau">ancien lien</span>
             </td>
             <td class="py-2.5 pr-2 text-center">
               <input type="checkbox" :checked="d.estValidePourAudit" :disabled="!ecriture" @change="basculerAudit(d)" class="accent-foret w-4 h-4" :aria-label="`Inclure « ${d.libelle} » dans l'audit`" />
@@ -253,14 +269,20 @@ const totalAffiche = computed(() => data.value?.total ?? 0)
           <input v-model="paiement.datePaiement" type="date" required class="mt-1 w-full px-3 py-2 rounded-lg border border-creme2 bg-creme text-sm text-noir font-normal" />
         </label>
         <div>
-          <p class="text-[10px] font-bold uppercase text-gris mb-1">Justificatif (obligatoire)</p>
+          <p class="text-[10px] font-bold uppercase text-gris mb-1">Justificatifs (au moins un) · stockage privé</p>
+          <ul v-if="pieces.length" class="mb-2 space-y-1 text-xs">
+            <li v-for="p in pieces" :key="p._id" class="flex items-center gap-2">
+              <Paperclip class="w-3.5 h-3.5 text-savane" />
+              <button type="button" class="cursor-pointer underline truncate" @click="ouvrirPiece(aPayer._id, p)">{{ p.nom || p.typePiece || 'Justificatif' }}</button>
+            </li>
+          </ul>
           <label class="flex items-center gap-2 px-3 py-3 rounded-xl border border-dashed border-foret/40 bg-creme/60 cursor-pointer text-xs font-semibold">
             <Upload class="w-4 h-4 text-foret" />
-            <span>{{ televersement ? 'Envoi en cours...' : paiement.urlPieceJointe ? 'Justificatif joint ✓ (changer)' : 'Choisir un PDF, JPG ou PNG (10 Mo max.)' }}</span>
+            <span>{{ televersement ? 'Envoi en cours...' : pieces.length ? 'Ajouter une autre pièce' : 'Choisir un PDF, JPG ou PNG (10 Mo max.)' }}</span>
             <input type="file" accept="application/pdf,image/jpeg,image/png" class="sr-only" @change="joindre" />
           </label>
         </div>
-        <button type="submit" :disabled="envoi || televersement || !paiement.urlPieceJointe" class="cursor-pointer w-full px-3 py-2.5 rounded-xl bg-foret text-white text-xs font-bold disabled:opacity-50">
+        <button type="submit" :disabled="envoi || televersement || !pieces.length" class="cursor-pointer w-full px-3 py-2.5 rounded-xl bg-foret text-white text-xs font-bold disabled:opacity-50">
           Marquer comme effectuée
         </button>
       </form>

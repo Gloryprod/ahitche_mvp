@@ -162,6 +162,15 @@ export interface LigneBudget {
   tauxExecution: number
 }
 
+export interface Justificatif {
+  _id: string
+  nom: string
+  format: string
+  typePiece: string
+  taille: number
+  televerseLe: string
+}
+
 export interface Depense {
   _id: string
   categorie: 'Budget' | 'Exploitation'
@@ -178,7 +187,8 @@ export interface Depense {
   estEffectue: boolean
   estValidePourAudit: boolean
   datePaiement: string | null
-  urlPieceJointe: string | null
+  urlPieceJointe: string | null // Ancien lien public (avant le stockage privé) : pièce à téléverser de nouveau
+  justificatifs: Justificatif[]
   creePar: { username: string } | null
   createdAt: string
 }

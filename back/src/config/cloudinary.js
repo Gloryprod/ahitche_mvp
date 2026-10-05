@@ -26,13 +26,17 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 } // Limite à 100 Mo
 });
 
-// Justificatifs des dépenses (Finances) : PDF ou image, 10 Mo maximum, sans retouche
+// Justificatifs des dépenses (Finances) : PDF ou image, 10 Mo maximum, sans retouche.
+// Stockage PRIVÉ (type « authenticated ») : aucune adresse publique ; consultation par un lien signé temporaire
+// généré par l'API pour les rôles autorisés (services/justificatifService.js). Les pièces contiennent IFU,
+// téléphones et références de paiement.
 const FORMATS_JUSTIFICATIF = ['application/pdf', 'image/jpeg', 'image/png'];
 const uploadJustificatif = multer({
   storage: new CloudinaryStorage({
     cloudinary,
     params: async () => ({
       folder: 'justificatifs',
+      type: 'authenticated',
       resource_type: 'image', // Cloudinary traite les PDF comme des images (aperçu possible)
       allowed_formats: ['pdf', 'jpg', 'jpeg', 'png']
     })
@@ -43,3 +47,4 @@ const uploadJustificatif = multer({
 
 module.exports = upload;
 module.exports.uploadJustificatif = uploadJustificatif;
+module.exports.cloudinary = cloudinary;

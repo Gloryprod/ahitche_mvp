@@ -7,6 +7,17 @@ const mongoose = require('mongoose');
 const CATEGORIES_DEPENSE = ['Budget', 'Exploitation'];
 const TYPES_EXPLOITATION = ['Achat stock', 'Livraison', 'Compensation', 'Autre'];
 
+const justificatifSchema = new mongoose.Schema({
+  publicId: { type: String, required: true }, // Identifiant Cloudinary (stockage privé)
+  format: { type: String, required: true }, // pdf, jpg ou png
+  resourceType: { type: String, default: 'image' },
+  nom: { type: String, trim: true, default: '' }, // Nom du fichier d'origine
+  typePiece: { type: String, trim: true, default: '' }, // Ex : facture, preuve de paiement, autorisation de décaissement
+  taille: { type: Number, default: 0 },
+  televerseLe: { type: Date, default: Date.now },
+  televersePar: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+});
+
 const expenseSchema = new mongoose.Schema({
   categorie: {
     type: String,
@@ -76,10 +87,13 @@ const expenseSchema = new mongoose.Schema({
   datePaiement: {
     type: Date
   },
+  // Ancien justificatif à adresse publique (avant le stockage privé) : à téléverser de nouveau, puis à effacer
   urlPieceJointe: {
     type: String,
-    default: null // Justificatif obligatoire pour passer la dépense en « effectuée »
+    default: null
   },
+  // Pièces justificatives en stockage privé (au moins une pour passer la dépense en « effectuée »)
+  justificatifs: [justificatifSchema],
   creePar: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

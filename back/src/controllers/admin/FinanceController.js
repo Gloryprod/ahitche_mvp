@@ -8,6 +8,7 @@ const Order = require('../../models/order');
 const Partner = require('../../models/partner');
 const { journaliser, tauxCourant, TAUX_CONVENTION } = require('../../services/journalService');
 const { lireCsv, lireNombre, ecrireCsv } = require('../../utils/csv');
+const { ficheJustificatif, lienSigne, supprimerFichier, DUREE_LIEN_SECONDES } = require('../../services/justificatifService');
 
 const arrondir = (n, decimales = 0) => Math.round(n * 10 ** decimales) / 10 ** decimales;
 const formatFcfa = (n) => `${Math.round(n).toLocaleString('fr-FR').replace(/\s/g, ' ')} FCFA`;
@@ -324,17 +325,16 @@ async function changerValiditeAudit(req, res) {
   }
 }
 
-// PATCH /api/admin/finances/depenses/:id/effectuer  { montantReelFcfa | montantReelUsd, datePaiement, urlPieceJointe }
+// PATCH /api/admin/finances/depenses/:id/effectuer  { montantReelFcfa | montantReelUsd, datePaiement } (au moins un justificatif joint)
 async function effectuerDepense(req, res) {
   try {
     const depense = await Expense.findOne({ _id: req.params.id, deletedAt: null });
     if (!depense) return res.status(404).json({ message: "Dépense introuvable." });
     if (depense.estEffectue) return res.status(400).json({ message: "Cette dépense est déjà effectuée." });
 
-    // Justificatif obligatoire, téléversé par l'API des justificatifs (stockage Cloudinary)
-    const url = typeof req.body.urlPieceJointe === 'string' ? req.body.urlPieceJointe.trim() : '';
-    if (!/^https:\/\/res\.cloudinary\.com\//.test(url)) {
-      return res.status(400).json({ message: "Joignez le justificatif (PDF ou image) avant de marquer la dépense effectuée." });
+    // Au moins un justificatif, joint à la dépense en stockage privé
+    if (!depense.justificatifs?.length) {
+      return res.status(400).json({ message: "Joignez au moins un justificatif (PDF ou image) avant de marquer la dépense effectuée." });
     }
 
     const fcfa = Number(req.body.montantReelFcfa ?? 0);
@@ -347,14 +347,13 @@ async function effectuerDepense(req, res) {
     depense.montantReelFcfa = Math.round(fcfa || usd * depense.tauxApplique);
     depense.montantReelUsd = arrondir(usd || fcfa / depense.tauxApplique, 2);
     depense.datePaiement = datePaiement;
-    depense.urlPieceJointe = url;
     depense.estEffectue = true;
     await depense.save();
 
     await journaliser(req, {
       action: 'Validation', entite: 'Dépense', entiteId: depense._id,
       resume: `Dépense « ${depense.libelle} » effectuée : ${formatFcfa(depense.montantReelFcfa)} (prévu ${formatFcfa(depense.montantPrevuFcfa)})`,
-      apres: { montantReelFcfa: depense.montantReelFcfa, montantReelUsd: depense.montantReelUsd, datePaiement, urlPieceJointe: url }
+      apres: { montantReelFcfa: depense.montantReelFcfa, montantReelUsd: depense.montantReelUsd, datePaiement, justificatifs: depense.justificatifs.length }
     });
     return res.status(200).json(depense);
   } catch (error) {
@@ -381,9 +380,58 @@ async function supprimerDepense(req, res) {
 }
 
 // POST /api/admin/finances/justificatifs (multipart, champ « fichier ») -> { url }
-async function televerserJustificatif(req, res) {
-  if (!req.file) return res.status(400).json({ message: "Aucun fichier reçu (PDF, JPG ou PNG, 10 Mo maximum)." });
-  return res.status(201).json({ url: req.file.path });
+// POST /api/admin/finances/depenses/:id/justificatifs (multipart : « fichier », « typePiece ») : stockage privé
+async function ajouterJustificatif(req, res) {
+  try {
+    if (!req.file) return res.status(400).json({ message: "Aucun fichier reçu (PDF, JPG ou PNG, 10 Mo maximum)." });
+    const depense = await Expense.findOne({ _id: req.params.id, deletedAt: null });
+    if (!depense) {
+      await supprimerFichier({ publicId: req.file.filename }).catch(() => {});
+      return res.status(404).json({ message: "Dépense introuvable." });
+    }
+    const fiche = ficheJustificatif(req.file, req.body?.typePiece, req.user.id);
+    depense.justificatifs.push(fiche);
+    await depense.save();
+    await journaliser(req, { action: 'Modification', entite: 'Dépense', entiteId: depense._id, resume: `Justificatif ajouté à « ${depense.libelle} »${fiche.typePiece ? ` (${fiche.typePiece})` : ''}` });
+    return res.status(201).json(depense.justificatifs[depense.justificatifs.length - 1]);
+  } catch (error) {
+    console.error("Erreur ajouterJustificatif:", error);
+    return res.status(500).json({ message: "Erreur lors de l'ajout du justificatif." });
+  }
+}
+
+// GET /api/admin/finances/depenses/:id/justificatifs/:jid/lien : lien signé, valable 5 minutes
+async function lienJustificatif(req, res) {
+  try {
+    const depense = await Expense.findOne({ _id: req.params.id, deletedAt: null }).select('justificatifs');
+    const justificatif = depense?.justificatifs.id(req.params.jid);
+    if (!justificatif) return res.status(404).json({ message: "Justificatif introuvable." });
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ url: lienSigne(justificatif), expireDans: DUREE_LIEN_SECONDES });
+  } catch (error) {
+    console.error("Erreur lienJustificatif:", error);
+    return res.status(500).json({ message: "Erreur lors de la création du lien." });
+  }
+}
+
+// DELETE /api/admin/finances/depenses/:id/justificatifs/:jid (une dépense effectuée garde au moins une pièce)
+async function supprimerJustificatif(req, res) {
+  try {
+    const depense = await Expense.findOne({ _id: req.params.id, deletedAt: null });
+    const justificatif = depense?.justificatifs.id(req.params.jid);
+    if (!justificatif) return res.status(404).json({ message: "Justificatif introuvable." });
+    if (depense.estEffectue && depense.justificatifs.length === 1) {
+      return res.status(400).json({ message: "Une dépense effectuée garde au moins un justificatif." });
+    }
+    await supprimerFichier(justificatif);
+    justificatif.deleteOne();
+    await depense.save();
+    await journaliser(req, { action: 'Suppression', entite: 'Dépense', entiteId: depense._id, resume: `Justificatif retiré de « ${depense.libelle} »` });
+    return res.status(200).json({ message: "Justificatif supprimé." });
+  } catch (error) {
+    console.error("Erreur supprimerJustificatif:", error);
+    return res.status(500).json({ message: "Erreur lors de la suppression du justificatif." });
+  }
 }
 
 // GET /api/admin/finances/depenses/export : CSV pour Excel (séparateur « ; »)
@@ -392,14 +440,14 @@ async function exporterDepenses(req, res) {
     const depenses = await Expense.find(filtreDepenses(req.query)).populate('partenaireId', 'nom').sort({ referenceLigne: 1, createdAt: 1 }).lean();
     const lignes = [[
       'Catégorie', 'Ligne', 'Type', 'Libellé', 'Prestataire', 'Prévu FCFA', 'Prévu USD', 'Réel FCFA', 'Réel USD',
-      'Taux', 'Effectuée', 'Date de paiement', 'Valide audit', 'Justificatif'
+      'Taux', 'Effectuée', 'Date de paiement', 'Valide audit', 'Justificatifs'
     ]];
     for (const d of depenses) {
       lignes.push([
         d.categorie, d.referenceLigne, d.typeExploitation || '', d.libelle, d.partenaireId?.nom || '',
         d.montantPrevuFcfa, String(d.montantPrevuUsd).replace('.', ','), d.montantReelFcfa, String(d.montantReelUsd).replace('.', ','),
         d.tauxApplique, d.estEffectue ? 'Oui' : 'Non', d.datePaiement ? new Date(d.datePaiement).toLocaleDateString('fr-FR') : '',
-        d.estValidePourAudit ? 'Oui' : 'Non', d.urlPieceJointe || ''
+        d.estValidePourAudit ? 'Oui' : 'Non', `${d.justificatifs?.length || 0} pièce(s)`
       ]);
     }
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -492,6 +540,6 @@ module.exports = {
   obtenirTaux, enregistrerTaux,
   listerLignes, creerLigne, modifierLigne, supprimerLigne, importerLignes,
   listerDepenses, creerDepense, modifierDepense, changerValiditeAudit, effectuerDepense, supprimerDepense,
-  televerserJustificatif, exporterDepenses,
+  ajouterJustificatif, lienJustificatif, supprimerJustificatif, exporterDepenses,
   obtenirSynthese, obtenirJournal
 };

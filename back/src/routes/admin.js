@@ -143,7 +143,10 @@ router.route('/finances/depenses/:id')
   .delete(financeC.supprimerDepense);
 router.patch('/finances/depenses/:id/effectuer', financeC.effectuerDepense);
 router.patch('/finances/depenses/:id/audit', financeC.changerValiditeAudit);
-router.post('/finances/justificatifs', upload.uploadJustificatif.single('fichier'), financeC.televerserJustificatif);
+// Justificatifs en stockage privé : ajout, lien signé temporaire, suppression
+router.post('/finances/depenses/:id/justificatifs', upload.uploadJustificatif.single('fichier'), financeC.ajouterJustificatif);
+router.get('/finances/depenses/:id/justificatifs/:jid/lien', financeC.lienJustificatif);
+router.delete('/finances/depenses/:id/justificatifs/:jid', financeC.supprimerJustificatif);
 
 // Simulateurs (lecture seule : aucun enregistrement, aucun prix modifié)
 router.get('/simulateurs/pack/:type', simulateurC.simulerPack);
