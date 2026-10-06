@@ -2,6 +2,9 @@ const CompositionRule = require('../../models/compositionRule');
 const { journaliser } = require('../../services/journalService');
 const { echapperRegex } = require('../../utils/texte');
 
+// Multiplicateur facultatif (D-14 : simple libellé) : vide -> null ; invalide -> NaN
+const multiplicateur = (v) => (v === undefined || v === null || v === '' ? null : Number(v) >= 0 ? Number(v) : NaN);
+
 // 1. Récupérer toutes les règles (Paginées et Filtrées)
 async function getAllRules(req, res) {
   try {
@@ -56,8 +59,8 @@ async function createRule(req, res) {
       return res.status(400).json({ message: "Le nom de la règle est obligatoire." });
     }
 
-    if (multiplierEquilibre === undefined || multiplierConfort === undefined) {
-      return res.status(400).json({ message: "Les multiplicateurs Équilibré et Confort sont obligatoires." });
+    if ([multiplierEquilibre, multiplierConfort].some(m => Number.isNaN(multiplicateur(m)))) {
+      return res.status(400).json({ message: "Multiplicateurs : nombres positifs ou vides." });
     }
 
     // Anti-doublon sur le nom
@@ -72,8 +75,8 @@ async function createRule(req, res) {
 
     const newRule = new CompositionRule({
       name: name.trim(),
-      multiplierEquilibre: Number(multiplierEquilibre),
-      multiplierConfort: Number(multiplierConfort),
+      multiplierEquilibre: multiplicateur(multiplierEquilibre),
+      multiplierConfort: multiplicateur(multiplierConfort),
       description: description ? description.trim() : ''
     });
 
@@ -112,8 +115,8 @@ async function updateRule(req, res) {
       id,
       { 
         name: name.trim(), 
-        multiplierEquilibre: Number(multiplierEquilibre),
-        multiplierConfort: Number(multiplierConfort),
+        multiplierEquilibre: multiplicateur(multiplierEquilibre),
+        multiplierConfort: multiplicateur(multiplierConfort),
         description: description ? description.trim() : ''
       },
       { new: true } // Retourne l'objet mis à jour

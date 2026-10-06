@@ -82,8 +82,9 @@ async function simulerPack(req, res) {
     const marge = parametres.margeCiblePct;
     const referentiel = (matieres) => {
       if (coefficient === null) return null;
-      const cout = arrondir(matieres * coefficient);
-      return { coutReel: cout, prixConseille: marge === null ? null : arrondir(cout / (1 - marge / 100)) };
+      // Arrondi à la fin seulement (comme le référentiel : 14 460 × 1,23 ÷ 0,8 = 22 232)
+      const cout = matieres * coefficient;
+      return { coutReel: arrondir(cout), prixConseille: marge === null ? null : arrondir(cout / (1 - marge / 100)) };
     };
 
     return res.status(200).json({

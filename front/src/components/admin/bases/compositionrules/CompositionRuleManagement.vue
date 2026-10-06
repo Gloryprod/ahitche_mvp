@@ -29,8 +29,8 @@ const selectedRule = ref<CompositionRule | null>(null)
 const form = ref({
   _id: '',
   name: '',
-  multiplierEquilibre: 2,
-  multiplierConfort: 5,
+  multiplierEquilibre: null as number | null,
+  multiplierConfort: null as number | null,
   description: ''
 })
 
@@ -68,7 +68,7 @@ const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
 const openCreateMode = () => {
   isEditing.value = false
   showDetailPanel.value = false
-  form.value = { _id: '', name: '', multiplierEquilibre: 2, multiplierConfort: 5, description: '' }
+  form.value = { _id: '', name: '', multiplierEquilibre: null, multiplierConfort: null, description: '' }
   showFormPanel.value = true
 }
 
@@ -211,8 +211,8 @@ const showNotification = (text: string, type: string) => {
                   <div>{{ rule.name }}</div>
                   <span class="text-[10px] text-gray-400 font-normal block max-w-xs truncate">{{ rule.description || 'Pas de description' }}</span>
                 </td>
-                <td class="py-3 px-4 text-center font-mono text-gray-700">× {{ rule.multiplierEquilibre }}</td>
-                <td class="py-3 px-4 text-center font-mono text-gray-700">× {{ rule.multiplierConfort }}</td>
+                <td class="py-3 px-4 text-center font-mono text-gray-700">{{ rule.multiplierEquilibre === null ? '—' : `× ${rule.multiplierEquilibre}` }}</td>
+                <td class="py-3 px-4 text-center font-mono text-gray-700">{{ rule.multiplierConfort === null ? '—' : `× ${rule.multiplierConfort}` }}</td>
                 <td class="py-3 px-4">
                   <div class="flex items-center justify-center gap-2">
                     <button @click="openDetailMode(rule)" class="cursor-pointer p-1.5 text-gray-400 hover:text-noir hover:bg-gray-100 rounded-lg transition-colors shadow-2xs">
@@ -264,11 +264,11 @@ const showNotification = (text: string, type: string) => {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block mb-1.5 font-bold text-noir text-[10px] uppercase">Multiplicateur Équilibré</label>
-              <input v-model.number="form.multiplierEquilibre" type="number" step="0.1" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" required />
+              <input v-model.number="form.multiplierEquilibre" type="number" step="0.1" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" placeholder="vide" />
             </div>
             <div>
               <label class="block mb-1.5 font-bold text-noir text-[10px] uppercase">Multiplicateur Confort</label>
-              <input v-model.number="form.multiplierConfort" type="number" step="0.1" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" required />
+              <input v-model.number="form.multiplierConfort" type="number" step="0.1" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret" placeholder="vide" />
             </div>
           </div>
           <div>

@@ -46,8 +46,8 @@ export interface Category {
 export interface CompositionRule {
   _id: string
   name: string
-  multiplierEquilibre: number
-  multiplierConfort: number
+  multiplierEquilibre: number | null // Libellé seulement (D-14) ; vide possible
+  multiplierConfort: number | null
   description?: string
   createdAt?: string
 }

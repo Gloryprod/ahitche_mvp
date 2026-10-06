@@ -92,9 +92,11 @@ function openEditMode(p: Product) {
 const regleChoisie = computed(() => rulesList.value.find(r => r._id === form.value.compositionRule))
 function proposerQuantites() {
   const base = form.value.quantites.essentiel
-  if (!regleChoisie.value || base === null) return
-  form.value.quantites.equilibre = Math.round(base * regleChoisie.value.multiplierEquilibre * 100) / 100
-  form.value.quantites.confort = Math.round(base * regleChoisie.value.multiplierConfort * 100) / 100
+  const regle = regleChoisie.value
+  if (!regle || base === null) return
+  // Une règle sans multiplicateur ne propose rien pour ce pack
+  if (regle.multiplierEquilibre !== null) form.value.quantites.equilibre = Math.round(base * regle.multiplierEquilibre * 100) / 100
+  if (regle.multiplierConfort !== null) form.value.quantites.confort = Math.round(base * regle.multiplierConfort * 100) / 100
 }
 
 // Un champ numérique vidé vaut '' : on l'envoie comme vide (null), jamais comme 0
