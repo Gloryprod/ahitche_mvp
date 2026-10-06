@@ -226,7 +226,6 @@ const exporterPdf = () => synthese.value && genererSynthesePDF(lignes.value ?? [
         <div class="bg-white rounded-2xl border border-creme2 p-4">
           <p class="text-[10px] uppercase font-bold text-gris">Courses livreurs</p>
           <p class="text-base font-bold">{{ formatFCFA(synthese.exploitation.coutLivraison) }}</p>
-          <p class="text-xs text-gris">{{ synthese.exploitation.livraisonsEnRetard }} en retard</p>
         </div>
         <div class="bg-white rounded-2xl border border-creme2 p-4">
           <p class="text-[10px] uppercase font-bold text-gris">Autres dépenses</p>

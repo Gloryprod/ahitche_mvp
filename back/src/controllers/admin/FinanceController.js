@@ -676,7 +676,7 @@ async function obtenirSynthese(req, res) {
   try {
     const { du, au, debut, fin } = lirePeriode(req.query);
 
-    const [encaissements, depensesExploitation, lignes, parMois, horsPeriode, compensations] = await Promise.all([
+    const [encaissements, depensesExploitation, lignes, parMois, horsPeriode] = await Promise.all([
       Order.aggregate([
         { $match: { statut: 'Livrée', dateLivraison: { $gte: debut, $lte: fin } } },
         { $group: { _id: '$modePaiement', total: { $sum: '$total' }, nombre: { $sum: 1 }, livraison: { $sum: '$coutLivraison' } } }
@@ -690,8 +690,7 @@ async function obtenirSynthese(req, res) {
         { $match: { categorie: 'Budget', deletedAt: null, estEffectue: true } },
         { $group: { _id: '$moisProjet', engageFcfa: { $sum: '$montantReelFcfa' } } }
       ]),
-      Expense.find({ categorie: 'Budget', deletedAt: null, estEffectue: true }).select('libelle datePaiement montantReelFcfa referenceLigne').lean(),
-      Order.countDocuments({ enRetard: true, dateLivraison: { $gte: debut, $lte: fin } })
+      Expense.find({ categorie: 'Budget', deletedAt: null, estEffectue: true }).select('libelle datePaiement montantReelFcfa referenceLigne').lean()
     ]);
 
     const totalEncaisse = encaissements.reduce((s, e) => s + e.total, 0);
@@ -723,8 +722,7 @@ async function obtenirSynthese(req, res) {
         coutLivraison,
         depenses: parType,
         // Marge = encaissé - achats engagés - coût des courses - autres dépenses de la période
-        marge: totalEncaisse - achats - coutLivraison - autres,
-        livraisonsEnRetard: compensations
+        marge: totalEncaisse - achats - coutLivraison - autres
       },
       budget: {
         prevuFcfa,

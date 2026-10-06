@@ -36,8 +36,6 @@ function formaterCommande(order, zonesParCode) {
     creneau: order.creneau,
     livreur: order.livreurId ? { _id: order.livreurId._id, nom: order.livreurId.nom, telephone: order.livreurId.telephone } : null,
     produits: (order.productsSnapshot || []).map(p => ({ nom: p.name, quantite: p.quantity, unite: p.unit })),
-    compensationRecue: order.compensationRecue?.reference ? order.compensationRecue : null,
-    enRetard: order.enRetard,
     paiement: order.paiement
   };
 }
@@ -48,7 +46,7 @@ const POPULATE = [
   { path: 'productsSnapshot', select: 'name quantity unit' }
 ];
 
-// GET /api/admin/logistique?date=AAAA-MM-JJ : tournées du jour, commandes à planifier, compensations à remettre
+// GET /api/admin/logistique?date=AAAA-MM-JJ : tournées du jour, commandes à planifier
 async function obtenirPlanning(req, res) {
   try {
     const jourTexte = req.query.date || aujourdhuiCotonou();
@@ -58,33 +56,26 @@ async function obtenirPlanning(req, res) {
     const zones = await Zone.find().lean();
     const zonesParCode = new Map(zones.map(z => [z.code, z]));
 
-    // Gestionnaire livreur (D-17) : ses tournées, les commandes sans livreur et ses compensations
+    // Gestionnaire livreur (D-17) : ses tournées et les commandes sans livreur
     const livreurId = await livreurDuCompte(req);
     const sesTournees = livreurId ? { livreurId } : {};
     const aPlanifierVisibles = livreurId ? { livreurId: { $in: [null, livreurId] } } : {};
 
-    const [duJour, aPlanifier, aConfirmer, compensations] = await Promise.all([
+    const [duJour, aPlanifier, aConfirmer] = await Promise.all([
       Order.find({ deletedAt: null, 'creneau.date': jour, statut: { $ne: 'Annulée' }, ...sesTournees }).populate(POPULATE).sort({ 'creneau.periode': 1 }),
       Order.find({
         deletedAt: null,
         $or: [{ statut: { $in: ['Confirmée', 'En préparation'] }, 'creneau.date': null }, { statut: 'Échec' }],
         ...aPlanifierVisibles
       }).populate(POPULATE).sort({ createdAt: 1 }),
-      Order.countDocuments({ deletedAt: null, statut: 'En attente' }),
-      Order.find({ 'compensation.statut': 'À appliquer', ...sesTournees }).populate({ path: 'userId', select: 'username telephone' }).select('reference userId compensation dateLivraison').lean()
+      Order.countDocuments({ deletedAt: null, statut: 'En attente' })
     ]);
 
     return res.status(200).json({
       date: jourTexte,
       duJour: duJour.map(o => formaterCommande(o, zonesParCode)),
       aPlanifier: aPlanifier.map(o => formaterCommande(o, zonesParCode)),
-      aConfirmer,
-      compensations: compensations.map(c => ({
-        reference: c.reference,
-        client: c.userId?.username || 'Client supprimé',
-        telephone: c.userId?.telephone || '',
-        motif: c.compensation.motif
-      }))
+      aConfirmer
     });
   } catch (error) {
     console.error("Erreur obtenirPlanning:", error);

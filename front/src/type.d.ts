@@ -31,9 +31,6 @@ interface Commande {
   creneau: { date: string | null; periode: 'Matin' | 'Après-midi' | null }
   livreurId: string | null
   paiement: { statut: 'En attente' | 'Payé'; reference: string; note: string; date: string | null }
-  enRetard: boolean
-  compensation: { statut: 'Aucune' | 'À appliquer' | 'Appliquée'; motif: string }
-  compensationRecue: { reference: string; motif: string }
 }
 
 export interface Category {
@@ -146,8 +143,6 @@ export interface CommandeTerrain {
   creneau: { date: string | null; periode: 'Matin' | 'Après-midi' | null }
   livreur: { _id: string; nom: string; telephone: string } | null
   produits: { nom: string; quantite: number; unite: string }[]
-  compensationRecue: { reference: string; motif: string } | null
-  enRetard: boolean
 }
 
 export interface ZoneLivraison {
@@ -243,7 +238,6 @@ export interface SyntheseFinances {
     coutLivraison: number
     depenses: Record<'Achat stock' | 'Livraison' | 'Compensation' | 'Autre', { paye: number; aPayer: number }>
     marge: number
-    livraisonsEnRetard: number
   }
   budget: {
     prevuFcfa: number

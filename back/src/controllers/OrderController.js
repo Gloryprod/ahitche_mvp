@@ -1,7 +1,7 @@
 const Order = require('../models/order');
 const Formule = require('../models/formules');
 const { genererReferenceCommande } = require('../services/orderReferenceService');
-const { ANNULABLES_PAR_CLIENT, appliquerCompensationEnAttente, libererCompensation } = require('../services/commandeService');
+const { ANNULABLES_PAR_CLIENT } = require('../services/commandeService');
 const { prixDeVente } = require('../services/formuleService');
 
 const CHAMPS_CLIENT = 'reference formule formuleSlug total modePaiement statut creneau dateLivraison paiement.statut createdAt';
@@ -75,8 +75,6 @@ async function saveOrder(req, res){
             historique: [{ statut: 'En attente', date: new Date(), par: userId }]
         });
 
-        // Compensation d'une livraison en retard : remise avec cette commande
-        await appliquerCompensationEnAttente(nouvelleCommande);
         await nouvelleCommande.save();
 
         return res.status(201).json({
@@ -106,7 +104,6 @@ async function deleteOrder(req, res) {
 
         order.statut = 'Annulée';
         order.deletedAt = new Date();
-        await libererCompensation(order);
         order.historique.push({ statut: 'Annulée', date: new Date(), par: req.user.id });
         await order.save();
 

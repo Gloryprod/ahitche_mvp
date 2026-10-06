@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ChevronLeft, ChevronRight, Phone, MapPin, FileText, MessageCircle, Truck, AlertTriangle, Gift } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Phone, MapPin, FileText, MessageCircle, Truck } from 'lucide-vue-next'
 import api from '@/stores/api'
 import type { CommandeTerrain, Prestataire, ZoneLivraison } from '@/type'
 import { useAuthStore } from '@/stores/auth'
@@ -46,7 +46,6 @@ interface Planning {
   duJour: CommandeTerrain[]
   aPlanifier: CommandeTerrain[]
   aConfirmer: number
-  compensations: { reference: string; client: string; telephone: string; motif: string }[]
 }
 
 const { data, isLoading, isError, error } = useQuery({
@@ -202,10 +201,6 @@ const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
       <RouterLink v-if="data.aConfirmer" to="/dashboard/admin/commandes" class="block p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
         {{ data.aConfirmer }} commande(s) en attente de confirmation dans « Commandes » →
       </RouterLink>
-      <div v-if="data.compensations.length" class="p-3 rounded-xl bg-or/15 border border-or/40 text-xs space-y-1">
-        <p class="font-bold flex items-center gap-1.5"><Gift class="w-3.5 h-3.5" /> Compensations à remettre à la prochaine commande</p>
-        <p v-for="comp in data.compensations" :key="comp.reference">{{ comp.client }} ({{ comp.reference }}) : {{ comp.motif }}</p>
-      </div>
 
       <!-- TOURNÉES DU JOUR -->
       <section v-if="onglet === 'tournees'" class="space-y-5">
@@ -239,8 +234,6 @@ const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
               </div>
               <p v-if="c.client.adresse" class="text-xs">{{ c.client.adresse }}</p>
               <p class="text-xs"><strong>{{ c.formule }}</strong> · {{ formatFCFA(c.total) }} ({{ c.modePaiement }})</p>
-              <p v-if="c.compensationRecue" class="text-xs font-semibold text-savane flex items-center gap-1"><Gift class="w-3.5 h-3.5" /> Remettre la compensation ({{ c.compensationRecue.reference }})</p>
-              <p v-if="c.enRetard" class="text-xs font-semibold text-red-700 flex items-center gap-1"><AlertTriangle class="w-3.5 h-3.5" /> Livrée en retard : compensation due</p>
 
               <div class="flex flex-wrap gap-2 pt-1">
                 <a v-if="c.client.telephone" :href="`tel:${c.client.telephone}`" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-creme2 text-xs font-semibold"><Phone class="w-3.5 h-3.5" /> Appeler</a>

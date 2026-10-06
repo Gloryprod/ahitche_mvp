@@ -253,7 +253,6 @@ const handleOrderSuccess = () => {
             <tr v-for="cmd in data?.orders" :key="cmd.id" class="hover:bg-gray-50/60 transition-colors">
               <td class="py-3.5 px-2 text-gris whitespace-nowrap">
                 {{ cmd.reference }}
-                <span v-if="cmd.compensationRecue?.reference" class="block text-[9px] font-bold text-savane" :title="cmd.compensationRecue.motif">+ compensation</span>
               </td>
               <td class="py-3.5 px-2 text-noir font-bold">{{ cmd.clientName }}</td>
               <td class="py-3.5 px-2 text-gris tracking-wide">{{ cmd.whatsapp }}</td>

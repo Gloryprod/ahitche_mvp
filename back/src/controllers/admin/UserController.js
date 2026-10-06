@@ -146,10 +146,7 @@ async function getOrders(req, res) {
         zone: order.zone,
         creneau: order.creneau,
         livreurId: order.livreurId,
-        paiement: order.paiement,
-        enRetard: order.enRetard,
-        compensation: order.compensation,
-        compensationRecue: order.compensationRecue
+        paiement: order.paiement
       };
     });
 

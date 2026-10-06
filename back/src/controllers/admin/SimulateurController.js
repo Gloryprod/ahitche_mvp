@@ -111,11 +111,11 @@ async function simulerPack(req, res) {
   }
 }
 
-// POST /api/admin/simulateurs/achats  { quantites: { essentiel: 10, equilibre: 5, ... } }
+// GET /api/admin/stock/prevision-achats?essentiel=10&equilibre=5… (section Stock, gestionnaires compris)
 // Prévision d'achats pour N commandes : besoins par produit, stock disponible, quantité et coût à acheter
 async function simulerAchats(req, res) {
   try {
-    const quantites = req.body?.quantites || {};
+    const quantites = req.query || {};
     const packs = TYPES_PACK.map(t => ({ type: t, nombre: Math.min(Math.floor(nombrePositif(quantites[t])), 10000) })).filter(p => p.nombre > 0);
     if (!packs.length) return res.status(400).json({ message: "Indiquez au moins une commande à simuler." });
 

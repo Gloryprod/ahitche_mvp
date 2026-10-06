@@ -7,7 +7,7 @@ const { genererReferenceCommande } = require('../../services/orderReferenceServi
 const { STATUTS } = require('../../models/order');
 const User = require('../../models/user');
 const Zone = require('../../models/zone');
-const { TRANSITIONS, estEnRetard, appliquerCompensationEnAttente, libererCompensation, genererCompositionSiAbsente } = require('../../services/commandeService');
+const { TRANSITIONS, genererCompositionSiAbsente } = require('../../services/commandeService');
 const { MODES_PAIEMENT_ACCEPTES, calculerPrixCommande } = require('../../services/prixCommandeService');
 const { journaliser } = require('../../services/journalService');
 
@@ -67,8 +67,6 @@ async function createAdminOrder(req, res) {
       historique: [{ statut: 'En attente', date: new Date(), par: req.user.id }]
     });
 
-    // Compensation d'une livraison en retard : remise avec cette commande
-    await appliquerCompensationEnAttente(newOrder);
     await newOrder.save();
     await journaliser(req, {
       action: 'Création', entite: 'Commande', entiteId: newOrder._id,
@@ -179,7 +177,7 @@ async function updateOrderStatus(req, res) {
     return res.status(400).json({ message: "Statut inconnu." });
   }
 
-  // Transaction : changement de statut, sortie de stock FIFO et compensation réussissent ou échouent ensemble
+  // Transaction : changement de statut et sortie de stock FIFO réussissent ou échouent ensemble
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -227,16 +225,6 @@ async function updateOrderStatus(req, res) {
       const zone = order.zone ? await Zone.findOne({ code: order.zone }).session(session) : null;
       order.coutLivraison = zone?.tarifCourse || 0;
 
-      // Garantie : plus de 24 h de retard sur le créneau confirmé -> compensation à la commande suivante
-      if (estEnRetard(order.creneau, maintenant)) {
-        order.enRetard = true;
-        order.compensation = {
-          statut: 'À appliquer',
-          motif: `Livrée le ${maintenant.toLocaleDateString('fr-FR', { timeZone: 'Africa/Porto-Novo' })}, plus de 24 h après le créneau prévu.`,
-          appliqueeSurCommande: null
-        };
-      }
-
       // Sortie de stock FIFO de tous les produits (fixes et extras) de la commande
       const orderProducts = await OrderProductSnapshot.find({ orderId: order._id }).session(session);
       if (!orderProducts.length) {
@@ -249,7 +237,6 @@ async function updateOrderStatus(req, res) {
 
     if (statut === 'Annulée') {
       order.deletedAt = new Date();
-      await libererCompensation(order, session);
     }
 
     order.statut = statut;
@@ -296,8 +283,6 @@ async function deleteAdminOrder(req, res) {
       return res.status(404).json({ message: "Commande introuvable." });
     }
 
-    // Une compensation portée par cette commande revient au client pour sa prochaine commande
-    await libererCompensation(deletedOrder);
     await deletedOrder.save();
 
     return res.status(200).json({

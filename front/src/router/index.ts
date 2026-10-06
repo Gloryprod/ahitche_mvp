@@ -119,6 +119,12 @@ const router = createRouter({
           component: () => import('@/components/admin/stock/StockMovementsView.vue')
         },
         {
+          path: 'prevision-achats',
+          name: 'prevision-achats-page',
+          meta: { roles: ACCES.stock.lecture },
+          component: () => import('@/components/admin/stock/PrevisionAchats.vue')
+        },
+        {
           path: 'bon-commande',
           name: 'bon-commande-page',
           meta: { roles: ACCES.stock.lecture },
@@ -185,7 +191,7 @@ const TITRES: Record<string, string> = {
   ResetPassword: 'Nouveau mot de passe', 'user-dashboard': 'Mon espace', 'page-introuvable': 'Page introuvable',
   'admin-dashboard-page': 'Tableau de bord', 'client-page': 'Clients', 'commandes-page': 'Commandes', 'categories-page': 'Catégories',
   'regles-page': 'Règles de composition', 'products-page': 'Produits', 'formulas-page': 'Formules', 'saveStock-page': 'Entrées de stock',
-  'inventaire-page': 'Inventaire', 'mouvement-stock-page': 'Mouvements de stock', 'bon-commande-page': 'Bons de commande',
+  'inventaire-page': 'Inventaire', 'mouvement-stock-page': 'Mouvements de stock', 'bon-commande-page': 'Bons de commande', 'prevision-achats-page': 'Prévision d\'achats',
   'prestataires-page': 'Prestataires', 'logistique-page': 'Logistique', 'finances-page': 'Finances', 'simulateurs-page': 'Simulateurs',
   'idees-repas-page': 'Idées de repas', 'nutrition-page': 'Nutrition', 'posts-page': 'Contenus et médias',
 }

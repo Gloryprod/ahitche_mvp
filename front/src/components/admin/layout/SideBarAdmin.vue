@@ -61,6 +61,7 @@ const tousLesGroupes: { title: string; items: MenuItem[] }[] = [
       { id: 'inventaire', name: 'Inventaire de stock', icon: Package, hasChevron: true, path: '/dashboard/admin/inventaire', section: 'stock' },
       { id: 'mouvement-stock', name: 'Mouvements de stock', icon: Package, hasChevron: true, path: '/dashboard/admin/mouvement-stock', section: 'stock' },
       { id: 'bon-commande', name: 'Bons de commande', icon: Package, hasChevron: true, path: '/dashboard/admin/bon-commande', section: 'stock' },
+      { id: 'prevision-achats', name: 'Prévision d\'achats', icon: Package, hasChevron: true, path: '/dashboard/admin/prevision-achats', section: 'stock' },
     ]
   },
   {

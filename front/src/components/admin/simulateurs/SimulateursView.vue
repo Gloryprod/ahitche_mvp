@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { peutLire, peutEcrire } from '@/config/roles'
 import { genererSimulationPDF, fcfaPDF } from '@/services/pdfSimulateurs'
 
-// Simulateurs en lecture seule : coût et marge d'un pack, prévision d'achats, seuil de rentabilité.
+// Simulateurs en lecture seule : coût et marge d'un pack, seuil de rentabilité (la prévision d'achats est dans le Stock).
 // Aucun prix n'est appliqué ici : le prix de vente se fixe dans « Formules ».
 // Les réglages (charges, objectifs, coefficient, marge cible) sont enregistrés côté serveur (onglet Paramètres).
 
@@ -20,12 +20,6 @@ interface SimulationPack {
   frais: { livraison: number; emballage: number; commission: number }
   totaux: { coutCatalogue: number; coutReel: number; frais: number; margeCatalogue: number | null; margeReelle: number | null; tauxMargeCatalogue: number | null; tauxMargeReelle: number | null }
   methode: { coefficient: number | null; margeCiblePct: number | null; catalogue: Referentiel | null; achatsReels: Referentiel | null }
-}
-interface SimulationAchats {
-  lignes: { produit: string; unite: string; besoin: number; disponible: number; aAcheter: number; prixEstime: number | null; coutEstime: number | null }[]
-  coutTotal: number
-  produitsARacheter: number
-  prixManquants: number
 }
 interface Parametres {
   chargesFixesMensuellesFcfa: number | null
@@ -69,7 +63,7 @@ const queryClient = useQueryClient()
 const lireParametres = computed(() => peutLire(authStore.role.value, 'parametres'))
 const ecrireParametres = computed(() => peutEcrire(authStore.role.value, 'parametres'))
 
-const onglet = ref<'pack' | 'achats' | 'seuil' | 'parametres'>('pack')
+const onglet = ref<'pack' | 'seuil' | 'parametres'>('pack')
 const formatFCFA = (n: number | null) => n === null ? 'à renseigner' : `${Math.round(n).toLocaleString('fr-FR')} FCFA`
 const formatNombre = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
 const formatPourcent = (n: number | null) => n === null ? '—' : `${n.toLocaleString('fr-FR')} %`
@@ -117,39 +111,6 @@ function exporterPack() {
     entetes: ['Produit', 'Quantité', 'Coût catalogue', 'Coût réel'],
     lignes: s.lignes.map(l => [l.produit, `${formatNombre(l.quantite)} ${l.unite}`, fcfaPDF(l.coutCatalogue), fcfaPDF(l.coutReel) + (l.prixAchatReel === null ? ' *' : '')]),
     pied: ['Marge', '', `${fcfaPDF(s.totaux.margeCatalogue)} (${formatPourcent(s.totaux.tauxMargeCatalogue)})`, `${fcfaPDF(s.totaux.margeReelle)} (${formatPourcent(s.totaux.tauxMargeReelle)})`],
-  }])
-}
-
-// --- (b) Prévision d'achats pour N commandes ---
-const commandesPrevues = reactive<Record<string, number>>({ essentiel: 0, equilibre: 0, confort: 0, reserve: 0, fraicheur: 0 })
-const achats = ref<SimulationAchats | null>(null)
-const erreurAchats = ref('')
-const calculAchats = ref(false)
-
-async function simulerAchats() {
-  calculAchats.value = true
-  erreurAchats.value = ''
-  try {
-    achats.value = (await api.post('/api/admin/simulateurs/achats', { quantites: commandesPrevues })).data
-  } catch (err: any) {
-    achats.value = null
-    erreurAchats.value = err.response?.data?.message || 'Simulation impossible'
-  } finally {
-    calculAchats.value = false
-  }
-}
-
-function exporterAchats() {
-  const a = achats.value
-  if (!a) return
-  genererSimulationPDF("Prévision d'achats", [
-    `Commandes prévues : ${PACKS.filter(p => commandesPrevues[p.type]).map(p => `${commandesPrevues[p.type]} ${p.nom}`).join(', ')}`,
-    'Prix estimé : prix d\'achat réel moyen du stock, sinon dernier achat, sinon prix catalogue',
-  ], [{
-    titre: 'Besoins et achats',
-    entetes: ['Produit', 'Besoin', 'En stock', 'À acheter', 'Coût estimé'],
-    lignes: a.lignes.map(l => [l.produit, `${formatNombre(l.besoin)} ${l.unite}`, formatNombre(l.disponible), formatNombre(l.aAcheter), fcfaPDF(l.coutEstime)]),
-    pied: ['Total', '', '', `${a.produitsARacheter} produit(s)`, fcfaPDF(a.coutTotal)],
   }])
 }
 
@@ -232,7 +193,6 @@ async function enregistrerParametres() {
 
 const ONGLETS = computed(() => [
   { id: 'pack', label: 'Coût et marge d\'un pack' },
-  { id: 'achats', label: 'Prévision d\'achats' },
   { id: 'seuil', label: 'Seuil de rentabilité' },
   ...(lireParametres.value ? [{ id: 'parametres', label: 'Paramètres' }] : []),
 ])
@@ -323,40 +283,6 @@ const etiquette = 'text-[10px] font-bold uppercase text-gris'
               <td class="py-2 pr-2 text-right">{{ formatFCFA(simulation.totaux.coutCatalogue) }}</td>
               <td class="py-2 text-right">{{ formatFCFA(simulation.totaux.coutReel) }}</td>
             </tr></tfoot>
-          </table>
-        </div>
-      </template>
-    </section>
-
-    <!-- (b) ACHATS -->
-    <section v-if="onglet === 'achats'" class="bg-white rounded-2xl border border-creme2 p-4 space-y-4">
-      <form @submit.prevent="simulerAchats" class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <label v-for="p in PACKS" :key="p.type" :class="etiquette">{{ p.nom }}
-          <input v-model.number="commandesPrevues[p.type]" type="number" min="0" step="1" :class="champ" />
-        </label>
-        <button type="submit" :disabled="calculAchats" class="cursor-pointer col-span-2 sm:col-span-5 px-3 py-2.5 rounded-xl bg-foret text-white text-xs font-bold disabled:opacity-50">Calculer les achats</button>
-      </form>
-      <p v-if="erreurAchats" class="text-red-700 text-xs">{{ erreurAchats }}</p>
-      <template v-if="achats">
-        <div class="flex flex-wrap items-center gap-3">
-          <p class="font-bold">{{ achats.produitsARacheter }} produit(s) à acheter · {{ formatFCFA(achats.coutTotal) }}</p>
-          <button @click="exporterAchats" class="cursor-pointer ml-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-foret text-white text-xs font-bold"><FileText class="w-3.5 h-3.5" /> PDF</button>
-        </div>
-        <p v-if="achats.prixManquants" class="text-xs text-amber-800">{{ achats.prixManquants }} produit(s) sans prix : coût total incomplet.</p>
-        <div v-defilable="'Besoins et achats'" class="overflow-x-auto">
-          <table class="w-full text-left text-xs border-collapse min-w-130">
-            <thead><tr class="text-[10px] uppercase tracking-wider text-gris border-b border-creme2">
-              <th class="py-2 pr-2">Produit</th><th class="py-2 pr-2 text-right">Besoin</th><th class="py-2 pr-2 text-right">En stock</th><th class="py-2 pr-2 text-right">À acheter</th><th class="py-2 text-right">Coût estimé</th>
-            </tr></thead>
-            <tbody class="divide-y divide-creme2">
-              <tr v-for="l in achats.lignes" :key="l.produit" :class="!l.aAcheter ? 'text-gris' : ''">
-                <td class="py-2 pr-2 font-semibold">{{ l.produit }}</td>
-                <td class="py-2 pr-2 text-right whitespace-nowrap">{{ formatNombre(l.besoin) }} {{ l.unite }}</td>
-                <td class="py-2 pr-2 text-right">{{ formatNombre(l.disponible) }}</td>
-                <td class="py-2 pr-2 text-right font-bold">{{ formatNombre(l.aAcheter) }}</td>
-                <td class="py-2 text-right whitespace-nowrap">{{ formatFCFA(l.coutEstime) }}</td>
-              </tr>
-            </tbody>
           </table>
         </div>
       </template>

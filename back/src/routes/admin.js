@@ -100,6 +100,7 @@ router.route('/stock/lots/:id')
 router.post('/stock/lots/:id/comptage', stockC.compterLot);
 router.post('/stock/lots/:id/correction', stockC.corrigerLot);
 router.post('/stock/essais', stockC.enregistrerEssai);
+router.get('/stock/prevision-achats', simulateurC.simulerAchats); // Besoins et achats pour N commandes, sans marge
 router.post('/stock/transformations', stockC.enregistrerTransformation);
 
 // État et Historique
@@ -164,7 +165,6 @@ router.delete('/finances/depenses/:id/justificatifs/:jid', financeC.supprimerJus
 
 // Simulateurs (lecture seule : aucun enregistrement, aucun prix modifié)
 router.get('/simulateurs/pack/:type', simulateurC.simulerPack);
-router.post('/simulateurs/achats', simulateurC.simulerAchats);
 router.route('/parametres')
   .get(parametresC.obtenirParametres)
   .put(parametresC.modifierParametres);

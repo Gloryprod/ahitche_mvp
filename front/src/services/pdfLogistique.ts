@@ -56,7 +56,7 @@ export function genererPreparationPDF(jour: string, commandes: CommandeTerrain[]
     startY: (doc as any).lastAutoTable.finalY + 8,
     head: [['Réf.', 'Client', 'Formule', 'Créneau', 'Livreur', 'Produits']],
     body: commandes.map(c => [
-      c.reference + (c.compensationRecue ? '\n+ compensation' : ''),
+      c.reference,
       c.client.nom,
       c.formule,
       c.creneau?.periode || '-',
@@ -83,7 +83,7 @@ export function genererTourneePDF(jour: string, livreur: { nom: string; telephon
       c.creneau?.periode || '-',
       c.reference,
       `${c.client.nom}\n${c.client.telephone}`,
-      `${lieu(c)}\n${c.client.adresse}${c.compensationRecue ? '\nRemettre la compensation' : ''}`,
+      `${lieu(c)}\n${c.client.adresse}`,
       `${formatPrixPDF(c.total)}\n${c.modePaiement}`
     ]),
     headStyles: { fillColor: COULEUR_FORET },
@@ -106,7 +106,6 @@ export function messageTournee(jour: string, livreur: { nom: string }, commandes
     message += `   📍 ${lieu(c)} - ${c.client.adresse}\n`
     if (c.client.lienLocalisation) message += `   🗺️ ${c.client.lienLocalisation}\n`
     message += `   💰 ${formatPrixPDF(c.total)} (${c.modePaiement})\n`
-    if (c.compensationRecue) message += `   🎁 Remettre la compensation (${c.compensationRecue.reference})\n`
   })
   message += `\nAppelle chaque client 30 min avant d'arriver. Merci !`
   return message

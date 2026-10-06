@@ -89,7 +89,7 @@ const orderSchema = new mongoose.Schema({
     date: { type: Date, default: null }
   },
 
-  // --- Garantie : livraison avec plus de 24 h de retard sur le créneau confirmé ---
+  // --- Ancienne garantie « livraison > 24 h » : retirée (D-07, D-08), champs gardés pour l'historique, plus alimentés ---
   enRetard: { type: Boolean, default: false },
   compensation: {
     statut: { type: String, enum: ['Aucune', 'À appliquer', 'Appliquée'], default: 'Aucune' },
