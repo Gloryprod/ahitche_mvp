@@ -30,8 +30,11 @@ npm start
 node src/scripts/createAdmin.js     # crée l'admin (ADMIN_PASSWORD dans .env)
 node src/scripts/createFormules.js  # upsert des formules (prix, « Bientôt », cycle de relance)
 node src/scripts/migrerDonnees.js   # migration idempotente (téléphone, fournisseurs, zones, statuts, taux, admin principal)
-STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <role>  # compte de l'équipe
+STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <role> [--livreur "<fiche livreur>"]  # compte de l'équipe
+STAFF_PASSWORD=… node src/scripts/importerDonnees.js ../docs-internes/imports [--appliquer] [--attendu <json>]  # import 01 à 11 (simulation sans --appliquer)
+node src/scripts/controlerDonnees.js [--attendu <json>]  # contrôles B.4, lecture seule
 ```
+L'import ne touche jamais la production sans `--appliquer` : la simulation s'exécute dans une transaction annulée et affiche les écarts. Les fichiers CSV et les valeurs attendues des contrôles restent dans `docs-internes/` (exclu de Git).
 Les transactions MongoDB (livraison + sortie de stock FIFO) exigent un replica set : c'est le cas sur Atlas ; en local, utiliser `MongoMemoryReplSet` ou un replica set à un nœud.
 Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL`, `CLOUDINARY_*`, `ADMIN_PASSWORD`, `NODE_ENV`, `PORT`, et `INACTIVITE_MINUTES` (facultative, 60 par défaut : déconnexion de l'équipe après inactivité).
 
@@ -41,7 +44,8 @@ Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`,
 - `front/src/components/admin/` : back-office (commandes, stock, produits, formules, posts) et les sections Gestion : `prestataires/`, `logistique/`, `finances/`, `simulateurs/`, `nutrition/` (chargées à la demande).
 - `front/src/components/client/` : blocs de l'espace client (suivi alimentaire).
 - Contenus de l'accueil, à modifier dans `front/src/config/` sans toucher aux composants : `contact.ts` (WhatsApp, messages pré-remplis, Facebook, TikTok, horaires, délai de livraison), `formules.ts` (vitrine, prix, taille de foyer), `photos.ts` (emplacements « PHOTO À FOURNIR » : n'y mettre que des photos à licence vérifiable), `temoignages.ts` (avis réels validés par les clients uniquement), `faq.ts`, `actualites.ts`.
-- `front/src/config/roles.ts` et `back/src/config/roles.js` : rôles (`user`, `admin`, `gestionnaire`, `comptable`, `nutritionniste`) et droits lecture/écriture par section, à garder synchronisés. Le serveur fait foi (middleware `acces()`).
+- `front/src/config/roles.ts` et `back/src/config/roles.js` : rôles (`user`, `admin`, `gestionnaire`, `comptable`, `nutritionniste`, `coordinateur`, `auditeur`) et droits lecture/écriture par section, à garder synchronisés. Le serveur fait foi (middleware `acces()`). Les gestionnaires n'ont accès ni aux marges ni aux finances (D-17) ; un gestionnaire relié à une fiche livreur (`User.livreurId`) ne voit que ses commandes, celles à planifier et leurs clients (`services/perimetreService.js`).
+- `back/src/config/convention.js` : période de la convention N°171 (mois du projet du 26 au 25), sources de financement, pièces exigées par catégorie. Jamais de montant du budget dans le code.
 - `front/src/config/commandes.ts` et `back/src/services/commandeService.js` : statuts de commande et passages autorisés.
 - `front/src/stores/auth.ts` : état d'authentification (composable, pas un store Pinia ; `user`, `role`… sont des refs/computed, donc à lire avec `.value`). `stores/api.ts` : instance axios avec un intercepteur 401.
 - `back/src/routes/` : `auth.js` (client), `admin.js` (back-office, droits par section), `public.js` (blog, zones).
@@ -56,8 +60,13 @@ Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`,
 - Prix de vente = `prixCommercial` s'il est fixé par l'admin, sinon `prixActuel`. `GET /api/admin/formulas/:pack` est en lecture seule et renvoie la valeur issue du catalogue dans `prixCalcule`.
 - Une commande client est enregistrée par le serveur, qui fixe lui-même le prix et la référence `CMD-xxx` (`orderReferenceService`). Les packs `bientotDisponible` (Réserve, Fraîcheur) sont visibles mais ne peuvent pas être commandés.
 - Liste commune : 17 produits de base. L'Essentiel exclut l'huile de palme. Les quantités par pack ne sont pas affichées.
-- Commande : En attente → Confirmée → En préparation → En livraison → Livrée (paiement Mobile Money à la livraison, référence obligatoire ; Espèces/Acompte avec note) ou Échec ; Annulée. Livraison > 24 h après le créneau = compensation remise à la commande suivante.
-- Finances : toute action sur les dépenses, lignes budgétaires, taux et prix de formule passe par `journaliser()` (journal des modifications). Une dépense payée (justificatif obligatoire) ne se modifie plus.
+- Commande : En attente → Confirmée → En préparation → En livraison → Livrée (paiement à la livraison : Mobile Money, référence obligatoire, ou espèces avec note, D-06 ; l'acompte ne reste que sur les anciennes commandes) ou Échec ; Annulée. Le serveur impose le prix (formule + extras au prix du catalogue − remise validée par l'admin, motif obligatoire). La compensation « livraison > 24 h » existe encore côté serveur, mais le site ne la promet plus (D-07, D-08) : à revoir.
+- Site : packs hebdomadaires (cycle 7 jours, Réserve 30), sans prix barré ni prix par jour ; livraison « à jour fixe » (`JOURS_LIVRAISON` dans `config/contact.ts`, vide tant que les jours ne sont pas confirmés) ; garantie : produit manquant ou abîmé remplacé à l'identique à la livraison suivante.
+- Finances : toute action sur les dépenses, lignes budgétaires, taux, paramètres, prix de formule, produits, règles, lots et fiches prestataires passe par `journaliser()` (journal des modifications). Une dépense payée (justificatif obligatoire) ne se modifie plus. « Valide pour l'audit » se coche seul quand les pièces exigées par la catégorie de la ligne sont jointes. Un mois du projet clos ne se modifie plus sans réouverture par l'admin (motif tracé). Dépassement de ligne et paiement hors période : alerte sans blocage (D-20).
+- Stock : un lot « à compter » garde quantité et prix vides jusqu'au comptage ; une entrée se rattache à la dépense de sa pièce, sans en créer une seconde ; la quantité ne change que par comptage ou correction motivée ; transformation (lot « Production interne ») et essai sont des mouvements à part.
+- Règles de composition : simples libellés (D-14), multiplicateurs facultatifs ; les quantités par pack du catalogue font foi.
+- Idées de repas (section `repas`) : rédigées par les gestionnaires et le nutritionniste, publiées par l'admin seulement, avec la mention « Ces conseils ne remplacent pas l'avis d'un professionnel de santé. »
+- Simulateurs : paramètres enregistrés côté serveur, vides par défaut ; méthode du référentiel (matières × coefficient, ÷ (1 − marge cible)).
 - Nutrition : aucune donnée de santé ni conviction religieuse sans autorisation préalable de l'APDP (Code du numérique, art. 394).
 - Écrans admin : vérifier l'affichage à 375 px ; la Logistique est conçue d'abord pour le téléphone.
 - Navigation et session : la déconnexion passe par `useDeconnexion` (retour à l'accueil, cache vidé, session gardée si le serveur ne confirme pas). Toute page affichée sans le menu du site (`hideNavigation`) propose `LienAccueil`. Une page protégée renvoie vers `/login?redirect=…` (et `&session=expiree` sur un 401) ; seuls les chemins internes sont acceptés comme `redirect`.
