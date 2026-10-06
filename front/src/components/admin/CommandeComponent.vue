@@ -198,7 +198,7 @@ const handleOrderSuccess = () => {
     </div>
 
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 bg-white p-4 rounded-2xl shadow-2xs">
-      <div class="flex items-center gap-2 text-xs font-semibold text-gray-500">
+      <div class="flex items-center gap-2 text-xs font-semibold text-gris">
         <span>{{ statutActif === 'Toutes' ? 'Toutes les commandes' : `Commandes : ${statutActif.toLowerCase()}` }}</span>
         <span class="px-2.5 py-1 bg-foret/10 text-foret rounded-full font-bold text-[11px]">{{ data?.total || 0 }}</span>
       </div>
@@ -208,7 +208,7 @@ const handleOrderSuccess = () => {
       {{ notification.text }}
     </div>
 
-    <div v-if="isLoading" class="text-sm font-medium text-gray-500 py-12 text-center bg-white rounded-2xl border border-gray-100 shadow-sm">
+    <div v-if="isLoading" class="text-sm font-medium text-gris py-12 text-center bg-white rounded-2xl border border-gray-100 shadow-sm">
       <span class="inline-block animate-pulse">Chargement initial des commandes...</span>
     </div>
     
@@ -219,12 +219,12 @@ const handleOrderSuccess = () => {
     <div v-else :style="{ opacity: isPlaceholderData ? 0.6 : 1 }" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-5 transition-opacity duration-200">
       
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-50 pb-2">
-        <div class="flex gap-5 text-xs font-semibold text-gray-400 overflow-x-auto whitespace-nowrap">
+        <div class="flex gap-5 text-xs font-semibold text-gris overflow-x-auto whitespace-nowrap">
           <button v-for="onglet in ongletsStatut" :key="onglet" @click="statutActif = onglet" :class="['pb-2 border-b-2 transition-all cursor-pointer', statutActif === onglet ? 'border-foret text-foret font-bold' : 'border-transparent hover:text-noir']">{{ onglet }}</button>
         </div>
 
         <div class="relative w-full sm:w-64">
-            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 stroke-[2.5]" />
+            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris stroke-[2.5]" />
             <input v-model="search" type="text" placeholder="Rechercher un client..." class="w-full pl-9 pr-4 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir placeholder-gray-400 focus:outline-none focus:border-foret focus:bg-white transition-all shadow-2xs" />
         </div>
       </div>
@@ -236,7 +236,7 @@ const handleOrderSuccess = () => {
       <div v-else class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-xs">
           <thead>
-            <tr class="border-b border-gray-100 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+            <tr class="border-b border-gray-100 text-[10px] text-gris font-bold uppercase tracking-wider">
               <th class="py-3 px-2 font-normal">#</th>
               <th class="py-3 px-2 font-normal">Client</th>
               <th class="py-3 px-2 font-normal">Whatsapp</th>
@@ -248,17 +248,17 @@ const handleOrderSuccess = () => {
               <th class="py-3 px-2 font-normal text-center">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-50 text-gray-600 font-medium">
+          <tbody class="divide-y divide-gray-50 text-gris font-medium">
 
             <tr v-for="cmd in data?.orders" :key="cmd.id" class="hover:bg-gray-50/60 transition-colors">
-              <td class="py-3.5 px-2 text-gray-400 whitespace-nowrap">
+              <td class="py-3.5 px-2 text-gris whitespace-nowrap">
                 {{ cmd.reference }}
                 <span v-if="cmd.compensationRecue?.reference" class="block text-[9px] font-bold text-savane" :title="cmd.compensationRecue.motif">+ compensation</span>
               </td>
               <td class="py-3.5 px-2 text-noir font-bold">{{ cmd.clientName }}</td>
-              <td class="py-3.5 px-2 text-gray-400 tracking-wide">{{ cmd.whatsapp }}</td>
+              <td class="py-3.5 px-2 text-gris tracking-wide">{{ cmd.whatsapp }}</td>
               <td class="py-3.5 px-2">
-                <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200/60 uppercase">
+                <span class="bg-gray-100 text-gris px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200/60 uppercase">
                     {{ cmd.formule }}
                 </span>
               </td>
@@ -274,11 +274,11 @@ const handleOrderSuccess = () => {
                 </span>
               </td>
               <td class="py-3.5 px-2">
-                <span :class="['inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold border', paiementStyles[cmd.modePaiement] || 'bg-gray-50 text-gray-600 border-gray-200']">
+                <span :class="['inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold border', paiementStyles[cmd.modePaiement] || 'bg-gray-50 text-gris border-gray-200']">
                   {{ cmd.modePaiement }}
                 </span>
               </td>
-              <td class="py-3.5 px-2 text-gray-400">{{ cmd.date }}</td>
+              <td class="py-3.5 px-2 text-gris">{{ cmd.date }}</td>
               <td class="py-3.5 px-2">
                 <span :class="[classeStatut(cmd.statut), 'px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap']">
                     {{ cmd.statut }}
@@ -286,19 +286,19 @@ const handleOrderSuccess = () => {
               </td>
               <td class="py-3.5 px-2 text-right">
                 <div class="flex items-center justify-center gap-1.5">
-                  <button v-if="ecriture && TRANSITIONS[cmd.statut]?.length && cmd.deletedAt === null" @click="handleChangerStatut(cmd)" title="Changer le statut" aria-label="Changer le statut" class="cursor-pointer p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
+                  <button v-if="ecriture && TRANSITIONS[cmd.statut]?.length && cmd.deletedAt === null" @click="handleChangerStatut(cmd)" title="Changer le statut" aria-label="Changer le statut" class="cursor-pointer p-1.5 text-gris hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors">
                     <CheckCircle class="w-3.5 h-3.5" />
                   </button>
                   
-                  <button @click="openDetailMode(cmd)" title="Voir détails" class="cursor-pointer p-1.5 text-gray-400 hover:text-noir hover:bg-gray-100 rounded-lg transition-colors">
+                  <button @click="openDetailMode(cmd)" title="Voir détails" class="cursor-pointer p-1.5 text-gris hover:text-noir hover:bg-gray-100 rounded-lg transition-colors" aria-label="Voir le détail">
                     <Eye class="w-3.5 h-3.5" />
                   </button>
                   
-                  <button v-if="ecriture" @click="openEditMode(cmd)" title="Modifier" class="cursor-pointer p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
+                  <button v-if="ecriture" @click="openEditMode(cmd)" title="Modifier" class="cursor-pointer p-1.5 text-gris hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors" aria-label="Modifier">
                     <Edit2 class="w-3.5 h-3.5" />
                   </button>
                   
-                  <button v-if="ecriture" @click="handleDeleteClick(cmd.id)" title="Supprimer" class="cursor-pointer p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                  <button v-if="ecriture" @click="handleDeleteClick(cmd.id)" title="Supprimer" class="cursor-pointer p-1.5 text-gris hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" aria-label="Supprimer">
                     <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -308,7 +308,7 @@ const handleOrderSuccess = () => {
           </tbody>
         </table>
 
-        <div class="flex items-center justify-between pt-4 border-t border-gray-100 text-xs font-semibold text-gray-600">
+        <div class="flex items-center justify-between pt-4 border-t border-gray-100 text-xs font-semibold text-gris">
           <button :disabled="page === 1 || isPlaceholderData" @click="page--" class="px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">← Précédent</button>
           <span class="bg-gray-100 px-3 py-1.5 rounded-lg text-noir">Page {{ page }}</span>
           <button :disabled="!data?.hasMore || isPlaceholderData" @click="page++" class="px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm">Suivant →</button>

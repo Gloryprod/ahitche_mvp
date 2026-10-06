@@ -167,7 +167,30 @@ const router = createRouter({
         }
       ]
     },
+    // Adresse inconnue : page 404 (dans le site, avec le menu)
+    {
+      path: '/:cheminInconnu(.*)*',
+      name: 'page-introuvable',
+      component: () => import('@/views/NotFoundView.vue'),
+    },
   ],
+})
+
+// Titre de l'onglet : propre à chaque page (accessibilité, historique du navigateur, partage)
+const TITRE_ACCUEIL = 'Ahitché | Suivi Alimentaire Personnalisé & Ravitaillement Régulier à domicile au Bénin'
+const TITRES: Record<string, string> = {
+  register: 'Créer un compte', login: 'Connexion', blog: 'Actualités et médias', 'mentions-legales': 'Mentions légales',
+  ResetPassword: 'Nouveau mot de passe', 'user-dashboard': 'Mon espace', 'page-introuvable': 'Page introuvable',
+  'admin-dashboard-page': 'Tableau de bord', 'client-page': 'Clients', 'commandes-page': 'Commandes', 'categories-page': 'Catégories',
+  'regles-page': 'Règles de composition', 'products-page': 'Produits', 'formulas-page': 'Formules', 'saveStock-page': 'Entrées de stock',
+  'inventaire-page': 'Inventaire', 'mouvement-stock-page': 'Mouvements de stock', 'bon-commande-page': 'Bons de commande',
+  'prestataires-page': 'Prestataires', 'logistique-page': 'Logistique', 'finances-page': 'Finances', 'simulateurs-page': 'Simulateurs',
+  'idees-repas-page': 'Idées de repas', 'nutrition-page': 'Nutrition', 'posts-page': 'Contenus et médias',
+}
+router.afterEach((to) => {
+  const titre = TITRES[String(to.name)]
+  const espace = to.path.startsWith('/dashboard/admin') ? 'Back-office Ahitché' : 'Ahitché'
+  document.title = titre ? `${titre} · ${espace}` : TITRE_ACCUEIL
 })
 
 

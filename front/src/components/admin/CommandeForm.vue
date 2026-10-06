@@ -245,24 +245,24 @@ const submitOrder = async () => {
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-medium text-xs text-gray-600">
+  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-medium text-xs text-gris">
     <div class="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
       
       <div class="p-4 border-b border-gray-100 flex items-center justify-between">
         <div>
           <h3 class="font-display font-bold text-sm text-noir">{{ modalTitle }}</h3>
-          <p class="text-[10px] text-gray-400">
+          <p class="text-[10px] text-gris">
             {{ isReadOnly ? 'Consultation des détails de l\'historique' : 'Gestion de la tarification et du panier' }}
           </p>
         </div>
-        <button @click="emit('close')" class="cursor-pointer p-1.5 hover:bg-gray-50 rounded-lg text-gray-400 transition-colors">
+        <button @click="emit('close')" class="cursor-pointer p-1.5 hover:bg-gray-50 rounded-lg text-gris transition-colors" aria-label="Fermer">
           <X class="w-4 h-4" />
         </button>
       </div>
 
       <div class="px-4 pt-4 flex gap-1">
         <div v-for="s in [{n:1,l:'Client'}, {n:2,l:'Formule'}, {n:3,l:'Ajust.'}, {n:4,l:'Validation'}]" :key="s.n"
-          :class="[step === s.n ? 'bg-foret text-white border-foret font-bold' : step > s.n ? 'bg-emerald-50 text-foret border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200','flex-1 py-1.5 text-[10px] text-center border rounded-lg transition-all']">
+          :class="[step === s.n ? 'bg-foret text-white border-foret font-bold' : step > s.n ? 'bg-emerald-50 text-foret border-emerald-200' : 'bg-gray-50 text-gris border-gray-200','flex-1 py-1.5 text-[10px] text-center border rounded-lg transition-all']">
           <span v-if="step > s.n">✓ </span>{{ s.l }}
         </div>
       </div>
@@ -282,7 +282,7 @@ const submitOrder = async () => {
 
         <div v-if="step === 2" class="space-y-4">
           <div class="p-2.5 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-2">
-            <User class="w-3.5 h-3.5 text-gray-400" />
+            <User class="w-3.5 h-3.5 text-gris" />
             <span>Client : <strong class="text-noir">{{ cl?.username || commande?.clientName }}</strong></span>
           </div>
 
@@ -292,19 +292,19 @@ const submitOrder = async () => {
               @click="selectedPackSlug = pack as any" 
               :class="[selectedPackSlug === pack ? 'border-foret bg-emerald-50/50' : 'border-gray-200 bg-white', 'flex items-center justify-between p-3 rounded-xl border text-left cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed']">
               <span class="font-bold text-noir capitalize">Ahi-{{ pack }}</span>
-              <span v-if="selectedPackSlug === pack && isLoadingPack" class="text-[10px] text-gray-400">Chargement...</span>
+              <span v-if="selectedPackSlug === pack && isLoadingPack" class="text-[10px] text-gris">Chargement...</span>
             </button>
           </div>
 
           <div v-if="selectedPackSlug && packDetails" class="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-2xs">
-            <div class="px-3 py-2 bg-gray-100/70 font-semibold text-gray-500 flex justify-between items-center border-b">
+            <div class="px-3 py-2 bg-gray-100/70 font-semibold text-gris flex justify-between items-center border-b">
               <span class="flex items-center gap-1"><Layers class="w-3.5 h-3.5" /> Dotation auto ({{ packDetails.itemCount }} produits)</span>
               <strong class="font-mono text-noir font-bold">{{ packDetails.prixCalcule?.toLocaleString() }} F</strong>
             </div>
             <div class="max-h-36 overflow-y-auto divide-y divide-gray-100 bg-white">
               <div v-for="item in packDetails.items" :key="item.productId" class="flex justify-between px-3 py-1.5 text-[11px]">
                 <span class="text-gray-700 font-medium">{{ item.name }}</span>
-                <span class="text-gray-400 font-mono">{{ item.quantity }} {{ item.unit }}<template v-if="item.isExtra"> · {{ item.totalPrice === null ? 'prix à renseigner' : `${item.totalPrice.toLocaleString('fr-FR')} F` }}</template></span>
+                <span class="text-gris font-mono">{{ item.quantity }} {{ item.unit }}<template v-if="item.isExtra"> · {{ item.totalPrice === null ? 'prix à renseigner' : `${item.totalPrice.toLocaleString('fr-FR')} F` }}</template></span>
               </div>
             </div>
           </div>
@@ -345,16 +345,16 @@ const submitOrder = async () => {
                     <span class="text-noir font-bold truncate text-[11px]">{{ item.name }}</span>
                     <span v-if="item.isExtra" class="px-1 text-[8px] bg-amber-100 text-amber-700 rounded-sm font-extrabold uppercase tracking-wide">Hors-Pack</span>
                   </div>
-                  <span class="text-[10px] text-gray-400 font-mono">{{ item.unitPrice === null ? 'prix à renseigner' : `${item.unitPrice.toLocaleString('fr-FR')} F` }} / {{ item.unit }}</span>
+                  <span class="text-[10px] text-gris font-mono">{{ item.unitPrice === null ? 'prix à renseigner' : `${item.unitPrice.toLocaleString('fr-FR')} F` }} / {{ item.unit }}</span>
                 </div>
                 
                 <div class="flex items-center gap-2 shrink-0">
                   <div class="flex items-center border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
-                    <button type="button" :disabled="isReadOnly" @click="decrementQty(idx)" class="p-1 hover:bg-gray-200 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed"><Minus class="w-3 h-3" /></button>
+                    <button type="button" :disabled="isReadOnly" @click="decrementQty(idx)" class="p-1 hover:bg-gray-200 text-gris disabled:opacity-30 disabled:cursor-not-allowed" aria-label="Diminuer la quantité"><Minus class="w-3 h-3" /></button>
                     <span class="px-1.5 font-mono font-bold text-noir text-[11px] min-w-5 text-center">{{ item.quantity }}</span>
-                    <button type="button" :disabled="isReadOnly" @click="incrementQty(idx)" class="p-1 hover:bg-gray-200 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed"><Plus class="w-3 h-3" /></button>
+                    <button type="button" :disabled="isReadOnly" @click="incrementQty(idx)" class="p-1 hover:bg-gray-200 text-gris disabled:opacity-30 disabled:cursor-not-allowed" aria-label="Augmenter la quantité"><Plus class="w-3 h-3" /></button>
                   </div>
-                  <button v-if="!isReadOnly" type="button" @click="removeItem(idx)" class="cursor-pointer p-1 text-red-400 hover:text-red-600"><Trash2 class="w-3.5 h-3.5" /></button>
+                  <button v-if="!isReadOnly" type="button" @click="removeItem(idx)" class="cursor-pointer p-1 text-red-400 hover:text-red-600" aria-label="Supprimer"><Trash2 class="w-3.5 h-3.5" /></button>
                 </div>
               </div>
             </div>
@@ -366,7 +366,7 @@ const submitOrder = async () => {
               <button v-for="m in MODES_PAIEMENT" :key="m" 
                 :disabled="isReadOnly"
                 @click="paiement = m" 
-                :class="[paiement === m ? 'bg-foret text-white' : 'bg-white text-gray-500 border-gray-200', 'flex-1 py-1.5 rounded-lg border text-center transition-all cursor-pointer disabled:cursor-not-allowed']">
+                :class="[paiement === m ? 'bg-foret text-white' : 'bg-white text-gris border-gray-200', 'flex-1 py-1.5 rounded-lg border text-center transition-all cursor-pointer disabled:cursor-not-allowed']">
                 {{ m }}
               </button>
             </div>

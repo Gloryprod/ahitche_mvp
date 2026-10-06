@@ -10,8 +10,8 @@
       </div>
 
       <div class="mb-6 text-center">
-        <h2 class="text-2xl font-bold text-foret font-display">Nouveau mot de passe</h2>
-        <p class="text-sm text-gray-500 mt-1">Choisissez un mot de passe sécurisé pour votre compte.</p>
+        <h1 class="text-2xl font-bold text-foret font-display">Nouveau mot de passe</h1>
+        <p class="text-sm text-gris mt-1">Choisissez un mot de passe sécurisé pour votre compte.</p>
       </div>
 
       <form @submit.prevent="handleResetPassword" class="flex flex-col gap-4">

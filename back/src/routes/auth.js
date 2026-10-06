@@ -6,13 +6,21 @@ const userC = require('../controllers/UserController');
 const formuleC = require('../controllers/FormuleController');
 const orderC = require('../controllers/OrderController');
 const nutritionC = require('../controllers/NutritionController');
+const { limiteTentatives } = require('../middlewares/limiteTentatives');
+
+// Force brute : 5 échecs de connexion par compte en 15 minutes, 30 par adresse IP ;
+// mot de passe oublié : 3 demandes par compte et 10 par IP en 1 heure ; inscription et réinitialisation : 10 par IP en 1 heure
+const limiteConnexion = limiteTentatives({ nom: 'connexion', minutes: 15, maxParCompte: 5, maxParIp: 30, echecsSeulement: true });
+const limiteOubli = limiteTentatives({ nom: 'oubli', minutes: 60, maxParCompte: 3, maxParIp: 10 });
+const limiteInscription = limiteTentatives({ nom: 'inscription', minutes: 60, maxParCompte: 0, maxParIp: 10 });
+const limiteReinitialisation = limiteTentatives({ nom: 'reinitialisation', minutes: 60, maxParCompte: 0, maxParIp: 10 });
 
 // Authentification
-router.post('/register', authC.register);
-router.post('/login', authC.login);
+router.post('/register', limiteInscription, authC.register);
+router.post('/login', limiteConnexion, authC.login);
 router.post('/logout', authC.logout);
-router.post('/forgot-password', authC.forgotPassword);
-router.post('/reset-password', authC.resetPassword);
+router.post('/forgot-password', limiteOubli, authC.forgotPassword);
+router.post('/reset-password', limiteReinitialisation, authC.resetPassword);
 
 // Profil
 router.get('/session', authC.session); // Toujours 200 (visiteur : user null)

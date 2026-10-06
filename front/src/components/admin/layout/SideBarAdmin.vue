@@ -116,7 +116,7 @@ const { seDeconnecter, deconnexionEnCours } = useDeconnexion()
           type="button"
           title="Déconnexion"
           aria-label="Se déconnecter"
-          class="cursor-pointer p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 focus:outline-none group-hover:scale-105 disabled:opacity-50"
+          class="cursor-pointer p-2 text-gris hover:text-red-700 hover:bg-red-50 rounded-xl transition-all duration-200 focus:outline-none group-hover:scale-105 disabled:opacity-50"
         >
           <LogOut class="w-4 h-4 stroke-2" />
         </button>
@@ -133,19 +133,19 @@ const { seDeconnecter, deconnexionEnCours } = useDeconnexion()
 
     <div class="w-full space-y-6">
       <div v-for="group in menuGroups" :key="group.title" class="space-y-2">
-        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3">
+        <h3 class="text-[10px] font-bold text-gris uppercase tracking-wider px-3">
           {{ group.title }}
         </h3>
         
-        <nav class="w-full flex flex-col divide-y divide-gray-50 text-xs font-semibold text-gray-600">
+        <nav class="w-full flex flex-col divide-y divide-gray-50 text-xs font-semibold text-gris">
           <template v-for="item in group.items" :key="item.id">
           <div
             v-if="item.bientot"
-            class="w-full py-3 px-3 rounded-xl flex items-center justify-between text-gray-400 cursor-default select-none"
+            class="w-full py-3 px-3 rounded-xl flex items-center justify-between text-gris cursor-default select-none"
             aria-disabled="true"
           >
             <div class="flex items-center gap-3">
-              <component :is="item.icon" class="w-4 h-4 stroke-2 text-gray-300" />
+              <component :is="item.icon" class="w-4 h-4 stroke-2 text-gris" />
               <span>{{ item.name }}</span>
             </div>
             <span class="text-[9px] font-bold uppercase tracking-wider text-savane bg-savane/10 px-2 py-0.5 rounded-full">Bientôt</span>
@@ -162,7 +162,7 @@ const { seDeconnecter, deconnexionEnCours } = useDeconnexion()
               <component 
                 :is="item.icon" 
                 class="w-4 h-4 stroke-2" 
-                :class="route.path === item.path ? 'text-savane' : 'text-gray-400 group-hover:text-noir'" 
+                :class="route.path === item.path ? 'text-savane' : 'text-gris group-hover:text-noir'" 
               />
               <span>{{ item.name }}</span>
             </div>

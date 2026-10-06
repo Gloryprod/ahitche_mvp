@@ -15,8 +15,8 @@
         </nav>
 
         <div class="mb-6 text-center">
-            <h2 class="text-2xl font-bold text-foret font-display">Rejoignez Ahitché</h2>
-            <p class="text-sm text-gray-500 mt-1">Créez votre profil pour finaliser votre commande.</p>
+            <h1 class="text-2xl font-bold text-foret font-display">Rejoignez Ahitché</h1>
+            <p class="text-sm text-gris mt-1">Créez votre profil pour finaliser votre commande.</p>
         </div>
 
         <form @submit.prevent="handleRegister" class="flex flex-col gap-4">
@@ -52,7 +52,7 @@
                   :input-options="{ placeholder: 'Ex : 01 97 00 00 00', type: 'tel' }"
                   :dropdown-options="{ showFlags: true, showSearchBox: true, searchBoxPlaceholder: 'Rechercher un pays' }"
                 ></vue-tel-input>
-                <p class="text-xs text-gray-500 mt-1">Ce numéro sera utilisé pour vos commandes et livraisons.</p>
+                <p class="text-xs text-gris mt-1">Ce numéro sera utilisé pour vos commandes et livraisons.</p>
             </div>
 
             <div>
@@ -76,7 +76,7 @@
         </form>
 
         <div class="flex items-center justify-center gap-1 mt-4">
-            <span class="text-sm text-gray-500">
+            <span class="text-sm text-gris">
                 Déjà inscrit ? <button @click="login" class="cursor-pointer text-foret hover:text-foret/90 font-bold">Se connecter</button>
             </span>
         </div>

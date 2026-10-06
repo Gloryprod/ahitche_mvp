@@ -73,3 +73,10 @@ section[id] {
     .frise-trace-horizontal { transform-origin: left; animation-name: tracerHorizontal; }
   }
 }
+
+/* Notifications : couleurs de la charte, texte blanc lisible (contraste ≥ 4,5 : 1) */
+.Vue-Toastification__container .Vue-Toastification__toast { font-family: var(--font-body); }
+.Vue-Toastification__container .Vue-Toastification__toast--success { background-color: #1A5C38; }
+.Vue-Toastification__container .Vue-Toastification__toast--error { background-color: #B42318; }
+.Vue-Toastification__container .Vue-Toastification__toast--warning { background-color: #8A5A00; }
+.Vue-Toastification__container .Vue-Toastification__toast--info { background-color: #2E7D4F; }

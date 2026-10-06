@@ -28,8 +28,10 @@ watch(() => route.path, () => {
       
       <button 
         @click="isMobileMenuOpen = !isMobileMenuOpen"
-        type="button" 
-        class="p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-colors focus:outline-none"
+        type="button"
+        :aria-label="isMobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'"
+        :aria-expanded="isMobileMenuOpen"
+        class="p-2 text-gris hover:bg-creme rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-foret"
       >
         <Menu v-if="!isMobileMenuOpen" class="w-5 h-5 stroke-2" />
         <X v-else class="w-5 h-5 stroke-2" />
@@ -41,7 +43,7 @@ watch(() => route.path, () => {
       <div 
         :class="[
           'lg:col-span-1 fixed inset-0 z-50 lg:z-auto lg:relative bg-black/40 lg:bg-transparent transition-opacity duration-300 lg:opacity-100 lg:pointer-events-auto',
-          isMobileMenuOpen ? 'opacity-100 pointer-ev  ents-auto' : 'opacity-0 pointer-events-none lg:block hidden'
+          isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none lg:block hidden'
         ]"
         @click.self="isMobileMenuOpen = false"
       >
@@ -52,7 +54,7 @@ watch(() => route.path, () => {
           ]"
         >
           <div class="p-4 flex justify-end lg:hidden border-b border-gray-50">
-            <button @click="isMobileMenuOpen = false" class="p-1.5 bg-gray-50 text-gray-500 rounded-lg">
+            <button type="button" @click="isMobileMenuOpen = false" aria-label="Fermer le menu" class="p-1.5 bg-creme text-gris rounded-lg">
               <X class="w-4 h-4" />
             </button>
           </div>
@@ -63,13 +65,13 @@ watch(() => route.path, () => {
         </div>
       </div>
 
-      <main class="lg:col-span-3 w-full min-w-0">
+      <div class="lg:col-span-3 w-full min-w-0">
         <RouterView v-slot="{ Component }">
           <transition name="fade" mode="out-in">
             <component :is="Component" />
           </transition>
         </RouterView>
-      </main>
+      </div>
 
     </div>
   </div>

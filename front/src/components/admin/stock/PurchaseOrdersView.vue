@@ -221,7 +221,7 @@ const showNotification = (text: string, type: string) => {
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gray-600">
+  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gris">
 
     <!-- BARRE D'ENTÊTE -->
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
@@ -230,7 +230,7 @@ const showNotification = (text: string, type: string) => {
       </h1>
       <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
         <div class="relative w-full sm:w-60">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 stroke-[2.5]" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris stroke-[2.5]" />
           <input 
             v-model="search" 
             type="text" 
@@ -250,7 +250,7 @@ const showNotification = (text: string, type: string) => {
 
     <!-- COMPTEUR TOTAL -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 bg-white p-4 rounded-2xl shadow-2xs">
-      <div class="flex items-center gap-2 text-xs font-semibold text-gray-500">
+      <div class="flex items-center gap-2 text-xs font-semibold text-gris">
         <span>Bons émis dans le registre</span>
         <span class="px-2.5 py-1 bg-foret/10 text-foret rounded-full font-bold text-[11px]">{{ data?.total || 0 }}</span>
       </div>
@@ -261,20 +261,20 @@ const showNotification = (text: string, type: string) => {
       
       <!-- HISTORIQUE DES BONS ÉMIS -->
       <div :class="[activePanel ? 'lg:col-span-2' : 'lg:col-span-3', 'bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden transition-all']">
-        <div v-if="isLoading" class="text-sm font-medium text-gray-500 p-6 text-center">
+        <div v-if="isLoading" class="text-sm font-medium text-gris p-6 text-center">
           Chargement du registre...
         </div>
         <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl m-4 border">
           Erreur lors de la récupération des bons de commande.
         </div>
         <div v-else class="p-4 overflow-x-auto">
-          <div v-if="!data?.bonsCommande || data.bonsCommande.length === 0" class="text-center py-8 text-sm text-gray-400">
+          <div v-if="!data?.bonsCommande || data.bonsCommande.length === 0" class="text-center py-8 text-sm text-gris">
             Aucun bon de commande trouvé.
           </div>
 
           <table v-else class="w-full text-left border-collapse min-w-162.5">
             <thead>
-              <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
                 <th class="py-3 px-4">Code Référence</th>
                 <th class="py-3 px-4">Fournisseur</th>
                 <th class="py-3 px-4 text-center">Articles</th>
@@ -287,7 +287,7 @@ const showNotification = (text: string, type: string) => {
               <tr v-for="bon in data.bonsCommande" :key="bon._id" class="hover:bg-gray-50/50 transition-colors">
                 <td class="py-3 px-4 font-mono font-bold text-gray-900">{{ bon.numeroBon }}</td>
                 <td class="py-3 px-4 font-bold text-gray-700">{{ bon.fournisseur }}</td>
-                <td class="py-3 px-4 text-center font-mono text-gray-400">{{ bon.items?.length || 0 }}</td>
+                <td class="py-3 px-4 text-center font-mono text-gris">{{ bon.items?.length || 0 }}</td>
                 <td class="py-3 px-4 text-right font-mono font-bold text-gray-900">
                   {{ formatPrixCFA(calculerTotalBon(bon.items)) }}
                 </td>
@@ -301,13 +301,13 @@ const showNotification = (text: string, type: string) => {
                 </td>
                 <!-- BOUTONS D'ACTION -->
                 <td class="py-3 px-4 text-right space-x-1">
-                  <button @click="openDetailsPanel(bon)" title="Voir les détails" class="p-1.5 text-gray-400 hover:text-foret hover:bg-gray-100 rounded-lg transition-all cursor-pointer">
+                  <button @click="openDetailsPanel(bon)" title="Voir les détails" class="p-1.5 text-gris hover:text-foret hover:bg-gray-100 rounded-lg transition-all cursor-pointer" aria-label="Voir le détail">
                     <Eye class="w-4 h-4" />
                   </button>
-                  <button @click="openEditPanel(bon)" title="Modifier" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-all cursor-pointer">
+                  <button @click="openEditPanel(bon)" title="Modifier" class="p-1.5 text-gris hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-all cursor-pointer">
                     <Edit3 class="w-4 h-4" />
                   </button>
-                  <button @click="confirmerSuppression(bon)" title="Supprimer" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-all cursor-pointer">
+                  <button @click="confirmerSuppression(bon)" title="Supprimer" class="p-1.5 text-gris hover:text-red-600 hover:bg-gray-100 rounded-lg transition-all cursor-pointer" aria-label="Supprimer">
                     <Trash2 class="w-4 h-4" />
                   </button>
                 </td>
@@ -346,7 +346,7 @@ const showNotification = (text: string, type: string) => {
             <span v-else-if="activePanel === 'edit'">Modifier Bon {{ selectedBon?.numeroBon }}</span>
             <span v-else-if="activePanel === 'details'">Détails - {{ selectedBon?.numeroBon }}</span>
           </h3>
-          <button @click="closePanel" class="p-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-400 transition-all cursor-pointer">
+          <button @click="closePanel" class="p-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-gris transition-all cursor-pointer" aria-label="Fermer">
             <X class="w-3.5 h-3.5" />
           </button>
         </div>
@@ -355,24 +355,24 @@ const showNotification = (text: string, type: string) => {
         <div v-if="activePanel === 'details' && selectedBon" class="space-y-4">
           <div class="bg-gray-50 p-3 rounded-xl space-y-1">
             <div class="flex justify-between">
-              <span class="text-gray-400">Fournisseur :</span>
+              <span class="text-gris">Fournisseur :</span>
               <span class="font-bold text-noir">{{ selectedBon.fournisseur }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">Statut :</span>
-              <span class="font-bold" :class="selectedBon.statut === 'Reçu' ? 'text-green-600' : 'text-savane'">
+              <span class="text-gris">Statut :</span>
+              <span class="font-bold" :class="selectedBon.statut === 'Reçu' ? 'text-green-800' : 'text-savane'">
                 {{ selectedBon.statut }}
               </span>
             </div>
           </div>
 
           <div>
-            <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-2">Articles commandés</span>
+            <span class="text-[10px] uppercase font-bold text-gris tracking-wider block mb-2">Articles commandés</span>
             <div class="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
               <div v-for="(item, idx) in selectedBon.items" :key="idx" class="p-2.5 flex justify-between items-center bg-white">
                 <div>
                   <p class="font-bold text-noir">{{ getNomProduit(item) }}</p>
-                  <p class="text-[10px] text-gray-400 font-mono">{{ item.quantiteCommandee }} x {{ formatPrixCFA(item.prixUnitairePrevu) }}</p>
+                  <p class="text-[10px] text-gris font-mono">{{ item.quantiteCommandee }} x {{ formatPrixCFA(item.prixUnitairePrevu) }}</p>
                 </div>
                 <span class="font-mono font-bold text-noir">
                   {{ formatPrixCFA(item.quantiteCommandee * item.prixUnitairePrevu) }}
@@ -396,7 +396,7 @@ const showNotification = (text: string, type: string) => {
         <!-- 2. MODE CRÉATION OU ÉDITION -->
         <form v-else-if="activePanel === 'create' || activePanel === 'edit'" @submit.prevent="soumettreFormulaire" class="space-y-4">
           <div class="space-y-1">
-            <label class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Fournisseur</label>
+            <label class="text-[10px] uppercase font-bold text-gris tracking-wider">Fournisseur</label>
             <select v-model="fournisseurSelectionne" required aria-label="Fournisseur" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret focus:bg-white transition-all">
               <option value="" disabled>-- Choisir le fournisseur --</option>
               <option v-for="f in fournisseurs" :key="f._id" :value="f._id">{{ f.nom }}</option>
@@ -404,10 +404,10 @@ const showNotification = (text: string, type: string) => {
           </div>
 
           <div class="space-y-2">
-            <label class="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">Articles à commander</label>
+            <label class="text-[10px] uppercase font-bold text-gris tracking-wider block">Articles à commander</label>
             
             <div v-for="(item, index) in itemsCommande" :key="index" class="p-3 bg-gray-50/50 rounded-xl border border-gray-100 space-y-2 relative">
-              <button v-if="itemsCommande.length > 1" type="button" @click="retirerLigneProduit(index)" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors cursor-pointer">
+              <button v-if="itemsCommande.length > 1" type="button" @click="retirerLigneProduit(index)" class="absolute top-2 right-2 text-gris hover:text-red-700 transition-colors cursor-pointer">
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
 
@@ -420,23 +420,23 @@ const showNotification = (text: string, type: string) => {
 
               <div class="grid grid-cols-2 gap-2">
                 <div>
-                  <span class="text-[9px] text-gray-400 uppercase font-bold">Quantité</span>
+                  <span class="text-[9px] text-gris uppercase font-bold">Quantité</span>
                   <input v-model.number="item.quantiteCommandee" type="number" min="1" class="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg font-mono text-xs focus:outline-none focus:border-foret" />
                 </div>
                 <div>
-                  <span class="text-[9px] text-gray-400 uppercase font-bold">P.U. Estimé</span>
+                  <span class="text-[9px] text-gris uppercase font-bold">P.U. Estimé</span>
                   <input v-model.number="item.prixUnitairePrevu" type="number" min="0" class="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg font-mono text-xs focus:outline-none focus:border-foret" />
                 </div>
               </div>
             </div>
 
-            <button type="button" @click="ajouterLigneProduit" class="w-full py-1.5 border border-dashed border-gray-300 rounded-xl text-gray-400 hover:text-foret hover:border-foret transition-all font-bold text-center cursor-pointer">
+            <button type="button" @click="ajouterLigneProduit" class="w-full py-1.5 border border-dashed border-gray-300 rounded-xl text-gris hover:text-foret hover:border-foret transition-all font-bold text-center cursor-pointer">
               + Ajouter un produit
             </button>
           </div>
 
           <div class="pt-2 flex items-center gap-3">
-            <button type="button" @click="closePanel" class="w-1/2 py-2 border border-gray-200 text-gray-500 font-bold rounded-xl hover:bg-gray-50 transition-all text-center cursor-pointer">
+            <button type="button" @click="closePanel" class="w-1/2 py-2 border border-gray-200 text-gris font-bold rounded-xl hover:bg-gray-50 transition-all text-center cursor-pointer">
               Annuler
             </button>
             <button type="submit" :disabled="createMutation.isPending.value || updateMutation.isPending.value" class="w-1/2 py-2 bg-foret text-white font-bold rounded-xl hover:bg-foret/90 disabled:opacity-50 transition-all text-center cursor-pointer">

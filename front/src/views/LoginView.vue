@@ -20,8 +20,8 @@
 
             <div v-if="isForgotPassword">
                 <div class="mb-6 text-center">
-                    <h2 class="text-2xl font-bold text-foret font-display">Mot de passe oublié</h2>
-                    <p class="text-sm text-gray-500 mt-1">Saisissez votre e-mail pour recevoir un lien de réinitialisation.</p>
+                    <h1 class="text-2xl font-bold text-foret font-display">Mot de passe oublié</h1>
+                    <p class="text-sm text-gris mt-1">Saisissez votre e-mail pour recevoir un lien de réinitialisation.</p>
                 </div>
 
                 <form @submit.prevent="handleForgotPassword" class="flex flex-col gap-4">
@@ -46,7 +46,7 @@
                 </form>
 
                 <div class="flex items-center justify-center gap-1 mt-4">
-                    <button @click="isForgotPassword = false" class="cursor-pointer text-sm text-gray-500 hover:text-foret font-medium transition-all">
+                    <button @click="isForgotPassword = false" class="cursor-pointer text-sm text-gris hover:text-foret font-medium transition-all">
                         ← Retour à la connexion
                     </button>
                 </div>
@@ -54,8 +54,8 @@
 
             <div v-else>
                 <div class="mb-6 text-center">
-                    <h2 class="text-2xl font-bold text-foret font-display">Connexion</h2>
-                    <p class="text-sm text-gray-500 mt-1">Connectez-vous à votre compte pour accéder à vos commandes et préférences.</p>
+                    <h1 class="text-2xl font-bold text-foret font-display">Connexion</h1>
+                    <p class="text-sm text-gris mt-1">Connectez-vous à votre compte pour accéder à vos commandes et préférences.</p>
                 </div>
 
                 <form @submit.prevent="handleLogin" class="flex flex-col gap-4">
@@ -100,7 +100,7 @@
                 </form>
 
                 <div class="flex items-center justify-center gap-1 mt-4">
-                    <span class="text-sm text-gray-500">
+                    <span class="text-sm text-gris">
                         Pas de compte ? <button @click="register" class="cursor-pointer text-foret hover:text-foret/90 font-bold">S'inscrire</button>
                     </span>
                 </div>

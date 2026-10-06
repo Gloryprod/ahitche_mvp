@@ -15,7 +15,7 @@ import ActionsFlottantes from '../components/layout/ActionsFlottantes.vue'
 
 <!-- Ordre validé pour la refonte : comprendre, être rassuré, voir la chaîne, choisir, commander -->
 <template>
-  <main>
+  <div>
     <HeroSection />
     <BandeConfiance />
     <FermeAVous />
@@ -26,7 +26,7 @@ import ActionsFlottantes from '../components/layout/ActionsFlottantes.vue'
     <TemoignagesAndGarantie />
     <FaqSection />
     <ActualitesSection />
-  </main>
+  </div>
   <!-- Commande WhatsApp collante (mobile) et retour en haut de page -->
   <ActionsFlottantes />
 </template>

@@ -110,7 +110,7 @@ const dateFr = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: 'nu
     <!-- Questionnaire -->
     <form v-else-if="enEdition" @submit.prevent="enregistrer" class="space-y-4 text-sm">
       <fieldset>
-        <legend class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Votre foyer (nombre de personnes)</legend>
+        <legend class="text-xs font-bold uppercase tracking-wider text-gris mb-2">Votre foyer (nombre de personnes)</legend>
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
           <label v-for="t in tranches" :key="t" class="text-xs text-gris">{{ LIBELLES_TRANCHES[t] }}
             <input v-model.number="form.foyer[t]" type="number" min="0" max="20" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-noir" />
@@ -118,17 +118,17 @@ const dateFr = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: 'nu
         </div>
       </fieldset>
       <fieldset>
-        <legend class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Ce que vous souhaitez</legend>
+        <legend class="text-xs font-bold uppercase tracking-wider text-gris mb-2">Ce que vous souhaitez</legend>
         <div class="flex flex-wrap gap-2">
           <label v-for="o in objectifsPossibles" :key="o" :class="['cursor-pointer px-3 py-2 rounded-full border text-xs font-semibold', form.objectifs.includes(o) ? 'bg-foret text-white border-foret' : 'border-gray-200 text-gris']">
             <input v-model="form.objectifs" :value="o" type="checkbox" class="sr-only" />{{ o }}
           </label>
         </div>
       </fieldset>
-      <label class="block text-xs font-bold uppercase tracking-wider text-gray-500">Plats que vous aimez
+      <label class="block text-xs font-bold uppercase tracking-wider text-gris">Plats que vous aimez
         <textarea v-model="form.platsAimes" rows="2" maxlength="500" placeholder="Ex : sauce arachide, amiwo, pâte de maïs…" class="mt-1 w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-normal normal-case text-noir resize-none"></textarea>
       </label>
-      <label class="block text-xs font-bold uppercase tracking-wider text-gray-500">Aliments que vous n'aimez pas
+      <label class="block text-xs font-bold uppercase tracking-wider text-gris">Aliments que vous n'aimez pas
         <textarea v-model="form.alimentsNonAimes" rows="2" maxlength="500" placeholder="Ex : gombo, poisson fumé…" class="mt-1 w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-normal normal-case text-noir resize-none"></textarea>
       </label>
       <p class="text-xs text-gris bg-creme rounded-xl p-3">

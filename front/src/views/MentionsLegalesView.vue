@@ -4,7 +4,7 @@ import { lienWhatsApp, WHATSAPP_AFFICHAGE, RESEAUX_SOCIAUX } from '@/config/cont
 </script>
 
 <template>
-  <main class="min-h-screen bg-creme px-4 py-10 md:py-16">
+  <div class="min-h-screen bg-creme px-4 py-10 md:py-16">
     <article class="max-w-3xl mx-auto bg-white rounded-3xl border border-creme2 p-6 md:p-10 text-gris leading-relaxed">
       <LienAccueil />
 
@@ -73,5 +73,5 @@ import { lienWhatsApp, WHATSAPP_AFFICHAGE, RESEAUX_SOCIAUX } from '@/config/cont
         </p>
       </section>
     </article>
-  </main>
+  </div>
 </template>

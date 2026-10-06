@@ -259,14 +259,14 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gray-600">
+  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gris">
 
     <!-- BARRE D'ENTÊTE -->
     <div class="bg-white p-4 rounded-2xl flex flex-col gap-3 border-b border-gray-200">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 class="font-display font-bold text-xl text-noir">Entrées de Stock</h1>
         <div class="relative w-full sm:w-60">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 stroke-[2.5]" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris stroke-[2.5]" />
           <input v-model="search" type="text" placeholder="Lot, fournisseur, n° de pièce…" aria-label="Rechercher un lot" class="w-full pl-9 pr-4 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret focus:bg-white transition-all" />
         </div>
       </div>
@@ -290,11 +290,11 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
 
     <!-- COMPTEUR ET FILTRE « À CONFIRMER » -->
     <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl shadow-2xs">
-      <div class="flex items-center gap-2 text-xs font-semibold text-gray-500">
+      <div class="flex items-center gap-2 text-xs font-semibold text-gris">
         <span>Lots affichés</span>
         <span class="px-2.5 py-1 bg-foret/10 text-foret rounded-full font-bold text-[11px]">{{ data?.lots?.length ?? 0 }}</span>
       </div>
-      <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold" :class="data?.aConfirmer ? 'text-amber-800' : 'text-gray-400'">
+      <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold" :class="data?.aConfirmer ? 'text-amber-800' : 'text-gris'">
         <input v-model="seulementAConfirmer" type="checkbox" class="accent-foret" />
         Seulement les lots à compter ou à vérifier ({{ data?.aConfirmer ?? 0 }})
       </label>
@@ -304,7 +304,7 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
 
       <!-- TABLEAU DES LOTS -->
       <div :class="[volet ? 'lg:col-span-2' : 'lg:col-span-3', 'bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden']">
-        <div v-if="isLoading" class="text-sm font-medium text-gray-500 p-8 text-center">Chargement des lots…</div>
+        <div v-if="isLoading" class="text-sm font-medium text-gris p-8 text-center">Chargement des lots…</div>
         <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-100">
           Erreur : {{ error?.message || "Impossible de charger les lots." }}
         </div>
@@ -313,7 +313,7 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
           <div v-else class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
                   <th class="py-3 px-3">N° de lot</th>
                   <th class="py-3 px-3">Produit</th>
                   <th class="py-3 px-3">Fournisseur</th>
@@ -329,23 +329,23 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
                     <span class="font-bold">{{ nomProduit(lot) }}</span>
                     <span v-if="lot.aConfirmer" class="block mt-1 text-[10px] font-semibold text-amber-800 max-w-[16rem]">À vérifier : {{ lot.aConfirmer }}</span>
                   </td>
-                  <td class="py-3 px-3 text-gray-500">{{ lot.fournisseur }}</td>
+                  <td class="py-3 px-3 text-gris">{{ lot.fournisseur }}</td>
                   <td class="py-3 px-3 text-center whitespace-nowrap">
                     <span v-if="estACompter(lot)" class="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-bold">à compter</span>
                     <template v-else>
                       <span :class="[lot.quantiteRestante === 0 ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-noir', 'px-2 py-0.5 rounded font-mono font-bold']">{{ lot.quantiteRestante }}</span>
-                      <span class="text-gray-400 font-mono text-[10px]"> / {{ lot.quantiteInitiale }} {{ uniteLot(lot) }}</span>
+                      <span class="text-gris font-mono text-[10px]"> / {{ lot.quantiteInitiale }} {{ uniteLot(lot) }}</span>
                     </template>
                   </td>
-                  <td class="py-3 px-3 text-right font-mono text-gray-600 whitespace-nowrap">{{ formatPrix(lot.prixAchatUnitaire) }}</td>
+                  <td class="py-3 px-3 text-right font-mono text-gris whitespace-nowrap">{{ formatPrix(lot.prixAchatUnitaire) }}</td>
                   <td class="py-3 px-3">
                     <div class="flex items-center justify-center gap-1">
-                      <button @click="ouvrir('detail', lot)" class="cursor-pointer p-1.5 text-gray-400 hover:text-noir hover:bg-gray-100 rounded-lg" title="Fiche du lot" aria-label="Fiche du lot"><Eye class="w-3.5 h-3.5" /></button>
+                      <button @click="ouvrir('detail', lot)" class="cursor-pointer p-1.5 text-gris hover:text-noir hover:bg-gray-100 rounded-lg" title="Fiche du lot" aria-label="Fiche du lot"><Eye class="w-3.5 h-3.5" /></button>
                       <template v-if="ecriture">
                         <button v-if="estACompter(lot)" @click="ouvrirComptage(lot)" class="cursor-pointer p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg" title="Compter le lot" aria-label="Compter le lot"><Scale class="w-3.5 h-3.5" /></button>
-                        <button v-else @click="ouvrirCorrection(lot)" class="cursor-pointer p-1.5 text-gray-400 hover:text-savane hover:bg-amber-50 rounded-lg" title="Corriger la quantité" aria-label="Corriger la quantité"><SlidersHorizontal class="w-3.5 h-3.5" /></button>
-                        <button @click="openEditMode(lot)" class="cursor-pointer p-1.5 text-gray-400 hover:text-savane hover:bg-amber-50 rounded-lg" title="Modifier le lot" aria-label="Modifier le lot"><Edit2 class="w-3.5 h-3.5" /></button>
-                        <button @click="deleteLot(lot)" class="cursor-pointer p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Supprimer de l'inventaire" aria-label="Supprimer de l'inventaire"><Trash2 class="w-3.5 h-3.5" /></button>
+                        <button v-else @click="ouvrirCorrection(lot)" class="cursor-pointer p-1.5 text-gris hover:text-savane hover:bg-amber-50 rounded-lg" title="Corriger la quantité" aria-label="Corriger la quantité"><SlidersHorizontal class="w-3.5 h-3.5" /></button>
+                        <button @click="openEditMode(lot)" class="cursor-pointer p-1.5 text-gris hover:text-savane hover:bg-amber-50 rounded-lg" title="Modifier le lot" aria-label="Modifier le lot"><Edit2 class="w-3.5 h-3.5" /></button>
+                        <button @click="deleteLot(lot)" class="cursor-pointer p-1.5 text-gris hover:text-red-600 hover:bg-red-50 rounded-lg" title="Supprimer de l'inventaire" aria-label="Supprimer de l'inventaire"><Trash2 class="w-3.5 h-3.5" /></button>
                       </template>
                     </div>
                   </td>
@@ -354,7 +354,7 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
             </table>
           </div>
 
-          <div class="flex items-center justify-between pt-4 border-t border-gray-100 text-xs font-semibold text-gray-600">
+          <div class="flex items-center justify-between pt-4 border-t border-gray-100 text-xs font-semibold text-gris">
             <button :disabled="page === 1 || isPlaceholderData" @click="page--" class="px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">← Précédent</button>
             <span class="bg-gray-100 px-3 py-1.5 rounded-lg text-noir">Page {{ page }}</span>
             <button :disabled="!data?.hasMore || isPlaceholderData" @click="page++" class="px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">Suivant →</button>
@@ -365,8 +365,8 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
       <!-- VOLET LATÉRAL (au-dessus du tableau sur téléphone) -->
       <div v-if="volet" class="order-first lg:order-none bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 animate-fadeIn lg:sticky lg:top-6">
         <div class="flex items-center justify-between border-b pb-2.5">
-          <h3 class="font-bold text-noir text-sm">{{ titreVolet }}<span v-if="selectedLot && volet !== 'formulaire'" class="block font-mono text-[11px] text-gray-500">{{ selectedLot.numeroLot }} · {{ nomProduit(selectedLot) }}</span></h3>
-          <button @click="closePanels" class="cursor-pointer p-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-400" aria-label="Fermer"><X class="w-3.5 h-3.5" /></button>
+          <h3 class="font-bold text-noir text-sm">{{ titreVolet }}<span v-if="selectedLot && volet !== 'formulaire'" class="block font-mono text-[11px] text-gris">{{ selectedLot.numeroLot }} · {{ nomProduit(selectedLot) }}</span></h3>
+          <button @click="closePanels" class="cursor-pointer p-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-gris" aria-label="Fermer"><X class="w-3.5 h-3.5" /></button>
         </div>
 
         <!-- ENTRÉE / MODIFICATION -->
@@ -580,18 +580,18 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
 
         <!-- FICHE DU LOT -->
         <dl v-if="volet === 'detail' && selectedLot" class="grid grid-cols-2 gap-x-3 gap-y-3 text-xs">
-          <div class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gray-400">Produit</dt><dd class="text-noir font-bold text-sm">{{ nomProduit(selectedLot) }}</dd></div>
-          <div><dt class="text-[10px] uppercase font-bold text-gray-400">Quantité initiale</dt><dd class="font-mono font-bold text-noir">{{ selectedLot.quantiteInitiale ?? 'à compter' }} {{ uniteLot(selectedLot) }}</dd></div>
-          <div><dt class="text-[10px] uppercase font-bold text-gray-400">Reste</dt><dd class="font-mono font-bold" :class="selectedLot.quantiteRestante === 0 ? 'text-red-600' : 'text-foret'">{{ selectedLot.quantiteRestante ?? '—' }}</dd></div>
-          <div><dt class="text-[10px] uppercase font-bold text-gray-400">Prix d'achat</dt><dd class="font-mono">{{ formatPrix(selectedLot.prixAchatUnitaire) }}</dd></div>
-          <div><dt class="text-[10px] uppercase font-bold text-gray-400">Valeur facturée</dt><dd class="font-mono">{{ formatPrix(selectedLot.valeurFcfa) }}</dd></div>
-          <div class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gray-400">Fournisseur</dt><dd class="text-noir font-bold">{{ selectedLot.fournisseur }}</dd></div>
-          <div><dt class="text-[10px] uppercase font-bold text-gray-400">Réception</dt><dd class="font-mono">{{ formatDate(selectedLot.dateReception) }}</dd></div>
-          <div><dt class="text-[10px] uppercase font-bold text-gray-400">Lot fournisseur</dt><dd class="font-mono">{{ selectedLot.lotFournisseur || '—' }}</dd></div>
-          <div class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gray-400">Pièce</dt><dd class="font-mono">{{ selectedLot.numeroPiece || '—' }}<span v-if="selectedLot.numeroPiece" class="font-body text-[10px] ml-1" :class="selectedLot.depenseId ? 'text-savane' : 'text-amber-800'">{{ selectedLot.depenseId ? '· dépense rattachée' : '· aucune dépense rattachée' }}</span></dd></div>
-          <div v-if="selectedLot.conditionnement" class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gray-400">Conditionnement</dt><dd>{{ selectedLot.conditionnement }}</dd></div>
+          <div class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gris">Produit</dt><dd class="text-noir font-bold text-sm">{{ nomProduit(selectedLot) }}</dd></div>
+          <div><dt class="text-[10px] uppercase font-bold text-gris">Quantité initiale</dt><dd class="font-mono font-bold text-noir">{{ selectedLot.quantiteInitiale ?? 'à compter' }} {{ uniteLot(selectedLot) }}</dd></div>
+          <div><dt class="text-[10px] uppercase font-bold text-gris">Reste</dt><dd class="font-mono font-bold" :class="selectedLot.quantiteRestante === 0 ? 'text-red-600' : 'text-foret'">{{ selectedLot.quantiteRestante ?? '—' }}</dd></div>
+          <div><dt class="text-[10px] uppercase font-bold text-gris">Prix d'achat</dt><dd class="font-mono">{{ formatPrix(selectedLot.prixAchatUnitaire) }}</dd></div>
+          <div><dt class="text-[10px] uppercase font-bold text-gris">Valeur facturée</dt><dd class="font-mono">{{ formatPrix(selectedLot.valeurFcfa) }}</dd></div>
+          <div class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gris">Fournisseur</dt><dd class="text-noir font-bold">{{ selectedLot.fournisseur }}</dd></div>
+          <div><dt class="text-[10px] uppercase font-bold text-gris">Réception</dt><dd class="font-mono">{{ formatDate(selectedLot.dateReception) }}</dd></div>
+          <div><dt class="text-[10px] uppercase font-bold text-gris">Lot fournisseur</dt><dd class="font-mono">{{ selectedLot.lotFournisseur || '—' }}</dd></div>
+          <div class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gris">Pièce</dt><dd class="font-mono">{{ selectedLot.numeroPiece || '—' }}<span v-if="selectedLot.numeroPiece" class="font-body text-[10px] ml-1" :class="selectedLot.depenseId ? 'text-savane' : 'text-amber-800'">{{ selectedLot.depenseId ? '· dépense rattachée' : '· aucune dépense rattachée' }}</span></dd></div>
+          <div v-if="selectedLot.conditionnement" class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gris">Conditionnement</dt><dd>{{ selectedLot.conditionnement }}</dd></div>
           <div v-if="selectedLot.aConfirmer" class="col-span-2"><dt class="text-[10px] uppercase font-bold text-amber-800">À vérifier</dt><dd class="text-amber-900">{{ selectedLot.aConfirmer }}</dd></div>
-          <div v-if="selectedLot.commentaire" class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gray-400">Commentaire</dt><dd>{{ selectedLot.commentaire }}</dd></div>
+          <div v-if="selectedLot.commentaire" class="col-span-2"><dt class="text-[10px] uppercase font-bold text-gris">Commentaire</dt><dd>{{ selectedLot.commentaire }}</dd></div>
         </dl>
       </div>
 

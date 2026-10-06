@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PanneauMarque from '@/components/ui/PanneauMarque.vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from 'vue-toastification'
 import { espaceParDefaut } from '@/config/roles'
@@ -15,6 +15,9 @@ const LIENS = [
 ]
 
 const router = useRouter()
+const route = useRoute()
+// Ancre de l'accueil : telle quelle sur l'accueil, précédée de « / » ailleurs (blog, mentions, page 404…)
+const ancre = (cible: string) => (route.path === '/' ? cible : `/${cible}`)
 const isScrolled = ref(false)
 const isMenuOpen = ref(false)
 const scrollProgress = ref(0)
@@ -125,7 +128,7 @@ onUnmounted(() => {
     ]"
   >
     <div class="max-w-[1160px] mx-auto px-6 flex justify-between items-center gap-4">
-      <a href="#accueil" class="flex items-center gap-2 font-display text-2xl font-bold tracking-tight shrink-0" aria-label="Ahitché — Accueil">
+      <a :href="route.path === '/' ? '#accueil' : '/'" class="flex items-center gap-2 font-display text-2xl font-bold tracking-tight shrink-0" aria-label="Ahitché — Accueil">
         <img src="/logo-ahitche-96.webp" alt="" width="40" height="40" class="w-9 h-9 sm:w-10 sm:h-10" />
         <span class="hidden min-[400px]:inline"><span :class="isScrolled ? 'text-foret' : 'text-white'">Ahi</span><span :class="isScrolled ? 'text-or-deep' : 'text-or'">tché</span></span>
       </a>
@@ -135,7 +138,7 @@ onUnmounted(() => {
         <a
           v-for="lien in LIENS"
           :key="lien.href"
-          :href="lien.href"
+          :href="ancre(lien.href)"
           :class="['text-sm font-semibold transition-colors duration-250', isScrolled ? 'text-gris hover:text-foret' : 'text-white/85 hover:text-white']"
         >
           {{ lien.texte }}
@@ -191,7 +194,7 @@ onUnmounted(() => {
       <a
         v-for="lien in LIENS"
         :key="lien.href"
-        :href="lien.href"
+        :href="ancre(lien.href)"
         @click="closeMenu"
         class="text-noir text-base py-3 border-b border-foret/7 font-semibold"
       >
@@ -212,7 +215,7 @@ onUnmounted(() => {
       <!-- Bouton de fermeture (X) -->
       <button 
         @click="closeLoginModal" 
-        class="absolute top-4 right-4 z-10 p-2 text-gray-500 hover:text-noir bg-white/80 backdrop-blur rounded-full transition-colors"
+        class="absolute top-4 right-4 z-10 p-2 text-gris hover:text-noir bg-white/80 backdrop-blur rounded-full transition-colors"
         aria-label="Fermer la fenêtre"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -227,7 +230,7 @@ onUnmounted(() => {
             <div v-if="isForgotPassword">
                 <div class="mb-6 text-center">
                     <h2 class="text-2xl font-bold text-foret font-display">Mot de passe oublié</h2>
-                    <p class="text-sm text-gray-500 mt-1">Saisissez votre e-mail pour recevoir un lien de réinitialisation.</p>
+                    <p class="text-sm text-gris mt-1">Saisissez votre e-mail pour recevoir un lien de réinitialisation.</p>
                 </div>
 
                 <form @submit.prevent="handleForgotPassword" class="flex flex-col gap-4">
@@ -252,7 +255,7 @@ onUnmounted(() => {
                 </form>
 
                 <div class="flex items-center justify-center gap-1 mt-4">
-                    <button @click="isForgotPassword = false" class="cursor-pointer text-sm text-gray-500 hover:text-foret font-medium transition-all">
+                    <button @click="isForgotPassword = false" class="cursor-pointer text-sm text-gris hover:text-foret font-medium transition-all">
                         ← Retour à la connexion
                     </button>
                 </div>
@@ -261,7 +264,7 @@ onUnmounted(() => {
             <div v-else>
                 <div class="mb-6 text-center">
                     <h2 class="text-2xl font-bold text-foret font-display">Connexion</h2>
-                    <p class="text-sm text-gray-500 mt-1">Connectez-vous à votre compte pour accéder à vos commandes et préférences.</p>
+                    <p class="text-sm text-gris mt-1">Connectez-vous à votre compte pour accéder à vos commandes et préférences.</p>
                 </div>
 
                 <form @submit.prevent="handleLogin" class="flex flex-col gap-4">
@@ -306,7 +309,7 @@ onUnmounted(() => {
                 </form>
 
                 <div class="flex items-center justify-center gap-1 mt-4">
-                    <span class="text-sm text-gray-500">
+                    <span class="text-sm text-gris">
                         Pas de compte ? <button @click="register" class="cursor-pointer text-foret hover:text-foret/90 font-bold">S'inscrire</button>
                     </span>
                 </div>

@@ -197,7 +197,7 @@ function showNotification(text: string, type: string) {
                 </tr>
               </thead>
               <tbody class="divide-y divide-creme2 text-noir">
-                <tr v-for="prod in data?.products" :key="prod._id" :class="prod.statut === 'indisponible' ? 'opacity-60' : ''">
+                <tr v-for="prod in data?.products" :key="prod._id" :class="prod.statut === 'indisponible' ? 'bg-creme/70' : ''">
                   <td class="py-2.5 pr-2 font-mono font-bold">{{ prod.reference || '—' }}</td>
                   <td class="py-2.5 pr-2">
                     <span class="font-bold">{{ prod.name }}</span>

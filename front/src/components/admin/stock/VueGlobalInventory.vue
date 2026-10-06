@@ -79,7 +79,7 @@ const closePanels = () => {
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gray-600">
+  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gris">
 
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <h1 class="font-display font-bold text-xl text-noir flex items-center gap-2">
@@ -87,7 +87,7 @@ const closePanels = () => {
       </h1>
       <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
         <div class="relative w-full sm:w-60">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 stroke-[2.5]" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris stroke-[2.5]" />
           <input v-model="search" type="text" placeholder="Rechercher un produit..." class="w-full pl-9 pr-4 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret focus:bg-white transition-all" />
         </div>
         <RouterLink to="/dashboard/admin/saveStock" class="cursor-pointer flex items-center gap-1.5 px-2 py-2 bg-foret text-white text-xs font-bold rounded-xl hover:bg-opacity-95 transition-all shadow-sm shrink-0">
@@ -111,7 +111,7 @@ const closePanels = () => {
             Aucun produit ne correspond à votre recherche actuelle.
         </div>
 
-        <div class="flex items-center gap-4 text-xs font-semibold text-gray-500">
+        <div class="flex items-center gap-4 text-xs font-semibold text-gris">
             <div class="flex items-center gap-2">
               <span>Articles en Stock :</span>
               <span class="px-2.5 py-1 bg-foret/10 text-foret rounded-full font-bold text-[11px]">
@@ -120,7 +120,7 @@ const closePanels = () => {
             </div>
             <div class="w-px h-4 bg-gray-200"></div>
             <div class="flex items-center gap-2">
-              <span class="text-red-500">Alertes Actives :</span>
+              <span class="text-red-700">Alertes Actives :</span>
               <span class="px-2.5 py-1 bg-red-50 text-red-600 rounded-full font-bold text-[11px] border border-red-100">
                 {{ totalAlertes }}
               </span>
@@ -131,7 +131,7 @@ const closePanels = () => {
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
       
       <div :class="[showDetailPanel ? 'lg:col-span-2' : 'lg:col-span-3', 'bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden transition-all']">
-        <div v-if="isLoading" class="text-sm font-medium text-gray-500 p-8 text-center">
+        <div v-if="isLoading" class="text-sm font-medium text-gris p-8 text-center">
           Calcul des volumes cumulés en entrepôt...
         </div>
     
@@ -142,7 +142,7 @@ const closePanels = () => {
         <div v-else class="p-4 overflow-x-auto">
             <table class="w-full text-left border-collapse">
             <thead>
-                <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
                 <th class="py-3 px-4">Produit référencé</th>
                 <th class="py-3 px-4 text-right">Volume Global restant</th>
                 <th class="py-3 px-4 text-right hidden md:table-cell">Seuil Sécurité</th>
@@ -157,17 +157,17 @@ const closePanels = () => {
                 <td class="py-3 px-4 font-bold text-gray-900">{{ item.nom }}</td>
                 
                 <td class="py-3 px-4 text-right font-mono font-bold" :class="item.enAlerte ? 'text-red-600' : 'text-gray-700'">
-                  {{ item.stockTotal }} <span class="text-[10px] text-gray-400 font-sans font-medium">{{ item.unite }}</span>
+                  {{ item.stockTotal }} <span class="text-[10px] text-gris font-sans font-medium">{{ item.unite }}</span>
                   <span v-if="item.lotsACompter" class="block text-[10px] font-sans font-semibold text-amber-800">+ {{ item.lotsACompter }} lot(s) à compter</span>
                 </td>
                 
-                <td class="py-3 px-4 text-right font-mono text-gray-400 hidden md:table-cell">
+                <td class="py-3 px-4 text-right font-mono text-gris hidden md:table-cell">
                   <template v-if="item.seuilAlerte !== null">{{ item.seuilAlerte }} <span class="text-[10px] font-sans">{{ item.unite }}</span></template>
                   <span v-else class="text-[10px] font-sans">à renseigner</span>
                 </td>
 
                 <td class="py-3 px-4 text-center hidden sm:table-cell">
-                  <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-mono text-[11px] border border-gray-200">
+                  <span class="px-2 py-0.5 bg-gray-100 text-gris rounded font-mono text-[11px] border border-gray-200">
                     {{ item.nbLotsActifs }}
                   </span>
                 </td>
@@ -185,7 +185,7 @@ const closePanels = () => {
                 </td>
 
                 <td class="py-3 px-4 text-center">
-                    <button @click="openDetailMode(item)" class="cursor-pointer p-1.5 text-gray-400 hover:text-noir hover:bg-gray-100 rounded-lg transition-colors" title="Consulter la fiche">
+                    <button @click="openDetailMode(item)" class="cursor-pointer p-1.5 text-gris hover:text-noir hover:bg-gray-100 rounded-lg transition-colors" title="Consulter la fiche" aria-label="Voir le détail">
                         <Eye class="w-3.5 h-3.5" />
                     </button>
                 </td>
@@ -199,25 +199,25 @@ const closePanels = () => {
         
         <div class="flex items-center justify-between border-b pb-2.5">
           <h3 class="font-bold text-noir text-sm">Analyse d'inventaire</h3>
-          <button @click="closePanels" class="p-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-400 transition-all">
+          <button @click="closePanels" class="p-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-gris transition-all" aria-label="Fermer">
             <X class="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div class="space-y-4 text-xs">
           <div class="space-y-1">
-            <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Référence Produit ID</span>
-            <p class="font-mono bg-gray-50 p-2 rounded-lg text-gray-500 select-all">{{ selectedItem.productId }}</p>
+            <span class="text-[10px] uppercase font-bold text-gris tracking-wider">Référence Produit ID</span>
+            <p class="font-mono bg-gray-50 p-2 rounded-lg text-gris select-all">{{ selectedItem.productId }}</p>
           </div>
           
           <div class="space-y-1">
-            <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Libellé</span>
+            <span class="text-[10px] uppercase font-bold text-gris tracking-wider">Libellé</span>
             <p class="text-noir font-bold text-sm">{{ selectedItem.nom }}</p>
           </div>
 
           <div class="p-3.5 rounded-xl border flex items-start gap-2.5" :class="selectedItem.enAlerte ? 'bg-red-50/50 border-red-100 text-red-800' : 'bg-green-50/30 border-green-100 text-green-800'">
             <AlertTriangle v-if="selectedItem.enAlerte" class="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
-            <CheckCircle2 v-else class="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+            <CheckCircle2 v-else class="w-4 h-4 text-green-800 mt-0.5 shrink-0" />
             <div>
               <p class="font-bold text-[11px] uppercase tracking-wide">
                 {{ selectedItem.enAlerte ? 'Réapprovisionnement Urgent' : 'Niveau de Stock Correct' }}
@@ -230,27 +230,27 @@ const closePanels = () => {
 
           <div class="grid grid-cols-2 gap-3 pt-1">
             <div class="bg-[#f9f9fb] p-3 rounded-xl border border-gray-100">
-              <span class="text-[9px] uppercase font-bold text-gray-400 block">Total en rayon</span>
+              <span class="text-[9px] uppercase font-bold text-gris block">Total en rayon</span>
               <p class="text-noir font-mono font-bold text-base mt-0.5">
-                {{ selectedItem.stockTotal }} <span class="text-xs font-sans font-medium text-gray-400">{{ selectedItem.unite }}</span>
+                {{ selectedItem.stockTotal }} <span class="text-xs font-sans font-medium text-gris">{{ selectedItem.unite }}</span>
               </p>
             </div>
             <div class="bg-[#f9f9fb] p-3 rounded-xl border border-gray-100">
-              <span class="text-[9px] uppercase font-bold text-gray-400 block">Seuil critique</span>
+              <span class="text-[9px] uppercase font-bold text-gris block">Seuil critique</span>
               <p class="text-gray-700 font-mono font-bold text-base mt-0.5">
-                <template v-if="selectedItem.seuilAlerte !== null">{{ selectedItem.seuilAlerte }} <span class="text-xs font-sans font-medium text-gray-400">{{ selectedItem.unite }}</span></template>
+                <template v-if="selectedItem.seuilAlerte !== null">{{ selectedItem.seuilAlerte }} <span class="text-xs font-sans font-medium text-gris">{{ selectedItem.unite }}</span></template>
                 <span v-else class="text-xs font-sans">à renseigner</span>
               </p>
             </div>
             <div class="bg-[#f9f9fb] p-3 rounded-xl border border-gray-100 col-span-2">
-              <span class="text-[9px] uppercase font-bold text-gray-400 block">Valeur au prix d'achat</span>
+              <span class="text-[9px] uppercase font-bold text-gris block">Valeur au prix d'achat</span>
               <p class="text-noir font-mono font-bold text-base mt-0.5">{{ formatFcfa(selectedItem.valeurFcfa) }}</p>
               <p v-if="selectedItem.lotsACompter" class="text-[10px] text-amber-800">Dont {{ selectedItem.lotsACompter }} lot(s) à compter, à leur valeur facturée</p>
             </div>
           </div>
 
           <div class="space-y-1 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
-            <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">Dispersion physique</span>
+            <span class="text-[10px] uppercase font-bold text-gris tracking-wider block">Dispersion physique</span>
             <p class="text-gray-700 font-medium leading-relaxed">
               Ce volume global est actuellement réparti et segmenté sur <span class="font-bold text-noir">{{ selectedItem.nbLotsActifs }} lot(s) physique(s)</span> distinct(s) non vidés et traçables au sein de votre base FIFO.
             </p>

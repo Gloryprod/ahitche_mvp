@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import { lienWhatsApp, WHATSAPP_AFFICHAGE, RESEAUX_SOCIAUX, HORAIRES } from '@/config/contact'
 
 const annee = new Date().getFullYear()
+const route = useRoute()
+// Ancre de l'accueil : telle quelle sur l'accueil, précédée de « / » ailleurs
+const ancre = (cible: string) => (route.path === '/' ? cible : '/' + cible)
 </script>
 
 <template>
@@ -62,8 +66,8 @@ const annee = new Date().getFullYear()
         <div>
           <h3 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Liens utiles</h3>
           <ul class="space-y-2 text-sm">
-            <li><a href="#formules" class="text-gris hover:text-savane transition-colors">Nos formules</a></li>
-            <li><a href="#comment" class="text-gris hover:text-savane transition-colors">Comment ça marche</a></li>
+            <li><a :href="ancre('#formules')" class="text-gris hover:text-savane transition-colors">Nos formules</a></li>
+            <li><a :href="ancre('#comment')" class="text-gris hover:text-savane transition-colors">Comment ça marche</a></li>
             <li><RouterLink to="/blog" class="text-gris hover:text-savane transition-colors">Actualités et médias</RouterLink></li>
           </ul>
         </div>
@@ -78,7 +82,7 @@ const annee = new Date().getFullYear()
             © {{ annee }} Ahitché · Tous droits réservés ·
             <RouterLink to="/mentions-legales" class="underline underline-offset-4 hover:text-foret">Mentions légales</RouterLink>
           </p>
-          <a href="#accueil" class="inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-foret hover:text-savane transition-colors">
+          <a :href="route.path === '/' ? '#accueil' : '#'" class="inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-foret hover:text-savane transition-colors">
             Haut de page
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
           </a>

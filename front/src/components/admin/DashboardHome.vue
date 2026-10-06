@@ -299,12 +299,12 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
     <div class="bg-white p-4 rounded-2xl flex items-center justify-between border-b border-gray-200 shadow-2xs">
       <div>
         <h1 class="font-display font-bold text-xl text-noir">Tableau de bord</h1>
-        <p class="text-[11px] text-gray-400 font-medium">Aperçu opérationnel & logistique d'Ahitché</p>
+        <p class="text-[11px] text-gris font-medium">Aperçu opérationnel & logistique d'Ahitché</p>
       </div>
 
       <div class="flex items-center gap-3">
         <button @click="refreshAll" title="Actualiser" class="p-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all cursor-pointer">
-          <RefreshCw :class="['w-4 h-4 text-gray-600', isLoadingOrders || isLoadingStock ? 'animate-spin' : '']" />
+          <RefreshCw :class="['w-4 h-4 text-gris', isLoadingOrders || isLoadingStock ? 'animate-spin' : '']" />
         </button>
 
         <component
@@ -313,7 +313,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
           :type="tauxModifiable ? 'button' : undefined"
           @click="tauxModifiable && changerTaux()"
           :title="tauxModifiable ? 'Modifier le taux USD/FCFA' : undefined"
-          :class="['bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 font-mono text-[11px]', tauxModifiable ? 'cursor-pointer hover:border-foret' : '']"
+          :class="['bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-gris font-mono text-[11px]', tauxModifiable ? 'cursor-pointer hover:border-foret' : '']"
         >
           1 USD = <span class="font-bold text-noir">{{ tauxUsd }} FCFA</span>
           <span v-if="tauxUsd === tauxConvention" class="font-body text-savane"> · convention</span>
@@ -323,7 +323,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
 
     <!-- CHARGEMENT INITIAL -->
     <div v-if="isLoadingOrders && isLoadingStock" class="text-center py-12 bg-white rounded-2xl border border-gray-100">
-      <span class="animate-pulse text-gray-500 font-medium">Synchronisation des données en cours...</span>
+      <span class="animate-pulse text-gris font-medium">Synchronisation des données en cours...</span>
     </div>
 
     <template v-else>
@@ -331,34 +331,34 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">CLIENTS ACTIFS</span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gris">CLIENTS ACTIFS</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ activeClientsCount }}</span>
-            <span v-if="targetClients !== null" class="text-[11px] text-gray-500">↑ obj. {{ targetClients }} pilote</span>
+            <span v-if="targetClients !== null" class="text-[11px] text-gris">↑ obj. {{ targetClients }} pilote</span>
           </div>
         </div>
 
         <div v-if="voirMarges" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">CA ESTIMÉ / CYCLE</span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gris">CA ESTIMÉ / CYCLE</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ estimatedRevenue.toLocaleString('fr-FR') }}</span>
-            <span class="text-[11px] text-gray-500">FCFA · {{ activeClientsCount }} clients</span>
+            <span class="text-[11px] text-gris">FCFA · {{ activeClientsCount }} clients</span>
           </div>
         </div>
 
         <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">COMMANDES EN ATTENTE</span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gris">COMMANDES EN ATTENTE</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ pendingOrdersCount }}</span>
-            <span class="text-[11px] text-amber-600 font-semibold">→ À préparer</span>
+            <span class="text-[11px] text-amber-800 font-semibold">→ À préparer</span>
           </div>
         </div>
 
         <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">RENOUVELLEMENTS (J-5)</span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gris">RENOUVELLEMENTS (J-5)</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ upcomingRenewals.length }}</span>
-            <span class="text-[11px] text-red-500 font-semibold">Client(s) concerné(s)</span>
+            <span class="text-[11px] text-red-700 font-semibold">Client(s) concerné(s)</span>
           </div>
         </div>
 
@@ -385,7 +385,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
         <!-- Alerte Renouvellements imminents (J-5) -->
         <div v-if="upcomingRenewals.length > 0 && upcomingRenewals[0]" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 flex items-center justify-between gap-2.5">
           <div class="flex items-center gap-2.5">
-            <Bell class="w-4 h-4 text-amber-600 shrink-0" />
+            <Bell class="w-4 h-4 text-amber-800 shrink-0" />
             <p class="leading-tight">
               <strong>{{ upcomingRenewals.length }} renouvellement(s) sous 5 jours</strong> — 
               <span>Prochain : {{ upcomingRenewals[0]?.clientName }} ({{ upcomingRenewals[0]?.formule }}) 
@@ -410,16 +410,16 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
             <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-4">
                 <div class="flex items-center justify-between border-b border-gray-100 pb-2">
                 <h2 class="font-bold text-noir text-sm">Répartition clients</h2>
-                <span class="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-md text-[10px]">par formule</span>
+                <span class="px-2 py-0.5 bg-gray-100 text-gris rounded-md text-[10px]">par formule</span>
                 </div>
 
                 <div class="space-y-3">
                 <div v-for="form in formulaDistribution" :key="form.name" class="flex items-center gap-3">
-                    <span class="w-20 font-bold text-[10px] uppercase text-gray-600 tracking-wider">{{ form.name }}</span>
+                    <span class="w-20 font-bold text-[10px] uppercase text-gris tracking-wider">{{ form.name }}</span>
                     <div class="flex-1 bg-gray-100 h-3 rounded-full overflow-hidden">
                     <div :class="[form.color, 'h-full transition-all duration-500 rounded-full']" :style="{ width: form.width }"></div>
                     </div>
-                    <span class="w-16 text-right font-semibold text-gray-500">{{ form.count }} client(s)</span>
+                    <span class="w-16 text-right font-semibold text-gris">{{ form.count }} client(s)</span>
                 </div>
                 </div>
             </div>
@@ -429,7 +429,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
             <div class="flex items-center justify-between border-b border-gray-100 pb-2">
                 <div>
                 <h2 class="font-bold text-noir text-sm">Marge brute</h2>
-                <p class="text-[10px] text-gray-400">Calculée dynamiquement selon les compositions des packs</p>
+                <p class="text-[10px] text-gris">Calculée dynamiquement selon les compositions des packs</p>
                 </div>
                 <span class="px-2.5 py-0.5 bg-amber-100 text-amber-800 font-bold rounded-full text-[10px]">
                 Phase 1 lancement
@@ -437,14 +437,14 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
             </div>
 
             <!-- Indication pendant le chargement -->
-            <div v-if="isLoadingFormulas" class="text-center py-6 text-gray-400 animate-pulse">
+            <div v-if="isLoadingFormulas" class="text-center py-6 text-gris animate-pulse">
                 Calcul des coûts et marges par formule...
             </div>
 
             <div v-else class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <tr class="border-b border-gray-100 text-[10px] font-bold text-gris uppercase tracking-wider">
                     <th class="py-2 px-3">Formule</th>
                     <th class="py-2 px-3 text-right">Prix Vente</th>
                     <th class="py-2 px-3 text-right">Coût Réel (Dotation)</th>
@@ -457,18 +457,18 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                     
                     <!-- Prix Lancement / Vente -->
                     <td class="py-2.5 px-3 text-right font-semibold">
-                        <span v-if="item.launchPrice === null" class="text-gray-400 font-body text-[10px]">Prix à définir</span>
+                        <span v-if="item.launchPrice === null" class="text-gris font-body text-[10px]">Prix à définir</span>
                         <span v-else>{{ item.launchPrice.toLocaleString('fr-FR') }} F</span>
                     </td>
 
                     <!-- Coût Réel des produits du pack -->
-                    <td class="py-2.5 px-3 text-right text-gray-500">
+                    <td class="py-2.5 px-3 text-right text-gris">
                         {{ item.realCost.toLocaleString('fr-FR') }} F
                     </td>
 
                     <!-- Marge Brute Calculated -->
                     <td class="py-2.5 px-3 text-right">
-                        <span v-if="item.margin === null" class="text-gray-400 font-body text-[10px]">
+                        <span v-if="item.margin === null" class="text-gris font-body text-[10px]">
                         N/A
                         </span>
                         <span 
@@ -496,7 +496,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
           <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
             <div class="flex items-center justify-between border-b border-gray-100 pb-2">
               <h2 class="font-bold text-noir text-sm flex items-center gap-1.5">
-                <Clock class="w-4 h-4 text-amber-600" />
+                <Clock class="w-4 h-4 text-amber-800" />
                 Renouvellements J-5
               </h2>
               <span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-bold text-[10px]">
@@ -504,7 +504,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
               </span>
             </div>
 
-            <div v-if="upcomingRenewals.length === 0" class="text-center py-6 text-gray-400">
+            <div v-if="upcomingRenewals.length === 0" class="text-center py-6 text-gris">
               <p>Aucun renouvellement requis dans les 5 prochains jours.</p>
             </div>
 
@@ -517,12 +517,12 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                 <div class="overflow-hidden">
                   <span class="font-bold text-noir block truncate">{{ item.clientName }}</span>
                   <div class="flex items-center gap-1.5 mt-0.5">
-                    <span class="px-1.5 py-0.2 bg-white border border-gray-200 rounded text-[9px] font-bold text-gray-600 uppercase">
+                    <span class="px-1.5 py-0.2 bg-white border border-gray-200 rounded text-[9px] font-bold text-gris uppercase">
                       {{ item.formule }}
                     </span>
                     <span 
                       :class="[
-                        item.daysRemaining <= 0 ? 'text-red-600 font-bold' : 'text-amber-600 font-semibold',
+                        item.daysRemaining <= 0 ? 'text-red-600 font-bold' : 'text-amber-800 font-semibold',
                         'text-[10px]'
                       ]"
                     >
@@ -551,7 +551,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
 
             <table class="w-full text-left">
               <thead>
-                <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50">
+                <tr class="text-[10px] font-bold text-gris uppercase tracking-wider border-b border-gray-50">
                   <th class="pb-2">Client</th>
                   <th class="pb-2 text-center">Formule</th>
                   <th class="pb-2 text-right">Statut</th>
@@ -563,7 +563,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                     <span class="font-bold text-noir block leading-tight">{{ cmd.clientName }}</span>
                   </td>
                   <td class="py-2.5 text-center">
-                    <span class="px-2 py-0.5 bg-gray-100 rounded text-[10px] font-bold text-gray-600 uppercase">
+                    <span class="px-2 py-0.5 bg-gray-100 rounded text-[10px] font-bold text-gris uppercase">
                       {{ cmd.formule }}
                     </span>
                   </td>

@@ -24,10 +24,10 @@ useDeconnexionInactivite()
     <!-- La NavBar reste visible sur toutes les pages -->
     <NavBar v-if="!route.meta.hideNavigation" />
 
-    <!-- Le contenu change dynamiquement ici en fonction de l'URL -->
-    <div class="grow">
+    <!-- Le contenu change dynamiquement ici en fonction de l'URL (zone principale unique de la page) -->
+    <main id="contenu" class="grow">
       <RouterView />
-    </div>
+    </main>
 
     <!-- Le Footer reste visible sur toutes les pages -->
     <AppFooter v-if="!route.meta.hideNavigation" />

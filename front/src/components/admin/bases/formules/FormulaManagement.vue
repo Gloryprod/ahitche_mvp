@@ -91,55 +91,55 @@ const getPeriodText = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gray-600">
+  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gris">
     
     <div class="bg-white p-4 rounded-2xl flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <div>
         <h1 class="font-display font-bold text-xl text-noir">Formules & Packs</h1>
-        <p class="text-gray-400 text-[11px] mt-0.5">Vue d'ensemble et simulation des dots hebdomadaires et commandes libres</p>
+        <p class="text-gris text-[11px] mt-0.5">Vue d'ensemble et simulation des dots hebdomadaires et commandes libres</p>
       </div>
       
       <!-- Sélecteur d'onglets -->
       <div class="flex flex-wrap bg-[#f9f9fb] rounded-xl border border-gray-200 self-start xl:self-center">
         <button 
           @click="activePack = 'essentiel'"
-          :class="[activePack === 'essentiel' ? 'bg-white text-noir shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'essentiel' ? 'bg-white text-noir shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Essentiel
         </button>
         <button 
           @click="activePack = 'equilibre'"
-          :class="[activePack === 'equilibre' ? 'bg-foret text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'equilibre' ? 'bg-foret text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Équilibré
         </button>
         <button 
           @click="activePack = 'confort'"
-          :class="[activePack === 'confort' ? 'bg-savane text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'confort' ? 'bg-savane text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Confort
         </button>
         <button 
           @click="activePack = 'reserve'"
-          :class="[activePack === 'reserve' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'reserve' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Réserve
         </button>
         <button 
           @click="activePack = 'fraicheur'"
-          :class="[activePack === 'fraicheur' ? 'bg-rose-500 text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'fraicheur' ? 'bg-rose-500 text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Fraîcheur
         </button>
       </div>
     </div>
 
-    <div v-if="isLoading" class="text-sm font-medium text-gray-500 p-12 text-center bg-white rounded-2xl border">
+    <div v-if="isLoading" class="text-sm font-medium text-gris p-12 text-center bg-white rounded-2xl border">
       Génération de la formule {{ activePack }} en cours...
     </div>
     
     <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl border flex items-center gap-2">
-      <ShieldAlert class="w-4 h-4 text-red-500" />
+      <ShieldAlert class="w-4 h-4 text-red-700" />
       <span>Erreur lors du chargement de la formule : {{ error?.message }}</span>
     </div>
 
@@ -148,13 +148,13 @@ const getPeriodText = computed(() => {
       <!-- Table de composition -->
       <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden p-4">
         <h3 class="font-bold text-noir text-sm mb-3 flex items-center gap-2">
-          <Layers class="w-4 h-4 text-gray-400" /> Composition de la dotation commerciale
+          <Layers class="w-4 h-4 text-gris" /> Composition de la dotation commerciale
         </h3>
         
         <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse min-w-137.5">
             <thead>
-              <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
                 <th class="py-3 px-4">Produit</th>
                 <th class="py-3 px-4">Catégorie</th>
                 <th class="py-3 px-4">Règle (libellé)</th>
@@ -165,14 +165,14 @@ const getPeriodText = computed(() => {
             <tbody class="divide-y divide-gray-50 text-noir">
               <tr v-for="item in data?.items" :key="item.productId" class="hover:bg-gray-50/30 transition-colors">
                 <td class="py-3 px-4 font-bold">
-                  <span v-if="item.reference" class="font-mono text-gray-500 mr-1">{{ item.reference }}</span>{{ item.name }}
+                  <span v-if="item.reference" class="font-mono text-gris mr-1">{{ item.reference }}</span>{{ item.name }}
                   <span v-if="item.indisponible" class="text-[9px] font-semibold text-red-700 px-1.5 bg-red-50 rounded border border-red-100 ml-1">Indisponible</span>
-                  <span v-if="item.commentaire" class="block text-[10px] font-normal text-gray-500">{{ item.commentaire }}</span>
+                  <span v-if="item.commentaire" class="block text-[10px] font-normal text-gris">{{ item.commentaire }}</span>
                 </td>
                 <td class="py-3 px-4">
-                  <span class="px-2 py-0.5 bg-gray-100 rounded-md text-[10px] text-gray-500">{{ item.category }}</span>
+                  <span class="px-2 py-0.5 bg-gray-100 rounded-md text-[10px] text-gris">{{ item.category }}</span>
                 </td>
-                <td class="py-3 px-4 text-gray-500 italic">{{ item.regle || '—' }}</td>
+                <td class="py-3 px-4 text-gris italic">{{ item.regle || '—' }}</td>
                 <td class="py-3 px-4 text-right font-bold text-noir">
                   {{ item.quantity }} {{ item.unit }}
                 </td>
@@ -219,7 +219,7 @@ const getPeriodText = computed(() => {
                   placeholder="Ex: 22500"
                   class="w-full bg-white border border-gray-300 focus:border-noir text-noir font-mono font-bold text-sm rounded-xl px-3 py-2 pr-12 outline-none transition-all shadow-2xs"
                 />
-                <span class="absolute right-3 top-2.5 text-[10px] font-bold text-gray-400">FCFA</span>
+                <span class="absolute right-3 top-2.5 text-[10px] font-bold text-gris">FCFA</span>
               </div>
               
               <button 
@@ -258,7 +258,7 @@ const getPeriodText = computed(() => {
           <h4 class="font-bold text-noir text-xs flex items-center gap-1.5">
             <CheckCircle class="w-3.5 h-3.5 text-foret" /> Référentiel packs v4 (30/06/2026)
           </h4>
-          <p class="text-gray-500 text-[11px] leading-relaxed">
+          <p class="text-gris text-[11px] leading-relaxed">
             Les quantités de chaque produit dans ce pack sont celles du catalogue (écran Produits) ; un produit sans quantité est absent du pack.
           </p>
           <dl v-if="data?.formule" class="text-[11px] space-y-1">

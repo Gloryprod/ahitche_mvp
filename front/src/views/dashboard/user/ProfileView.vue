@@ -441,7 +441,7 @@ onMounted(async () => {
             <!-- Mode Formulaire épuré avec focus moderne -->
             <form v-else @submit.prevent="sauvegarderInfos" class="space-y-4 animate-fadeIn">
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Téléphone (WhatsApp)</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Téléphone (WhatsApp)</label>
                 <input 
                   v-model="formFormulaire.telephone" 
                   type="tel" 
@@ -452,7 +452,7 @@ onMounted(async () => {
               </div>
 
               <div>
-                <label for="livraison-quartier" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Quartier</label>
+                <label for="livraison-quartier" class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Quartier</label>
                 <select
                   id="livraison-quartier"
                   v-model="formFormulaire.choixQuartier"
@@ -468,7 +468,7 @@ onMounted(async () => {
               </div>
 
               <div v-if="formFormulaire.choixQuartier === AUTRE_QUARTIER">
-                <label for="livraison-quartier-libre" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Nom du quartier</label>
+                <label for="livraison-quartier-libre" class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Nom du quartier</label>
                 <input
                   id="livraison-quartier-libre"
                   v-model="formFormulaire.quartierLibre"
@@ -480,7 +480,7 @@ onMounted(async () => {
               </div>
 
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Précisions (Maison, repère...)</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Précisions (Maison, repère...)</label>
                 <textarea 
                   v-model="formFormulaire.adresse" 
                   rows="2"
@@ -491,7 +491,7 @@ onMounted(async () => {
               </div>
 
               <div>
-                <label for="livraison-lien" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Lien de localisation (facultatif)</label>
+                <label for="livraison-lien" class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Lien de localisation (facultatif)</label>
                 <input
                   id="livraison-lien"
                   v-model="formFormulaire.lienLocalisation"
@@ -620,7 +620,7 @@ onMounted(async () => {
           <div class="hidden md:block overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="text-gray-400 text-xs font-bold uppercase tracking-wider border-b border-gray-100 pb-3">
+                <tr class="text-gris text-xs font-bold uppercase tracking-wider border-b border-gray-100 pb-3">
                   <th class="pb-3 font-bold">N° Commande</th>
                   <th class="pb-3 font-bold">Pack Commandé</th>
                   <th class="pb-3 font-bold">Date</th>
@@ -673,7 +673,7 @@ onMounted(async () => {
             <div v-for="commande in commandes" :key="commande._id" class="bg-gray-50/60 rounded-xl p-4 border border-gray-100 flex flex-col gap-3 relative">
               <div class="flex justify-between items-start">
                 <div>
-                  <span class="text-xs text-gray-400 font-bold uppercase block">ID Unique</span>
+                  <span class="text-xs text-gris font-bold uppercase block">ID Unique</span>
                   <span class="font-bold text-foret">{{ commande.reference || `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}</span>
                 </div>
                 <span :class="['px-3 py-1 rounded-full text-xs font-bold tracking-wide whitespace-nowrap', classeStatut(commande.statut)]">
@@ -683,11 +683,11 @@ onMounted(async () => {
               
               <div class="grid grid-cols-2 gap-2 border-t border-b border-gray-100/80 py-2.5 my-0.5 text-sm">
                 <div>
-                  <span class="text-[11px] text-gray-400 font-bold uppercase block">Formule</span>
+                  <span class="text-[11px] text-gris font-bold uppercase block">Formule</span>
                   <span class="font-semibold text-gray-800">{{ commande.formule }}</span>
                 </div>
                 <div>
-                  <span class="text-[11px] text-gray-400 font-bold uppercase block">Prix payé</span>
+                  <span class="text-[11px] text-gris font-bold uppercase block">Prix payé</span>
                   <span class="font-bold text-noir">{{ commande.total }}</span>
                 </div>
               </div>

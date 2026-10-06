@@ -61,7 +61,7 @@ const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-5 transition-opacity duration-200">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-4">
   
-            <div class="flex items-center gap-2 text-xs font-semibold text-gray-500">
+            <div class="flex items-center gap-2 text-xs font-semibold text-gris">
                 <span>Nombre total de clients</span>
                 <span class="px-2.5 py-1 bg-foret/10 text-foret rounded-full font-bold text-[11px]">
                 {{ data?.total || 0 }}
@@ -69,7 +69,7 @@ const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
             </div>
 
             <div class="relative w-full sm:w-64">
-                <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 stroke-[2.5]" />
+                <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris stroke-[2.5]" />
                 
                 <input 
                 v-model="search"
@@ -83,7 +83,7 @@ const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
         
 
         <!-- États de chargement et d'erreur -->
-        <div v-if="isLoading" class="text-sm font-medium text-gray-500 py-4">
+        <div v-if="isLoading" class="text-sm font-medium text-gris py-4">
         Chargement initial des clients...
         </div>
     
@@ -119,13 +119,13 @@ const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
                 </div>
             </div>
             <div class="text-left sm:text-right border-t sm:border-t-0 border-gray-50 pt-3 sm:pt-0">
-                <span class="text-xs text-gray-400 font-medium block">Formule active</span>
+                <span class="text-xs text-gris font-medium block">Formule active</span>
                 <span class="text-sm font-bold text-foret">{{ client.formuleHabituelle || 'Aucune' }}</span>
             </div>
             </div>
 
             <!-- Barre de Pagination de style Ahitché -->
-            <div class="flex items-center justify-between pt-4 border-t border-gray-100 text-xs font-semibold text-gray-600">
+            <div class="flex items-center justify-between pt-4 border-t border-gray-100 text-xs font-semibold text-gris">
             <button 
                 :disabled="page === 1 || isPlaceholderData" 
                 @click="page--"
