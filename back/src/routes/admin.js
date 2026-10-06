@@ -14,6 +14,7 @@ const zoneC = require('../controllers/ZoneController');
 const logistiqueC = require('../controllers/admin/LogistiqueController');
 const financeC = require('../controllers/admin/FinanceController');
 const simulateurC = require('../controllers/admin/SimulateurController');
+const parametresC = require('../controllers/admin/ParametresController');
 const nutritionC = require('../controllers/NutritionController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
@@ -35,6 +36,7 @@ router.use(['/zones', '/logistique'], acces(ACCES.logistique));
 router.use('/finances', acces(ACCES.finances));
 router.use('/simulateurs', acces(ACCES.simulateurs));
 router.use('/nutrition', acces(ACCES.nutrition));
+router.use('/parametres', acces(ACCES.parametres));
 
 // Users
 router.get('/users', userC.index);
@@ -162,6 +164,9 @@ router.delete('/finances/depenses/:id/justificatifs/:jid', financeC.supprimerJus
 // Simulateurs (lecture seule : aucun enregistrement, aucun prix modifié)
 router.get('/simulateurs/pack/:type', simulateurC.simulerPack);
 router.post('/simulateurs/achats', simulateurC.simulerAchats);
+router.route('/parametres')
+  .get(parametresC.obtenirParametres)
+  .put(parametresC.modifierParametres);
 
 // Nutrition : clients suivis (avec leur accord), journal de suivi, menus types
 router.get('/nutrition/clients', nutritionC.listerClientsSuivis);

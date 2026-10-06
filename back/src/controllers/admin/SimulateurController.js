@@ -1,5 +1,6 @@
 const { LotStockFifo } = require('../../models/stock');
 const { TYPES_PACK, calculerCompositionPack } = require('../../services/compositionService');
+const Parametres = require('../../models/parametres');
 
 // Simulateurs en lecture seule (conception, questions 9 à 14) : rien n'est enregistré, aucun prix n'est modifié.
 // Logique de composition : celle du calcul de pack existant (services/compositionService.js).
@@ -46,13 +47,13 @@ async function simulerPack(req, res) {
     const composition = await calculerCompositionPack(type);
     if (!composition) return res.status(404).json({ message: "Formule introuvable ou inactive." });
 
-    const prixReels = await prixAchatReels();
-    const prixVente = composition.formule.prixCommercial ?? composition.formule.prixActuel;
+    const [prixReels, parametres] = await Promise.all([prixAchatReels(), Parametres.obtenir()]);
+    const prixVente = composition.formule.prixCommercial ?? composition.formule.prixActuel ?? null; // Vide : prix à définir
     const frais = {
       livraison: nombrePositif(req.query.livraison),
       emballage: nombrePositif(req.query.emballage),
       // Commission Mobile Money en % du prix de vente
-      commission: arrondir(prixVente * Math.min(nombrePositif(req.query.commission), 100) / 100)
+      commission: arrondir((prixVente ?? 0) * Math.min(nombrePositif(req.query.commission), 100) / 100)
     };
     const totalFrais = frais.livraison + frais.emballage + frais.commission;
 
@@ -72,8 +73,18 @@ async function simulerPack(req, res) {
 
     const coutCatalogue = lignes.reduce((s, l) => s + (l.coutCatalogue ?? 0), 0);
     const coutReel = lignes.reduce((s, l) => s + (l.coutReel ?? 0), 0);
-    const margeCatalogue = prixVente - coutCatalogue - totalFrais;
-    const margeReelle = prixVente - coutReel - totalFrais;
+    const margeCatalogue = prixVente === null ? null : prixVente - coutCatalogue - totalFrais;
+    const margeReelle = prixVente === null ? null : prixVente - coutReel - totalFrais;
+    const taux = (m) => (prixVente && m !== null ? Math.round((m / prixVente) * 1000) / 10 : null);
+
+    // Méthode du référentiel v4 (Q 10.3) : coût réel = matières × coefficient ; prix conseillé = coût réel ÷ (1 − marge cible)
+    const coefficient = parametres.coefficient();
+    const marge = parametres.margeCiblePct;
+    const referentiel = (matieres) => {
+      if (coefficient === null) return null;
+      const cout = arrondir(matieres * coefficient);
+      return { coutReel: cout, prixConseille: marge === null ? null : arrondir(cout / (1 - marge / 100)) };
+    };
 
     return res.status(200).json({
       formule: { nom: composition.formule.nom, slug: composition.formule.slug, prixVente },
@@ -84,8 +95,13 @@ async function simulerPack(req, res) {
       totaux: {
         coutCatalogue, coutReel, frais: totalFrais,
         margeCatalogue, margeReelle,
-        tauxMargeCatalogue: prixVente ? Math.round((margeCatalogue / prixVente) * 1000) / 10 : 0,
-        tauxMargeReelle: prixVente ? Math.round((margeReelle / prixVente) * 1000) / 10 : 0
+        tauxMargeCatalogue: taux(margeCatalogue),
+        tauxMargeReelle: taux(margeReelle)
+      },
+      methode: {
+        coefficient, margeCiblePct: marge, parts: parametres.parts,
+        catalogue: referentiel(coutCatalogue), // Matières au prix du catalogue
+        achatsReels: referentiel(coutReel) // Matières au prix d'achat réel
       }
     });
   } catch (error) {
@@ -119,14 +135,15 @@ async function simulerAchats(req, res) {
     const lignes = [...besoins.entries()].map(([id, l]) => {
       const disponible = stock.get(id) || 0;
       const aAcheter = Math.max(0, l.besoin - disponible);
-      const prix = prixReels.get(id) ?? l.prixCatalogue;
-      return { ...l, besoin: Math.round(l.besoin * 100) / 100, disponible, aAcheter: Math.round(aAcheter * 100) / 100, prixEstime: arrondir(prix), coutEstime: arrondir(aAcheter * prix) };
-    }).sort((a, b) => b.coutEstime - a.coutEstime || a.produit.localeCompare(b.produit, 'fr'));
+      const prix = prixReels.get(id) ?? l.prixCatalogue; // null : prix à renseigner
+      return { ...l, besoin: Math.round(l.besoin * 100) / 100, disponible, aAcheter: Math.round(aAcheter * 100) / 100, prixEstime: prix === null ? null : arrondir(prix), coutEstime: prix === null ? null : arrondir(aAcheter * prix) };
+    }).sort((a, b) => (b.coutEstime ?? 0) - (a.coutEstime ?? 0) || a.produit.localeCompare(b.produit, 'fr'));
 
     return res.status(200).json({
       packs,
       lignes,
-      coutTotal: lignes.reduce((s, l) => s + l.coutEstime, 0),
+      coutTotal: lignes.reduce((s, l) => s + (l.coutEstime ?? 0), 0),
+      prixManquants: lignes.filter(l => l.aAcheter > 0 && l.coutEstime === null).length,
       produitsARacheter: lignes.filter(l => l.aAcheter > 0).length
     });
   } catch (error) {

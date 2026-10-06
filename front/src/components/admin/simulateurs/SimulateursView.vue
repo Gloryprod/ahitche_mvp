@@ -1,24 +1,45 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
-import { useQuery, useQueries } from '@tanstack/vue-query'
+import { ref, reactive, computed, watch } from 'vue'
+import { useQuery, useQueries, useQueryClient } from '@tanstack/vue-query'
 import { Sliders, FileText, Info } from 'lucide-vue-next'
 import api from '@/stores/api'
+import { useAuthStore } from '@/stores/auth'
+import { peutLire, peutEcrire } from '@/config/roles'
 import { genererSimulationPDF, fcfaPDF } from '@/services/pdfSimulateurs'
 
 // Simulateurs en lecture seule : coût et marge d'un pack, prévision d'achats, seuil de rentabilité.
 // Aucun prix n'est appliqué ici : le prix de vente se fixe dans « Formules ».
+// Les réglages (charges, objectifs, coefficient, marge cible) sont enregistrés côté serveur (onglet Paramètres).
 
+interface Referentiel { coutReel: number; prixConseille: number | null }
 interface SimulationPack {
-  formule: { nom: string; slug: string; prixVente: number }
-  lignes: { produit: string; unite: string; quantite: number; prixCatalogue: number; coutCatalogue: number; prixAchatReel: number | null; coutReel: number }[]
+  formule: { nom: string; slug: string; prixVente: number | null }
+  lignes: { produit: string; unite: string; quantite: number; prixCatalogue: number | null; coutCatalogue: number | null; prixAchatReel: number | null; coutReel: number | null }[]
   produitsSansAchat: number
+  prixManquants: number
   frais: { livraison: number; emballage: number; commission: number }
-  totaux: { coutCatalogue: number; coutReel: number; frais: number; margeCatalogue: number; margeReelle: number; tauxMargeCatalogue: number; tauxMargeReelle: number }
+  totaux: { coutCatalogue: number; coutReel: number; frais: number; margeCatalogue: number | null; margeReelle: number | null; tauxMargeCatalogue: number | null; tauxMargeReelle: number | null }
+  methode: { coefficient: number | null; margeCiblePct: number | null; catalogue: Referentiel | null; achatsReels: Referentiel | null }
 }
 interface SimulationAchats {
-  lignes: { produit: string; unite: string; besoin: number; disponible: number; aAcheter: number; prixEstime: number; coutEstime: number }[]
+  lignes: { produit: string; unite: string; besoin: number; disponible: number; aAcheter: number; prixEstime: number | null; coutEstime: number | null }[]
   coutTotal: number
   produitsARacheter: number
+  prixManquants: number
+}
+interface Parametres {
+  chargesFixesMensuellesFcfa: number | null
+  objectifCaMensuelFcfa: number | null
+  repartition: { essentiel: number | null; equilibre: number | null; confort: number | null }
+  emballageParCommandeFcfa: number | null
+  commissionMobileMoneyPct: number | null
+  livraisonMoyenneFcfa: number | null
+  objectifClients: number | null
+  debutObjectif: string | null
+  finObjectif: string | null
+  parts: { emballage: number | null; transformation: number | null; logistique: number | null; pertes: number | null }
+  margeCiblePct: number | null
+  coefficient: number | null
 }
 
 const PACKS = [
@@ -28,34 +49,74 @@ const PACKS = [
   { type: 'reserve', nom: 'AHI Réserve' },
   { type: 'fraicheur', nom: 'AHI Fraîcheur' },
 ] as const
-const PACKS_OUVERTS = PACKS.slice(0, 3) // Réserve et Fraîcheur ouvrent après le lancement
+// Réserve et Fraîcheur ouvrent après le lancement
+const PACKS_OUVERTS = PACKS.slice(0, 3) as { type: 'essentiel' | 'equilibre' | 'confort'; nom: string }[]
 
-const onglet = ref<'pack' | 'achats' | 'seuil'>('pack')
-const formatFCFA = (n: number) => `${Math.round(n).toLocaleString('fr-FR')} FCFA`
+interface Seuil {
+  incomplet: string // Raison pour laquelle le calcul n'est pas possible ; vide sinon
+  prixMoyen: number
+  margeMoyenne: number
+  commandesSeuil: number | null // null : charges à renseigner ; -1 : marge moyenne négative
+  caSeuil: number | null
+  commandesObjectif: number | null
+  resultatObjectif: number | null
+  detail: { nom: string; part: number; prix: number; marge: number }[]
+}
+const seuilIncomplet = (incomplet: string): Seuil => ({ incomplet, prixMoyen: 0, margeMoyenne: 0, commandesSeuil: null, caSeuil: null, commandesObjectif: null, resultatObjectif: null, detail: [] })
+
+const authStore = useAuthStore()
+const queryClient = useQueryClient()
+const lireParametres = computed(() => peutLire(authStore.role.value, 'parametres'))
+const ecrireParametres = computed(() => peutEcrire(authStore.role.value, 'parametres'))
+
+const onglet = ref<'pack' | 'achats' | 'seuil' | 'parametres'>('pack')
+const formatFCFA = (n: number | null) => n === null ? 'à renseigner' : `${Math.round(n).toLocaleString('fr-FR')} FCFA`
 const formatNombre = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
-const formatPourcent = (n: number) => `${n.toLocaleString('fr-FR')} %`
+const formatPourcent = (n: number | null) => n === null ? '—' : `${n.toLocaleString('fr-FR')} %`
 
-// Frais paramétrables, à 0 par défaut (question 14) : partagés par les trois simulateurs
-const frais = reactive({ livraison: 0, emballage: 0, commission: 0 })
+// --- Paramètres enregistrés (vides tant qu'ils ne sont pas renseignés) ---
+const { data: parametres } = useQuery({
+  queryKey: ['parametres'],
+  queryFn: async (): Promise<Parametres> => (await api.get('/api/admin/parametres')).data,
+  enabled: lireParametres,
+})
+
+// Frais par commande : repris des paramètres ; vide = 0 dans le calcul, signalé « à renseigner »
+const frais = reactive({ livraison: null as number | null, emballage: null as number | null, commission: null as number | null })
+const repartition = reactive<Record<string, number | null>>({ essentiel: null, equilibre: null, confort: null }) // en % des commandes
+const chargesFixes = ref<number | null>(null) // FCFA par mois
+const objectifCa = ref<number | null>(null) // FCFA par mois
+watch(parametres, (p) => {
+  if (!p) return
+  frais.livraison = p.livraisonMoyenneFcfa
+  frais.emballage = p.emballageParCommandeFcfa
+  frais.commission = p.commissionMobileMoneyPct
+  Object.assign(repartition, p.repartition)
+  chargesFixes.value = p.chargesFixesMensuellesFcfa
+  objectifCa.value = p.objectifCaMensuelFcfa
+}, { immediate: true })
+const paramsFrais = computed(() => ({ livraison: frais.livraison ?? 0, emballage: frais.emballage ?? 0, commission: frais.commission ?? 0 }))
 
 // --- (a) Coût et marge d'un pack ---
 const packChoisi = ref<typeof PACKS[number]['type']>('essentiel')
 const { data: simulation, isLoading: chargementPack, error: erreurPack } = useQuery({
-  queryKey: ['simulateur', 'pack', packChoisi, () => ({ ...frais })],
-  queryFn: async (): Promise<SimulationPack> => (await api.get(`/api/admin/simulateurs/pack/${packChoisi.value}`, { params: { ...frais } })).data,
+  queryKey: ['simulateur', 'pack', packChoisi, paramsFrais],
+  queryFn: async (): Promise<SimulationPack> => (await api.get(`/api/admin/simulateurs/pack/${packChoisi.value}`, { params: paramsFrais.value })).data,
 })
 
 function exporterPack() {
   const s = simulation.value
   if (!s) return
+  const m = s.methode
   genererSimulationPDF(`Coût et marge ${s.formule.nom}`, [
     `Prix de vente : ${fcfaPDF(s.formule.prixVente)}`,
     `Frais : livraison ${fcfaPDF(s.frais.livraison)}, emballage ${fcfaPDF(s.frais.emballage)}, commission Mobile Money ${fcfaPDF(s.frais.commission)}`,
+    `Méthode du référentiel : coefficient ${m.coefficient ?? 'à renseigner'}, marge cible ${m.margeCiblePct ?? 'à renseigner'} % ; prix conseillé ${fcfaPDF(m.catalogue?.prixConseille ?? null)} (catalogue), ${fcfaPDF(m.achatsReels?.prixConseille ?? null)} (achats réels)`,
   ], [{
     titre: 'Composition',
     entetes: ['Produit', 'Quantité', 'Coût catalogue', 'Coût réel'],
     lignes: s.lignes.map(l => [l.produit, `${formatNombre(l.quantite)} ${l.unite}`, fcfaPDF(l.coutCatalogue), fcfaPDF(l.coutReel) + (l.prixAchatReel === null ? ' *' : '')]),
-    pied: ['Marge', '', `${fcfaPDF(s.totaux.margeCatalogue)} (${s.totaux.tauxMargeCatalogue} %)`, `${fcfaPDF(s.totaux.margeReelle)} (${s.totaux.tauxMargeReelle} %)`],
+    pied: ['Marge', '', `${fcfaPDF(s.totaux.margeCatalogue)} (${formatPourcent(s.totaux.tauxMargeCatalogue)})`, `${fcfaPDF(s.totaux.margeReelle)} (${formatPourcent(s.totaux.tauxMargeReelle)})`],
   }])
 }
 
@@ -96,41 +157,40 @@ function exporterAchats() {
 // Marge réelle unitaire de chaque formule ouverte, avec les mêmes frais
 const simulationsOuvertes = useQueries({
   queries: computed(() => PACKS_OUVERTS.map(p => ({
-    queryKey: ['simulateur', 'pack', p.type, { ...frais }],
-    queryFn: async (): Promise<SimulationPack> => (await api.get(`/api/admin/simulateurs/pack/${p.type}`, { params: { ...frais } })).data,
+    queryKey: ['simulateur', 'pack', p.type, paramsFrais.value],
+    queryFn: async (): Promise<SimulationPack> => (await api.get(`/api/admin/simulateurs/pack/${p.type}`, { params: paramsFrais.value })).data,
     enabled: onglet.value === 'seuil',
   }))),
 })
-const repartition = reactive<Record<string, number>>({ essentiel: 30, equilibre: 50, confort: 20 }) // en % des commandes
-const chargesFixes = ref(300000) // FCFA par mois
-const objectifCa = ref(2000000) // FCFA par mois
 
-const seuil = computed(() => {
+const seuil = computed((): Seuil | null => {
   const sims = simulationsOuvertes.value.map(q => q.data)
   if (sims.some(s => !s)) return null
-  const totalPart = PACKS_OUVERTS.reduce((s, p) => s + (repartition[p.type] || 0), 0)
-  if (!totalPart) return null
-  const poids = PACKS_OUVERTS.map(p => (repartition[p.type] || 0) / totalPart)
-  const prixMoyen = sims.reduce((s, sim, i) => s + sim!.formule.prixVente * poids[i]!, 0)
-  const margeMoyenne = sims.reduce((s, sim, i) => s + sim!.totaux.margeReelle * poids[i]!, 0)
-  const commandesSeuil = margeMoyenne > 0 ? Math.ceil(chargesFixes.value / margeMoyenne) : null
-  const commandesObjectif = prixMoyen > 0 ? Math.ceil(objectifCa.value / prixMoyen) : 0
+  if (sims.some(s => s!.formule.prixVente === null || s!.totaux.margeReelle === null)) return seuilIncomplet('Une formule ouverte n\'a pas de prix.')
+  const totalPart = PACKS_OUVERTS.reduce((s, p) => s + (repartition[p.type] ?? 0), 0)
+  if (!totalPart) return seuilIncomplet('Renseignez la répartition des commandes.')
+  const poids = PACKS_OUVERTS.map(p => (repartition[p.type] ?? 0) / totalPart)
+  const prixMoyen = sims.reduce((s, sim, i) => s + sim!.formule.prixVente! * poids[i]!, 0)
+  const margeMoyenne = sims.reduce((s, sim, i) => s + sim!.totaux.margeReelle! * poids[i]!, 0)
+  const commandesSeuil = chargesFixes.value === null ? null : margeMoyenne > 0 ? Math.ceil(chargesFixes.value / margeMoyenne) : -1
+  const commandesObjectif = objectifCa.value === null || prixMoyen <= 0 ? null : Math.ceil(objectifCa.value / prixMoyen)
   return {
+    incomplet: '',
     prixMoyen, margeMoyenne, commandesSeuil,
-    caSeuil: commandesSeuil !== null ? commandesSeuil * prixMoyen : null,
+    caSeuil: commandesSeuil !== null && commandesSeuil >= 0 ? commandesSeuil * prixMoyen : null,
     commandesObjectif,
-    resultatObjectif: commandesObjectif * margeMoyenne - chargesFixes.value,
-    detail: PACKS_OUVERTS.map((p, i) => ({ nom: p.nom, part: Math.round(poids[i]! * 100), prix: sims[i]!.formule.prixVente, marge: sims[i]!.totaux.margeReelle }))
+    resultatObjectif: commandesObjectif === null || chargesFixes.value === null ? null : commandesObjectif * margeMoyenne - chargesFixes.value,
+    detail: PACKS_OUVERTS.map((p, i) => ({ nom: p.nom, part: Math.round(poids[i]! * 100), prix: sims[i]!.formule.prixVente!, marge: sims[i]!.totaux.margeReelle! }))
   }
 })
 
 function exporterSeuil() {
   const s = seuil.value
-  if (!s) return
+  if (!s || s.incomplet) return
   genererSimulationPDF('Seuil de rentabilité', [
     `Charges fixes mensuelles : ${fcfaPDF(chargesFixes.value)}`,
     `Objectif de chiffre d'affaires mensuel : ${fcfaPDF(objectifCa.value)}`,
-    `Frais par commande : livraison ${fcfaPDF(frais.livraison)}, emballage ${fcfaPDF(frais.emballage)}, commission ${frais.commission} %`,
+    `Frais par commande : livraison ${fcfaPDF(paramsFrais.value.livraison)}, emballage ${fcfaPDF(paramsFrais.value.emballage)}, commission ${frais.commission ?? 'à renseigner'} %`,
   ], [{
     titre: 'Répartition et marge par formule (coût réel)',
     entetes: ['Formule', 'Part des commandes', 'Prix de vente', 'Marge unitaire'],
@@ -139,32 +199,63 @@ function exporterSeuil() {
     titre: 'Résultat',
     entetes: ['Indicateur', 'Valeur'],
     lignes: [
-      ['Commandes par mois pour couvrir les charges', s.commandesSeuil ?? 'Marge moyenne négative'],
-      ['Chiffre d\'affaires au seuil', s.caSeuil !== null ? fcfaPDF(s.caSeuil) : '-'],
-      ['Commandes pour atteindre l\'objectif', s.commandesObjectif],
+      ['Commandes par mois pour couvrir les charges', s.commandesSeuil === null ? 'Charges à renseigner' : s.commandesSeuil < 0 ? 'Marge moyenne négative' : s.commandesSeuil],
+      ['Chiffre d\'affaires au seuil', fcfaPDF(s.caSeuil)],
+      ['Commandes pour atteindre l\'objectif', s.commandesObjectif ?? 'Objectif à renseigner'],
       ['Résultat mensuel à l\'objectif', fcfaPDF(s.resultatObjectif)],
     ],
   }])
 }
+
+// --- (d) Paramètres : enregistrés côté serveur, journalisés ---
+const formParams = ref<Parametres | null>(null)
+watch(parametres, (p) => { if (p) formParams.value = JSON.parse(JSON.stringify({ ...p, debutObjectif: p.debutObjectif?.slice(0, 10) ?? '', finObjectif: p.finObjectif?.slice(0, 10) ?? '' })) }, { immediate: true })
+const messageParams = ref({ texte: '', type: '' })
+const coefficientSaisi = computed(() => {
+  const p = formParams.value?.parts
+  if (!p) return null
+  const v = [p.emballage, p.transformation, p.logistique, p.pertes]
+  if (v.some(x => x === null || (x as unknown) === '')) return null
+  return Math.round((1 + v.reduce((s: number, x) => s + Number(x), 0) / 100) * 10000) / 10000
+})
+async function enregistrerParametres() {
+  if (!formParams.value) return
+  try {
+    const { message } = (await api.put('/api/admin/parametres', formParams.value)).data
+    messageParams.value = { texte: message, type: 'success' }
+    queryClient.invalidateQueries({ queryKey: ['parametres'] })
+    queryClient.invalidateQueries({ queryKey: ['simulateur'] })
+  } catch (err: any) {
+    messageParams.value = { texte: err.response?.data?.message || 'Enregistrement impossible', type: 'error' }
+  }
+}
+
+const ONGLETS = computed(() => [
+  { id: 'pack', label: 'Coût et marge d\'un pack' },
+  { id: 'achats', label: 'Prévision d\'achats' },
+  { id: 'seuil', label: 'Seuil de rentabilité' },
+  ...(lireParametres.value ? [{ id: 'parametres', label: 'Paramètres' }] : []),
+])
+const champ = 'mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal'
+const etiquette = 'text-[10px] font-bold uppercase text-gris'
 </script>
 
 <template>
   <div class="space-y-4 animate-fadeIn text-sm text-noir">
     <div class="bg-white p-4 rounded-2xl space-y-2">
       <h1 class="font-display font-bold text-xl flex items-center gap-2"><Sliders class="w-5 h-5 text-foret" /> Simulateurs</h1>
-      <p class="text-xs text-gris flex items-start gap-1.5"><Info class="w-3.5 h-3.5 shrink-0 mt-0.5" /> Outils de calcul uniquement : rien n'est enregistré et aucun prix n'est modifié. Le prix de vente se fixe dans « Formules ».</p>
+      <p class="text-xs text-gris flex items-start gap-1.5"><Info class="w-3.5 h-3.5 shrink-0 mt-0.5" /> Outils de calcul uniquement : aucun prix n'est modifié. Le prix de vente se fixe dans « Formules » ; les réglages, dans l'onglet « Paramètres ».</p>
     </div>
 
     <!-- Frais communs -->
-    <div class="bg-white rounded-2xl border border-creme2 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <label class="text-[10px] font-bold uppercase text-gris">Livraison (FCFA / commande)<input v-model.number="frais.livraison" type="number" min="0" step="100" class="mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal" /></label>
-      <label class="text-[10px] font-bold uppercase text-gris">Emballage (FCFA / commande)<input v-model.number="frais.emballage" type="number" min="0" step="50" class="mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal" /></label>
-      <label class="text-[10px] font-bold uppercase text-gris">Commission Mobile Money (%)<input v-model.number="frais.commission" type="number" min="0" max="100" step="0.1" class="mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal" /></label>
+    <div v-if="onglet !== 'parametres'" class="bg-white rounded-2xl border border-creme2 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <label :class="etiquette">Livraison (FCFA / commande)<input v-model.number="frais.livraison" type="number" min="0" step="100" placeholder="à renseigner" :class="champ" /></label>
+      <label :class="etiquette">Emballage en plus du coefficient (FCFA)<input v-model.number="frais.emballage" type="number" min="0" step="50" placeholder="à renseigner" :class="champ" /></label>
+      <label :class="etiquette">Commission Mobile Money (%)<input v-model.number="frais.commission" type="number" min="0" max="100" step="0.1" placeholder="à renseigner" :class="champ" /></label>
     </div>
 
     <div class="flex gap-2 overflow-x-auto pb-1" role="tablist">
-      <button v-for="o in [{ id: 'pack', label: 'Coût et marge d\'un pack' }, { id: 'achats', label: 'Prévision d\'achats' }, { id: 'seuil', label: 'Seuil de rentabilité' }]"
-        :key="o.id" role="tab" :aria-selected="onglet === o.id" @click="onglet = o.id as any"
+      <button v-for="o in ONGLETS" :key="o.id" role="tab" :aria-selected="onglet === o.id" @click="onglet = o.id as any"
         :class="['cursor-pointer px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border', onglet === o.id ? 'bg-foret text-white border-foret' : 'bg-white text-gris border-creme2']">
         {{ o.label }}
       </button>
@@ -173,7 +264,7 @@ function exporterSeuil() {
     <!-- (a) PACK -->
     <section v-if="onglet === 'pack'" class="bg-white rounded-2xl border border-creme2 p-4 space-y-4">
       <div class="flex flex-wrap items-end gap-3">
-        <label class="text-[10px] font-bold uppercase text-gris">Formule
+        <label :class="etiquette">Formule
           <select v-model="packChoisi" class="mt-1 block px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal normal-case">
             <option v-for="p in PACKS" :key="p.type" :value="p.type">{{ p.nom }}</option>
           </select>
@@ -187,10 +278,33 @@ function exporterSeuil() {
           <div class="rounded-xl bg-creme p-3"><p class="text-[10px] uppercase font-bold text-gris">Prix de vente</p><p class="font-bold">{{ formatFCFA(simulation.formule.prixVente) }}</p></div>
           <div class="rounded-xl bg-creme p-3"><p class="text-[10px] uppercase font-bold text-gris">Frais</p><p class="font-bold">{{ formatFCFA(simulation.totaux.frais) }}</p></div>
           <div class="rounded-xl bg-creme p-3"><p class="text-[10px] uppercase font-bold text-gris">Marge (catalogue)</p><p class="font-bold">{{ formatFCFA(simulation.totaux.margeCatalogue) }}</p><p class="text-xs text-gris">{{ formatPourcent(simulation.totaux.tauxMargeCatalogue) }}</p></div>
-          <div :class="['rounded-xl p-3', simulation.totaux.margeReelle >= 0 ? 'bg-foret text-white' : 'bg-red-50 text-red-800']"><p class="text-[10px] uppercase font-bold opacity-80">Marge (coût réel)</p><p class="font-bold">{{ formatFCFA(simulation.totaux.margeReelle) }}</p><p class="text-xs opacity-80">{{ formatPourcent(simulation.totaux.tauxMargeReelle) }}</p></div>
+          <div :class="['rounded-xl p-3', (simulation.totaux.margeReelle ?? 0) >= 0 ? 'bg-foret text-white' : 'bg-red-50 text-red-800']"><p class="text-[10px] uppercase font-bold opacity-80">Marge (coût réel)</p><p class="font-bold">{{ formatFCFA(simulation.totaux.margeReelle) }}</p><p class="text-xs opacity-80">{{ formatPourcent(simulation.totaux.tauxMargeReelle) }}</p></div>
         </div>
+
+        <!-- Méthode du référentiel : matières × coefficient, puis ÷ (1 − marge cible) -->
+        <div class="rounded-xl border border-creme2 p-3 space-y-2 text-xs">
+          <p class="font-bold">Méthode du référentiel
+            <span class="font-normal text-gris">· coefficient {{ simulation.methode.coefficient?.toLocaleString('fr-FR') ?? 'à renseigner' }} · marge cible {{ formatPourcent(simulation.methode.margeCiblePct) }}</span>
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div v-for="(r, cle) in { catalogue: simulation.methode.catalogue, achatsReels: simulation.methode.achatsReels }" :key="cle" class="rounded-lg bg-creme p-2.5">
+              <p class="text-[10px] uppercase font-bold text-gris">{{ cle === 'catalogue' ? 'Matières au prix du catalogue' : 'Matières au prix d\'achat réel' }}</p>
+              <template v-if="r">
+                <p>Coût réel : <strong>{{ formatFCFA(r.coutReel) }}</strong></p>
+                <p>Prix conseillé : <strong>{{ formatFCFA(r.prixConseille) }}</strong>
+                  <span v-if="r.prixConseille !== null && simulation.formule.prixVente !== null" :class="simulation.formule.prixVente >= r.prixConseille ? 'text-green-800' : 'text-red-700'">
+                    ({{ simulation.formule.prixVente >= r.prixConseille ? '+' : '' }}{{ formatFCFA(simulation.formule.prixVente - r.prixConseille) }} au prix de vente)
+                  </span>
+                </p>
+              </template>
+              <p v-else class="text-gris">Parts du coefficient à renseigner (Paramètres).</p>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="simulation.prixManquants" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5">{{ simulation.prixManquants }} produit(s) sans prix au catalogue : coût incomplet.</p>
         <p v-if="simulation.produitsSansAchat" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5">* {{ simulation.produitsSansAchat }} produit(s) sans achat enregistré : leur coût réel reprend le prix catalogue.</p>
-        <p v-if="!simulation.lignes.length" class="text-xs text-gris text-center py-4 border border-dashed border-creme2 rounded-xl">Aucun produit dans la composition : complétez le catalogue (Produits, Règles de composition).</p>
+        <p v-if="!simulation.lignes.length" class="text-xs text-gris text-center py-4 border border-dashed border-creme2 rounded-xl">Aucun produit dans la composition : complétez le catalogue (Produits).</p>
         <div v-else class="overflow-x-auto">
           <table class="w-full text-left text-xs border-collapse min-w-130">
             <thead><tr class="text-[10px] uppercase tracking-wider text-gris border-b border-creme2">
@@ -200,7 +314,7 @@ function exporterSeuil() {
               <tr v-for="l in simulation.lignes" :key="l.produit">
                 <td class="py-2 pr-2 font-semibold">{{ l.produit }}</td>
                 <td class="py-2 pr-2 text-right whitespace-nowrap">{{ formatNombre(l.quantite) }} {{ l.unite }}</td>
-                <td class="py-2 pr-2 text-right whitespace-nowrap">{{ formatFCFA(l.coutCatalogue) }}<span class="block text-gris">{{ formatFCFA(l.prixCatalogue) }} / {{ l.unite }}</span></td>
+                <td class="py-2 pr-2 text-right whitespace-nowrap">{{ formatFCFA(l.coutCatalogue) }}<span v-if="l.prixCatalogue !== null" class="block text-gris">{{ formatFCFA(l.prixCatalogue) }} / {{ l.unite }}</span></td>
                 <td class="py-2 text-right whitespace-nowrap">{{ formatFCFA(l.coutReel) }}<span v-if="l.prixAchatReel !== null" class="block text-gris">{{ formatFCFA(l.prixAchatReel) }} / {{ l.unite }}</span><span v-else class="block text-amber-700">*</span></td>
               </tr>
             </tbody>
@@ -217,8 +331,8 @@ function exporterSeuil() {
     <!-- (b) ACHATS -->
     <section v-if="onglet === 'achats'" class="bg-white rounded-2xl border border-creme2 p-4 space-y-4">
       <form @submit.prevent="simulerAchats" class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <label v-for="p in PACKS" :key="p.type" class="text-[10px] font-bold uppercase text-gris">{{ p.nom }}
-          <input v-model.number="commandesPrevues[p.type]" type="number" min="0" step="1" class="mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal" />
+        <label v-for="p in PACKS" :key="p.type" :class="etiquette">{{ p.nom }}
+          <input v-model.number="commandesPrevues[p.type]" type="number" min="0" step="1" :class="champ" />
         </label>
         <button type="submit" :disabled="calculAchats" class="cursor-pointer col-span-2 sm:col-span-5 px-3 py-2.5 rounded-xl bg-foret text-white text-xs font-bold disabled:opacity-50">Calculer les achats</button>
       </form>
@@ -228,6 +342,7 @@ function exporterSeuil() {
           <p class="font-bold">{{ achats.produitsARacheter }} produit(s) à acheter · {{ formatFCFA(achats.coutTotal) }}</p>
           <button @click="exporterAchats" class="cursor-pointer ml-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-foret text-white text-xs font-bold"><FileText class="w-3.5 h-3.5" /> PDF</button>
         </div>
+        <p v-if="achats.prixManquants" class="text-xs text-amber-800">{{ achats.prixManquants }} produit(s) sans prix : coût total incomplet.</p>
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs border-collapse min-w-130">
             <thead><tr class="text-[10px] uppercase tracking-wider text-gris border-b border-creme2">
@@ -250,26 +365,63 @@ function exporterSeuil() {
     <!-- (c) SEUIL -->
     <section v-if="onglet === 'seuil'" class="bg-white rounded-2xl border border-creme2 p-4 space-y-4">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <label class="text-[10px] font-bold uppercase text-gris">Charges fixes (FCFA / mois)<input v-model.number="chargesFixes" type="number" min="0" step="10000" class="mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal" /></label>
-        <label class="text-[10px] font-bold uppercase text-gris">Objectif de chiffre d'affaires (FCFA / mois)<input v-model.number="objectifCa" type="number" min="0" step="50000" class="mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal" /></label>
+        <label :class="etiquette">Charges fixes (FCFA / mois)<input v-model.number="chargesFixes" type="number" min="0" step="10000" placeholder="à renseigner" :class="champ" /></label>
+        <label :class="etiquette">Objectif de chiffre d'affaires (FCFA / mois)<input v-model.number="objectifCa" type="number" min="0" step="50000" placeholder="à renseigner" :class="champ" /></label>
       </div>
       <fieldset class="grid grid-cols-3 gap-3">
         <legend class="text-[10px] font-bold uppercase text-gris mb-1">Répartition des commandes (%)</legend>
-        <label v-for="p in PACKS_OUVERTS" :key="p.type" class="text-[10px] font-bold uppercase text-gris">{{ p.nom }}
-          <input v-model.number="repartition[p.type]" type="number" min="0" max="100" class="mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal" />
+        <label v-for="p in PACKS_OUVERTS" :key="p.type" :class="etiquette">{{ p.nom }}
+          <input v-model.number="repartition[p.type]" type="number" min="0" max="100" placeholder="—" :class="champ" />
         </label>
       </fieldset>
       <p v-if="!seuil" class="text-gris text-center py-4">Calcul des marges par formule...</p>
+      <p v-else-if="seuil.incomplet" class="text-xs text-amber-800 text-center py-4">{{ seuil.incomplet }}</p>
       <template v-else>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div class="rounded-xl bg-creme p-3"><p class="text-[10px] uppercase font-bold text-gris">Prix moyen</p><p class="font-bold">{{ formatFCFA(seuil.prixMoyen) }}</p></div>
           <div class="rounded-xl bg-creme p-3"><p class="text-[10px] uppercase font-bold text-gris">Marge moyenne</p><p class="font-bold">{{ formatFCFA(seuil.margeMoyenne) }}</p></div>
-          <div class="rounded-xl bg-foret text-white p-3"><p class="text-[10px] uppercase font-bold opacity-80">Seuil (commandes / mois)</p><p class="font-bold">{{ seuil.commandesSeuil ?? 'Inatteignable' }}</p><p v-if="seuil.caSeuil !== null" class="text-xs opacity-80">soit {{ formatFCFA(seuil.caSeuil) }}</p></div>
-          <div class="rounded-xl bg-creme p-3"><p class="text-[10px] uppercase font-bold text-gris">Objectif</p><p class="font-bold">{{ seuil.commandesObjectif }} commandes</p><p :class="['text-xs', seuil.resultatObjectif >= 0 ? 'text-green-800' : 'text-red-700']">résultat {{ formatFCFA(seuil.resultatObjectif) }}</p></div>
+          <div class="rounded-xl bg-foret text-white p-3"><p class="text-[10px] uppercase font-bold opacity-80">Seuil (commandes / mois)</p>
+            <p class="font-bold">{{ seuil.commandesSeuil === null ? 'Charges à renseigner' : seuil.commandesSeuil < 0 ? 'Inatteignable' : seuil.commandesSeuil }}</p>
+            <p v-if="seuil.caSeuil != null" class="text-xs opacity-80">soit {{ formatFCFA(seuil.caSeuil) }}</p></div>
+          <div class="rounded-xl bg-creme p-3"><p class="text-[10px] uppercase font-bold text-gris">Objectif</p>
+            <p class="font-bold">{{ seuil.commandesObjectif === null ? 'à renseigner' : `${seuil.commandesObjectif} commandes` }}</p>
+            <p v-if="seuil.resultatObjectif != null" :class="['text-xs', seuil.resultatObjectif >= 0 ? 'text-green-800' : 'text-red-700']">résultat {{ formatFCFA(seuil.resultatObjectif) }}</p></div>
         </div>
-        <p v-if="seuil.commandesSeuil === null" class="text-xs text-red-700">La marge moyenne est négative : aucun volume ne couvre les charges avec ces prix et ces frais.</p>
+        <p v-if="seuil.commandesSeuil !== null && seuil.commandesSeuil < 0" class="text-xs text-red-700">La marge moyenne est négative : aucun volume ne couvre les charges avec ces prix et ces frais.</p>
         <button @click="exporterSeuil" class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-foret text-white text-xs font-bold"><FileText class="w-3.5 h-3.5" /> PDF</button>
       </template>
+    </section>
+
+    <!-- (d) PARAMÈTRES -->
+    <section v-if="onglet === 'parametres' && formParams" class="bg-white rounded-2xl border border-creme2 p-4 space-y-4">
+      <p class="text-xs text-gris">Vide = à renseigner. Chaque modification est inscrite au journal (Finances, « Taux & journal »).</p>
+      <form @submit.prevent="enregistrerParametres" class="space-y-4">
+        <fieldset :disabled="!ecrireParametres" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <legend class="text-xs font-bold mb-2">Méthode du référentiel (coefficient {{ coefficientSaisi?.toLocaleString('fr-FR') ?? 'à renseigner' }})</legend>
+          <label :class="etiquette">Part emballage (%)<input v-model.number="formParams.parts.emballage" type="number" min="0" max="100" step="0.1" :class="champ" /></label>
+          <label :class="etiquette">Part transformation (%)<input v-model.number="formParams.parts.transformation" type="number" min="0" max="100" step="0.1" :class="champ" /></label>
+          <label :class="etiquette">Part logistique (%)<input v-model.number="formParams.parts.logistique" type="number" min="0" max="100" step="0.1" :class="champ" /></label>
+          <label :class="etiquette">Part pertes (%)<input v-model.number="formParams.parts.pertes" type="number" min="0" max="100" step="0.1" :class="champ" /></label>
+          <label :class="etiquette">Marge cible (%)<input v-model.number="formParams.margeCiblePct" type="number" min="0" max="95" step="0.5" :class="champ" /></label>
+        </fieldset>
+        <fieldset :disabled="!ecrireParametres" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <legend class="text-xs font-bold mb-2">Frais par commande</legend>
+          <label :class="etiquette">Livraison moyenne (FCFA)<input v-model.number="formParams.livraisonMoyenneFcfa" type="number" min="0" :class="champ" /></label>
+          <label :class="etiquette">Emballage en plus (FCFA)<input v-model.number="formParams.emballageParCommandeFcfa" type="number" min="0" :class="champ" /></label>
+          <label :class="etiquette">Commission Mobile Money (%)<input v-model.number="formParams.commissionMobileMoneyPct" type="number" min="0" max="100" step="0.1" :class="champ" /></label>
+        </fieldset>
+        <fieldset :disabled="!ecrireParametres" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <legend class="text-xs font-bold mb-2">Objectifs et charges</legend>
+          <label :class="etiquette">Charges fixes (FCFA / mois)<input v-model.number="formParams.chargesFixesMensuellesFcfa" type="number" min="0" :class="champ" /></label>
+          <label :class="etiquette">Objectif de CA (FCFA / mois)<input v-model.number="formParams.objectifCaMensuelFcfa" type="number" min="0" :class="champ" /></label>
+          <label :class="etiquette">Objectif de clients<input v-model.number="formParams.objectifClients" type="number" min="0" :class="champ" /></label>
+          <label :class="etiquette">Début de l'objectif<input v-model="formParams.debutObjectif" type="date" :class="champ" /></label>
+          <label :class="etiquette">Fin de l'objectif<input v-model="formParams.finObjectif" type="date" :class="champ" /></label>
+          <label v-for="p in PACKS_OUVERTS" :key="p.type" :class="etiquette">Part {{ p.nom }} (%)<input v-model.number="formParams.repartition[p.type]" type="number" min="0" max="100" :class="champ" /></label>
+        </fieldset>
+        <p v-if="messageParams.texte" role="status" :class="messageParams.type === 'success' ? 'text-green-800' : 'text-red-700'" class="text-xs font-semibold">{{ messageParams.texte }}</p>
+        <button v-if="ecrireParametres" type="submit" class="cursor-pointer px-4 py-2.5 rounded-xl bg-foret text-white text-xs font-bold">Enregistrer les paramètres</button>
+      </form>
     </section>
   </div>
 </template>

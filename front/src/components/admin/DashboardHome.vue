@@ -157,7 +157,13 @@ const activeClientsCount = computed(() => {
   return uniqueClients.size
 })
 
-const targetClients = 20
+// Objectif de clients : paramètre enregistré (Simulateurs > Paramètres) ; rien d'affiché tant qu'il n'est pas renseigné
+const { data: parametres } = useQuery({
+  queryKey: ['parametres'],
+  queryFn: async (): Promise<{ objectifClients: number | null }> => (await api.get('/api/admin/parametres')).data,
+  enabled: computed(() => peutLire(authStore.role.value, 'parametres')),
+})
+const targetClients = computed(() => parametres.value?.objectifClients ?? null)
 
 const estimatedRevenue = computed(() => {
   return ordersList.value
@@ -325,7 +331,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
           <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">CLIENTS ACTIFS</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ activeClientsCount }}</span>
-            <span class="text-[11px] text-gray-500">↑ obj. {{ targetClients }} pilote</span>
+            <span v-if="targetClients !== null" class="text-[11px] text-gray-500">↑ obj. {{ targetClients }} pilote</span>
           </div>
         </div>
 

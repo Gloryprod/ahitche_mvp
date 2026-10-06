@@ -20,6 +20,8 @@ const ACCES = {
   finances:      { lecture: ['admin', 'comptable'],                 ecriture: ['admin', 'comptable'] },
   simulateurs:   { lecture: ['admin', 'gestionnaire', 'comptable'], ecriture: ['admin', 'gestionnaire', 'comptable'] },
   nutrition:     { lecture: ['admin', 'nutritionniste'],            ecriture: ['admin', 'nutritionniste'] },
+  // Réglages des simulateurs (charges, objectifs, coefficient, marge) : admin et comptable, journalisés (Q 10.4)
+  parametres:    { lecture: ['admin', 'comptable'],                 ecriture: ['admin', 'comptable'] },
 };
 
 module.exports = { ROLES, EQUIPE, ACCES };

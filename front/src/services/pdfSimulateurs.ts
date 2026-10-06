@@ -13,7 +13,7 @@ export interface SectionPDF {
 }
 
 // Montants en espace simple (les espaces insécables du format français posent problème à jsPDF)
-export const fcfaPDF = (n: number) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' FCFA'
+export const fcfaPDF = (n: number | null) => n === null ? 'à renseigner' : Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' FCFA'
 
 export function genererSimulationPDF(titre: string, hypotheses: string[], sections: SectionPDF[]) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
