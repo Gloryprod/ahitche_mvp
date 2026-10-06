@@ -5,8 +5,8 @@
 //                     Un gestionnaire relié à une fiche livreur ne voit que les clients de ses livraisons.
 //  - comptable      : finances ; le reste en lecture seule
 //  - nutritionniste : nutrition, idées de repas ; les clients et le catalogue en lecture seule
-//  - coordinateur   : lecture seule de toutes les sections de gestion (rapport financier mensuel) ;
-//                     droits proposés, à confirmer par le porteur
+//  - coordinateur   : lecture de toutes les sections de gestion et droits du comptable (finances, paramètres) :
+//                     DJEGUI est coordinateur et comptable (D-17)
 //  - auditeur       : lecture seule des finances et du stock, compte créé à la demande
 //  Idées de repas (D-18) : rédigées par les gestionnaires et le nutritionniste, publiées par l'admin
 
@@ -22,13 +22,13 @@ const ACCES = {
   stock:         { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur', 'auditeur'], ecriture: ['admin', 'gestionnaire'] },
   prestataires:  { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
   logistique:    { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
-  finances:      { lecture: ['admin', 'comptable', 'coordinateur', 'auditeur'],     ecriture: ['admin', 'comptable'] },
+  finances:      { lecture: ['admin', 'comptable', 'coordinateur', 'auditeur'],     ecriture: ['admin', 'comptable', 'coordinateur'] },
   // Marges et coûts : pas les gestionnaires (D-17) ; la prévision d'achats est un calcul (POST) sans enregistrement
   simulateurs:   { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable', 'coordinateur'] },
   nutrition:     { lecture: ['admin', 'nutritionniste'],                            ecriture: ['admin', 'nutritionniste'] },
   repas:         { lecture: ['admin', 'gestionnaire', 'nutritionniste', 'coordinateur'], ecriture: ['admin', 'gestionnaire', 'nutritionniste'] },
   // Réglages des simulateurs (charges, objectifs, coefficient, marge) : journalisés (Q 10.4)
-  parametres:    { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable'] },
+  parametres:    { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable', 'coordinateur'] },
 };
 
 module.exports = { ROLES, EQUIPE, ACCES };

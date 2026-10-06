@@ -33,6 +33,7 @@ node src/scripts/migrerDonnees.js   # migration idempotente (téléphone, fourni
 STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <role> [--livreur "<fiche livreur>"]  # compte de l'équipe
 STAFF_PASSWORD=… node src/scripts/importerDonnees.js ../docs-internes/imports [--appliquer] [--attendu <json>]  # import 01 à 11 (simulation sans --appliquer)
 node src/scripts/controlerDonnees.js [--attendu <json>]  # contrôles B.4, lecture seule
+MONGO_URI=<lecture seule> node src/scripts/inventaireBase.js  # inventaire d'une base (nombres seulement, aucune donnée personnelle)
 ```
 L'import ne touche jamais la production sans `--appliquer` : la simulation s'exécute dans une transaction annulée et affiche les écarts. Les fichiers CSV et les valeurs attendues des contrôles restent dans `docs-internes/` (exclu de Git).
 Les transactions MongoDB (livraison + sortie de stock FIFO) exigent un replica set : c'est le cas sur Atlas ; en local, utiliser `MongoMemoryReplSet` ou un replica set à un nœud.
