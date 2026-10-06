@@ -6,6 +6,7 @@ import { formaterPrix, type FormuleVitrine } from '@/config/formules'
 
 const props = defineProps<{
   formule: FormuleVitrine
+  valeurEstimee?: number | null // D-03 : matières × coefficient, affichée barrée au-dessus du prix
   conseillee?: boolean // Formule conseillée par le comparateur « taille du foyer »
   autreConseillee?: boolean // Une autre formule est conseillée : « Le plus choisi » s'efface
 }>()
@@ -15,6 +16,9 @@ const lienWhatsApp = computed(() => {
   const message = `Bonjour Ahitché ! Je souhaite commander la formule ${nom} (${formaterPrix(prix)} FCFA). Pouvez-vous me confirmer les détails ?`
   return lienWa(message)
 })
+
+// Prix barré seulement s'il dépasse le prix de vente
+const prixBarre = computed(() => (props.valeurEstimee && props.valeurEstimee > props.formule.prix ? props.valeurEstimee : null))
 
 // Mise en avant : la formule conseillée pour le foyer choisi, sinon la plus choisie
 const enAvant = computed(() => props.conseillee || (props.formule.recommandee && !props.autreConseillee))
@@ -55,6 +59,7 @@ const enAvant = computed(() => props.conseillee || (props.formule.recommandee &&
 
     <div>
       <div class="mb-6">
+        <span v-if="prixBarre" class="block text-sm text-gris">valeur estimée <s class="whitespace-nowrap">{{ formaterPrix(prixBarre) }} FCFA</s></span>
         <span class="text-3xl font-bold text-foret font-body">{{ formaterPrix(formule.prix) }} <small class="text-sm font-semibold">FCFA</small></span>
         <span class="block text-sm text-gris mt-1">par semaine</span>
       </div>

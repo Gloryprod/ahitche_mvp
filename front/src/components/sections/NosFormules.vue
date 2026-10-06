@@ -1,10 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import api from '@/stores/api'
 import FormuleCard from '../ui/FormuleCard.vue'
 import {
   FORMULES as formules, PRODUITS_INCLUS as produitsInclus, EXCLUS_ESSENTIEL as exclusEssentiel,
   TAILLES_FOYER, formaterPrix, type TailleFoyer,
 } from '@/config/formules'
+
+// Prix barrés (D-03) : valeur estimée de chaque pack, calculée par le serveur ; sans réponse, rien n'est barré
+const valeursEstimees = ref<Record<string, number | null>>({})
+onMounted(async () => {
+  try {
+    valeursEstimees.value = (await api.get('/api/public/formules/valeurs')).data
+  } catch {
+    // Connexion lente ou serveur indisponible : les cartes s'affichent sans valeur estimée
+  }
+})
 
 // Comparateur « taille du foyer » : conseille une formule et la met en avant
 const foyer = ref<TailleFoyer | null>(null)
@@ -83,6 +94,7 @@ async function choisirFoyer(valeur: TailleFoyer) {
         >
           <FormuleCard
             :formule="formule"
+            :valeur-estimee="valeursEstimees[formule.slug] ?? null"
             :conseillee="conseillee?.nom === formule.nom"
             :autre-conseillee="!!conseillee && conseillee.nom !== formule.nom"
             class="w-full"

@@ -2,13 +2,14 @@
 // back/src/scripts/createFormules.js. Toute modification de prix se fait aux deux endroits.
 
 export interface FormuleVitrine {
+  slug: string // Identifiant en base (valeur estimée servie par l'API)
   emoji: string
   nom: string // Ex : "AHI ESSENTIEL"
   cible: string // Ex : "1 personne · par semaine" (référentiel packs v4)
   accroche: string
   repas: string // Ex : "20–30"
   heures: string // Ex : "2–4h"
-  prix: number // Prix de vente en FCFA, par semaine (D-02 ; aucun prix barré, D-03)
+  prix: number // Prix de vente en FCFA, par semaine (D-02) ; le prix barré (valeur estimée, D-03) vient de l'API
   foyer: TailleFoyer // Taille de foyer pour laquelle la formule est conseillée
   recommandee?: boolean
 }
@@ -23,9 +24,9 @@ export const TAILLES_FOYER: { valeur: TailleFoyer; libelle: string }[] = [
 
 // Formules ouvertes au lancement : cibles, accroches, repas et heures du référentiel packs v4 (cycle d'une semaine)
 export const FORMULES: FormuleVitrine[] = [
-  { emoji: '🌿', nom: 'AHI ESSENTIEL', cible: '1 personne · par semaine', accroche: 'Les bases de votre semaine déjà organisées.', repas: '20–30', heures: '2–4h', prix: 10800, foyer: '1' },
-  { emoji: '🌾', nom: 'AHI ÉQUILIBRÉ', cible: 'Couples et familles actives · par semaine', accroche: 'Mieux manger sans compliquer votre quotidien.', repas: '35–50', heures: '4–6h', prix: 22500, foyer: '2-3', recommandee: true },
-  { emoji: '👑', nom: 'AHI CONFORT', cible: 'Familles établies · par semaine', accroche: 'Votre cuisine organisée sans stress.', repas: '60–90', heures: '6–10h', prix: 50300, foyer: '4-6' },
+  { slug: 'ahi-essentiel', emoji: '🌿', nom: 'AHI ESSENTIEL', cible: '1 personne · par semaine', accroche: 'Les bases de votre semaine déjà organisées.', repas: '20–30', heures: '2–4h', prix: 10800, foyer: '1' },
+  { slug: 'ahi-equilibre', emoji: '🌾', nom: 'AHI ÉQUILIBRÉ', cible: 'Couples et familles actives · par semaine', accroche: 'Mieux manger sans compliquer votre quotidien.', repas: '35–50', heures: '4–6h', prix: 22500, foyer: '2-3', recommandee: true },
+  { slug: 'ahi-confort', emoji: '👑', nom: 'AHI CONFORT', cible: 'Familles établies · par semaine', accroche: 'Votre cuisine organisée sans stress.', repas: '60–90', heures: '6–10h', prix: 50300, foyer: '4-6' },
 ]
 
 // Prix de la formule la moins chère, repris dans le hero (« dès … FCFA »)
