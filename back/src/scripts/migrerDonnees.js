@@ -188,6 +188,13 @@ async function migrerIndexLots() {
   console.log('  ✔ Numéros de lot uniques (index en place)');
 }
 
+// Étape 9 : idées de repas (D-18) : un ancien menu sans statut attend la validation du porteur (jamais publié d'office)
+async function migrerIdeesRepas() {
+  const { MenuType } = require('../models/nutrition');
+  const res = await MenuType.updateMany({ statut: { $exists: false } }, { $set: { statut: 'À valider' } });
+  console.log(res.modifiedCount ? `  ⚠ ${res.modifiedCount} ancien(s) menu(s) passé(s) « à valider » : plus visibles des clients avant validation` : '  ✔ Aucun ancien menu à reprendre');
+}
+
 const ETAPES = [
   ['Index du téléphone', migrerIndexTelephone],
   ['Fournisseurs vers Prestataires', migrerFournisseurs],
@@ -197,6 +204,7 @@ const ETAPES = [
   ['Admin principal', migrerAdminPrincipal],
   ['Quantités des produits par pack', migrerQuantitesProduits],
   ['Numéros de lot uniques', migrerIndexLots],
+  ['Idées de repas', migrerIdeesRepas],
 ];
 
 async function migrer() {

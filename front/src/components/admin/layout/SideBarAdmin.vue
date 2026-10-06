@@ -14,7 +14,8 @@ import {
   FolderTree,
   Scale,
   LogOut,
-  Globe
+  Globe,
+  UtensilsCrossed
 } from 'lucide-vue-next'
 import { computed } from 'vue';
 import { useDeconnexion } from '@/composables/useDeconnexion';
@@ -70,6 +71,7 @@ const tousLesGroupes: { title: string; items: MenuItem[] }[] = [
       { id: 'prestataires', name: 'Prestataires', icon: Users, hasChevron: true, path: '/dashboard/admin/prestataires', section: 'prestataires' },
       { id: 'logistique', name: 'Logistique', icon: FolderTree, hasChevron: true, path: '/dashboard/admin/logistique', section: 'logistique' },
       { id: 'nutrition', name: 'Nutrition', icon: Scale, hasChevron: true, path: '/dashboard/admin/nutrition', section: 'nutrition' },
+      { id: 'idees-repas', name: 'Idées de repas', icon: UtensilsCrossed, hasChevron: true, path: '/dashboard/admin/idees-repas', section: 'repas' },
     ]
   },
   {

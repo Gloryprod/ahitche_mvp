@@ -38,8 +38,11 @@ const suiviSchema = new mongoose.Schema({
   visibleClient: { type: Boolean, default: false } // Recommandations et points mensuels : visibles dans l'espace client
 }, { timestamps: true });
 
-// Menus types par formule, modifiables par l'admin et la nutritionniste (question 32)
+// Idées de repas par formule (D-18) : rédigées par l'équipe (gestionnaire, nutritionniste), sans conseil de santé,
+// publiées seulement après validation du porteur (admin). Brouillon -> À valider -> Publié (ou renvoyée en brouillon).
 const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+const STATUTS_IDEE = ['Brouillon', 'À valider', 'Publié'];
+const MENTION_SANTE = "Ces conseils ne remplacent pas l'avis d'un professionnel de santé."; // Q 11.5
 const menuSchema = new mongoose.Schema({
   formuleSlug: { type: String, required: true, enum: ['ahi-essentiel', 'ahi-equilibre', 'ahi-confort', 'ahi-reserve', 'ahi-fraicheur'] },
   titre: { type: String, required: true, trim: true, maxlength: 120 },
@@ -50,13 +53,17 @@ const menuSchema = new mongoose.Schema({
     diner: { type: String, trim: true, maxlength: 200, default: '' }
   }],
   conseil: { type: String, trim: true, maxlength: 500, default: '' },
-  actif: { type: Boolean, default: true },
-  auteur: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  actif: { type: Boolean, default: true }, // Ancien affichage, remplacé par le statut
+  statut: { type: String, enum: STATUTS_IDEE, default: 'Brouillon' },
+  auteur: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  validePar: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  valideLe: { type: Date, default: null },
+  remarque: { type: String, trim: true, maxlength: 500, default: '' } // Motif d'un renvoi en brouillon
 }, { timestamps: true });
 
 module.exports = {
   ProfilNutrition: mongoose.model('ProfilNutrition', profilSchema),
   SuiviNutrition: mongoose.model('SuiviNutrition', suiviSchema),
   MenuType: mongoose.model('MenuType', menuSchema),
-  TRANCHES_AGE, OBJECTIFS, JOURS, VERSION_CONSENTEMENT
+  TRANCHES_AGE, OBJECTIFS, JOURS, VERSION_CONSENTEMENT, STATUTS_IDEE, MENTION_SANTE
 };

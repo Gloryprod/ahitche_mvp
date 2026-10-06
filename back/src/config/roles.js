@@ -8,6 +8,7 @@
 //  - coordinateur   : lecture seule de toutes les sections de gestion (rapport financier mensuel) ;
 //                     droits proposés, à confirmer par le porteur
 //  - auditeur       : lecture seule des finances et du stock, compte créé à la demande
+//  Idées de repas (D-18) : rédigées par les gestionnaires et le nutritionniste, publiées par l'admin
 
 const ROLES = ['user', 'admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
 const EQUIPE = ['admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
@@ -25,6 +26,7 @@ const ACCES = {
   // Marges et coûts : pas les gestionnaires (D-17) ; la prévision d'achats est un calcul (POST) sans enregistrement
   simulateurs:   { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable', 'coordinateur'] },
   nutrition:     { lecture: ['admin', 'nutritionniste'],                            ecriture: ['admin', 'nutritionniste'] },
+  repas:         { lecture: ['admin', 'gestionnaire', 'nutritionniste', 'coordinateur'], ecriture: ['admin', 'gestionnaire', 'nutritionniste'] },
   // Réglages des simulateurs (charges, objectifs, coefficient, marge) : journalisés (Q 10.4)
   parametres:    { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable'] },
 };

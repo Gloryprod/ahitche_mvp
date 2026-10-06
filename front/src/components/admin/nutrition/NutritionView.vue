@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { Scale, Search, MessageCircle, X, Plus, Trash2, Edit2, ShieldCheck } from 'lucide-vue-next'
-import Swal from 'sweetalert2'
+import { Scale, Search, MessageCircle, X, ShieldCheck } from 'lucide-vue-next'
 import api from '@/stores/api'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
 
-// Suivi alimentaire : clients ayant rempli le questionnaire (avec leur accord), journal, menus types.
+// Suivi alimentaire : clients ayant rempli le questionnaire (avec leur accord) et journal.
+// Les idées de repas ont leur propre écran (IdeesRepas.vue).
 // v1 sans données de santé (autorisation APDP préalable, voir docs/conception-menu-admin.md, point 4.2).
 
 interface ClientSuivi { userId: string; nom: string; telephone: string; quartier: string; formule: string; personnes: number; prochainPoint: string | null; dernierSuivi: { date: string; type: string } | null }
@@ -16,19 +16,13 @@ interface Fiche {
   profil: { foyer: Record<string, number>; objectifs: string[]; platsAimes: string; alimentsNonAimes: string; prochainPoint: string | null; consentement: { date: string; version: string } }
   journal: { _id: string; type: string; contenu: string; visibleClient: boolean; createdAt: string; auteur?: { username: string } }[]
 }
-interface Menu { _id?: string; formuleSlug: string; titre: string; jours: { jour: string; dejeuner: string; diner: string }[]; conseil: string; actif: boolean }
 
-const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
-const FORMULES = [
-  { slug: 'ahi-essentiel', nom: 'AHI Essentiel' }, { slug: 'ahi-equilibre', nom: 'AHI Équilibré' }, { slug: 'ahi-confort', nom: 'AHI Confort' },
-  { slug: 'ahi-reserve', nom: 'AHI Réserve' }, { slug: 'ahi-fraicheur', nom: 'AHI Fraîcheur' },
-]
 const LIBELLES_TRANCHES: Record<string, string> = { '0-5': '0-5 ans', '6-12': '6-12 ans', '13-17': '13-17 ans', '18-59': '18-59 ans', '60+': '60 ans et +' }
 
 const authStore = useAuthStore()
 const ecriture = computed(() => peutEcrire(authStore.role.value, 'nutrition'))
 const queryClient = useQueryClient()
-const onglet = ref<'clients' | 'menus'>('clients')
+const onglet = ref<'clients'>('clients')
 const notification = ref({ text: '', type: '' })
 const notifier = (text: string, type: string) => {
   notification.value = { text, type }
@@ -92,39 +86,6 @@ async function ajouterSuivi() {
 const lienWhatsApp = (telephone: string, nom: string, texte: string) =>
   `https://wa.me/${telephone.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour ${nom} 👋\nConseil de votre nutritionniste Ahitché :\n\n${texte}`)}`
 
-// --- Menus types ---
-const { data: menus } = useQuery({
-  queryKey: ['nutrition', 'menus'],
-  queryFn: async (): Promise<(Menu & { _id: string })[]> => (await api.get('/api/admin/nutrition/menus')).data,
-  enabled: computed(() => onglet.value === 'menus'),
-})
-const menuVide = (): Menu => ({ formuleSlug: 'ahi-essentiel', titre: '', jours: JOURS.map(jour => ({ jour, dejeuner: '', diner: '' })), conseil: '', actif: true })
-const menuEdite = ref<Menu | null>(null)
-
-const editerMenu = (m?: Menu) => {
-  menuEdite.value = m ? { ...m, jours: JOURS.map(jour => ({ jour, dejeuner: '', diner: '', ...m.jours.find(j => j.jour === jour) })) } : menuVide()
-}
-async function enregistrerMenu() {
-  if (!menuEdite.value) return
-  const { _id, ...corps } = menuEdite.value
-  try {
-    if (_id) await api.put(`/api/admin/nutrition/menus/${_id}`, corps)
-    else await api.post('/api/admin/nutrition/menus', corps)
-    notifier('Menu enregistré.', 'success')
-    menuEdite.value = null
-    queryClient.invalidateQueries({ queryKey: ['nutrition', 'menus'] })
-  } catch (err: any) {
-    notifier(err.response?.data?.message || 'Enregistrement impossible', 'error')
-  }
-}
-async function supprimerMenu(m: Menu & { _id: string }) {
-  const choix = await Swal.fire({ title: `Supprimer « ${m.titre} » ?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#1A5C38', confirmButtonText: 'Supprimer', cancelButtonText: 'Annuler' })
-  if (!choix.isConfirmed) return
-  await api.delete(`/api/admin/nutrition/menus/${m._id}`)
-  notifier('Menu supprimé.', 'success')
-  queryClient.invalidateQueries({ queryKey: ['nutrition', 'menus'] })
-}
-const nomFormule = (slug: string) => FORMULES.find(f => f.slug === slug)?.nom ?? slug
 </script>
 
 <template>
@@ -139,8 +100,8 @@ const nomFormule = (slug: string) => FORMULES.find(f => f.slug === slug)?.nom ??
     </div>
 
     <div class="flex gap-2" role="tablist">
-      <button v-for="o in [{ id: 'clients', label: `Clients suivis (${clients?.length ?? 0})` }, { id: 'menus', label: 'Menus types' }]" :key="o.id" role="tab" :aria-selected="onglet === o.id" @click="onglet = o.id as any"
-        :class="['cursor-pointer px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border', onglet === o.id ? 'bg-foret text-white border-foret' : 'bg-white text-gris border-creme2']">{{ o.label }}</button>
+      <button role="tab" aria-selected="true" class="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border bg-foret text-white border-foret">Clients suivis ({{ clients?.length ?? 0 }})</button>
+      <RouterLink to="/dashboard/admin/idees-repas" class="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border bg-white text-gris border-creme2">Idées de repas →</RouterLink>
     </div>
 
     <!-- CLIENTS SUIVIS -->
@@ -213,51 +174,5 @@ const nomFormule = (slug: string) => FORMULES.find(f => f.slug === slug)?.nom ??
     </div>
 
     <!-- MENUS TYPES -->
-    <div v-if="onglet === 'menus'" class="space-y-3">
-      <button v-if="ecriture && !menuEdite" @click="editerMenu()" class="cursor-pointer inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-foret text-white text-xs font-bold"><Plus class="w-3.5 h-3.5" /> Nouveau menu</button>
-
-      <form v-if="menuEdite" @submit.prevent="enregistrerMenu" class="bg-white rounded-2xl border border-creme2 p-4 space-y-3 text-xs">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <label class="font-bold uppercase text-[10px] text-gris">Formule
-            <select v-model="menuEdite.formuleSlug" class="mt-1 w-full px-3 py-2 rounded-lg border border-creme2 bg-creme text-sm font-normal normal-case text-noir">
-              <option v-for="f in FORMULES" :key="f.slug" :value="f.slug">{{ f.nom }}</option>
-            </select>
-          </label>
-          <label class="sm:col-span-2 font-bold uppercase text-[10px] text-gris">Titre
-            <input v-model="menuEdite.titre" required maxlength="120" placeholder="Ex : Semaine équilibrée à petit budget" class="mt-1 w-full px-3 py-2 rounded-lg border border-creme2 bg-creme text-sm font-normal normal-case text-noir" />
-          </label>
-        </div>
-        <div class="space-y-2">
-          <div v-for="j in menuEdite.jours" :key="j.jour" class="grid grid-cols-1 sm:grid-cols-[6rem_1fr_1fr] gap-2 items-center">
-            <span class="font-bold">{{ j.jour }}</span>
-            <input v-model="j.dejeuner" maxlength="200" :aria-label="`Déjeuner du ${j.jour.toLowerCase()}`" placeholder="Déjeuner" class="px-3 py-2 rounded-lg border border-creme2 bg-creme text-sm" />
-            <input v-model="j.diner" maxlength="200" :aria-label="`Dîner du ${j.jour.toLowerCase()}`" placeholder="Dîner" class="px-3 py-2 rounded-lg border border-creme2 bg-creme text-sm" />
-          </div>
-        </div>
-        <label class="block font-bold uppercase text-[10px] text-gris">Conseil (facultatif)
-          <textarea v-model="menuEdite.conseil" rows="2" maxlength="500" class="mt-1 w-full px-3 py-2 rounded-lg border border-creme2 bg-creme text-sm font-normal normal-case text-noir resize-none"></textarea>
-        </label>
-        <label class="flex items-center gap-2 font-semibold"><input v-model="menuEdite.actif" type="checkbox" class="accent-foret w-4 h-4" /> Visible par les clients de cette formule</label>
-        <div class="flex gap-2">
-          <button type="submit" class="cursor-pointer flex-1 px-3 py-2.5 rounded-xl bg-foret text-white font-bold">Enregistrer le menu</button>
-          <button type="button" @click="menuEdite = null" class="cursor-pointer px-3 py-2.5 rounded-xl border border-creme2 font-semibold">Annuler</button>
-        </div>
-      </form>
-
-      <p v-if="menus && !menus.length && !menuEdite" class="bg-white rounded-2xl p-6 text-center text-gris text-xs border border-dashed border-creme2">Aucun menu type pour le moment.</p>
-      <article v-for="m in menus" :key="m._id" :class="['bg-white rounded-2xl border border-creme2 p-4 text-xs space-y-1', !m.actif ? 'opacity-60' : '']">
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <p class="font-bold text-sm">{{ m.titre }}</p>
-            <p class="text-gris">{{ nomFormule(m.formuleSlug) }}{{ m.actif ? '' : ' · masqué' }}</p>
-          </div>
-          <div v-if="ecriture" class="flex gap-1">
-            <button @click="editerMenu(m)" class="cursor-pointer p-1.5 text-gris hover:text-savane" :aria-label="`Modifier ${m.titre}`"><Edit2 class="w-3.5 h-3.5" /></button>
-            <button @click="supprimerMenu(m)" class="cursor-pointer p-1.5 text-gris hover:text-red-600" :aria-label="`Supprimer ${m.titre}`"><Trash2 class="w-3.5 h-3.5" /></button>
-          </div>
-        </div>
-        <p v-for="j in m.jours.filter(j => j.dejeuner || j.diner)" :key="j.jour"><strong>{{ j.jour }}</strong> : {{ j.dejeuner || '-' }} / {{ j.diner || '-' }}</p>
-      </article>
-    </div>
   </div>
 </template>

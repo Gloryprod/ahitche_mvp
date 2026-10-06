@@ -24,6 +24,7 @@ const chargement = ref(true)
 const profil = ref<Profil | null>(null)
 const recommandations = ref<{ type: string; contenu: string; date: string }[]>([])
 const menus = ref<Menu[]>([])
+const mentionSante = ref('')
 const objectifsPossibles = ref<string[]>([])
 const tranches = ref<string[]>([])
 const enEdition = ref(false)
@@ -39,6 +40,7 @@ async function charger() {
     profil.value = data.profil
     recommandations.value = data.recommandations
     menus.value = data.menus
+    mentionSante.value = data.mentionSante ?? ''
     objectifsPossibles.value = data.objectifsPossibles
     tranches.value = data.tranches
   } catch {
@@ -168,7 +170,8 @@ const dateFr = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: 'nu
       </div>
 
       <div v-if="menus.length" class="space-y-2">
-        <h3 class="font-bold text-sm">Idées de menus pour votre formule</h3>
+        <h3 class="font-bold text-sm">Idées de repas pour votre formule</h3>
+        <p v-if="mentionSante" class="text-[11px] text-gris">{{ mentionSante }}</p>
         <article v-for="m in menus" :key="m._id" class="rounded-xl border border-creme2">
           <button @click="menuOuvert = menuOuvert === m._id ? null : m._id" :aria-expanded="menuOuvert === m._id" class="cursor-pointer w-full text-left px-4 py-3 font-semibold text-sm flex justify-between">
             {{ m.titre }} <span aria-hidden="true">{{ menuOuvert === m._id ? '−' : '+' }}</span>

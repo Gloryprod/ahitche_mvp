@@ -37,6 +37,7 @@ router.use('/finances', acces(ACCES.finances));
 router.use('/simulateurs', acces(ACCES.simulateurs));
 router.use('/nutrition', acces(ACCES.nutrition));
 router.use('/parametres', acces(ACCES.parametres));
+router.use('/repas', acces(ACCES.repas));
 
 // Users
 router.get('/users', userC.index);
@@ -172,12 +173,14 @@ router.route('/parametres')
 router.get('/nutrition/clients', nutritionC.listerClientsSuivis);
 router.get('/nutrition/clients/:userId', nutritionC.ficheClient);
 router.post('/nutrition/clients/:userId/suivi', nutritionC.ajouterSuivi);
-router.route('/nutrition/menus')
+// Idées de repas (D-18) : section séparée, sans accès aux données des clients
+router.route('/repas')
   .get(nutritionC.listerMenus)
   .post(nutritionC.creerMenu);
-router.route('/nutrition/menus/:id')
+router.route('/repas/:id')
   .put(nutritionC.modifierMenu)
   .delete(nutritionC.supprimerMenu);
+router.post('/repas/:id/decision', nutritionC.deciderMenu); // Admin seulement (contrôlé dans le contrôleur)
 
 module.exports = router;
         

@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const User = require('../models/user');
 const Formule = require('../models/formules');
-const { ProfilNutrition, SuiviNutrition, MenuType, TRANCHES_AGE, OBJECTIFS, JOURS, VERSION_CONSENTEMENT } = require('../models/nutrition');
+const { ProfilNutrition, SuiviNutrition, MenuType, TRANCHES_AGE, OBJECTIFS, JOURS, VERSION_CONSENTEMENT, MENTION_SANTE } = require('../models/nutrition');
+const { journaliser } = require('../services/journalService');
 const { echapperRegex } = require('../utils/texte');
 
 // ------------------------------------------------------------------
@@ -19,9 +20,11 @@ async function monSuivi(req, res) {
 
     // Menus de la formule habituelle du client (sinon de toutes les formules ouvertes)
     const formule = client?.formuleHabituelle ? await Formule.findOne({ nom: client.formuleHabituelle }).select('slug').lean() : null;
-    const menus = await MenuType.find({ actif: true, ...(formule ? { formuleSlug: formule.slug } : {}) }).sort({ updatedAt: -1 }).limit(4).lean();
+    // Idées de repas publiées (validées par le porteur) seulement
+    const menus = await MenuType.find({ statut: 'Publié', ...(formule ? { formuleSlug: formule.slug } : {}) })
+      .select('formuleSlug titre jours conseil').sort({ valideLe: -1 }).limit(4).lean();
 
-    return res.status(200).json({ profil, recommandations: recommandations.map(r => ({ type: r.type, contenu: r.contenu, date: r.createdAt })), menus, objectifsPossibles: OBJECTIFS, tranches: TRANCHES_AGE });
+    return res.status(200).json({ profil, recommandations: recommandations.map(r => ({ type: r.type, contenu: r.contenu, date: r.createdAt })), menus, mentionSante: MENTION_SANTE, objectifsPossibles: OBJECTIFS, tranches: TRANCHES_AGE });
   } catch (error) {
     console.error("Erreur monSuivi:", error);
     return res.status(500).json({ message: "Erreur lors du chargement de votre suivi alimentaire." });
@@ -161,7 +164,7 @@ async function ajouterSuivi(req, res) {
 }
 
 // ------------------------------------------------------------------
-// Menus types par formule
+// Idées de repas par formule (D-18) : section « repas » (admin, gestionnaire, nutritionniste)
 // ------------------------------------------------------------------
 
 function lireMenu(body) {
@@ -174,13 +177,15 @@ function lireMenu(body) {
     return { jour, dejeuner: String(saisi?.dejeuner ?? '').trim().slice(0, 200), diner: String(saisi?.diner ?? '').trim().slice(0, 200) };
   });
   if (!jours.some(j => j.dejeuner || j.diner)) return { erreur: "Renseignez au moins un repas." };
-  return { menu: { formuleSlug, titre, jours, conseil: String(body.conseil ?? '').trim().slice(0, 500), actif: body.actif !== false } };
+  // L'auteur garde l'idée en brouillon ou la soumet ; seule la décision de l'admin la publie
+  const statut = body.statut === 'À valider' ? 'À valider' : 'Brouillon';
+  return { menu: { formuleSlug, titre, jours, conseil: String(body.conseil ?? '').trim().slice(0, 500), statut } };
 }
 
-// GET /api/admin/nutrition/menus
+// GET /api/admin/repas
 async function listerMenus(req, res) {
   try {
-    const menus = await MenuType.find().populate('auteur', 'username').sort({ formuleSlug: 1, updatedAt: -1 }).lean();
+    const menus = await MenuType.find().populate('auteur', 'username').populate('validePar', 'username').sort({ formuleSlug: 1, updatedAt: -1 }).lean();
     return res.status(200).json(menus);
   } catch (error) {
     console.error("Erreur listerMenus:", error);
@@ -188,12 +193,13 @@ async function listerMenus(req, res) {
   }
 }
 
-// POST /api/admin/nutrition/menus
+// POST /api/admin/repas
 async function creerMenu(req, res) {
   try {
     const { menu, erreur } = lireMenu(req.body);
     if (erreur) return res.status(400).json({ message: erreur });
     const cree = await MenuType.create({ ...menu, auteur: req.user.id });
+    await journaliser(req, { action: 'Création', entite: 'Idée de repas', entiteId: cree._id, resume: `Idée de repas « ${cree.titre} » : ${cree.statut.toLowerCase()}` });
     return res.status(201).json(cree);
   } catch (error) {
     console.error("Erreur creerMenu:", error);
@@ -201,15 +207,16 @@ async function creerMenu(req, res) {
   }
 }
 
-// PUT /api/admin/nutrition/menus/:id
+// PUT /api/admin/repas/:id : toute modification retire la publication (nouvelle validation nécessaire)
 async function modifierMenu(req, res) {
   try {
     const { menu, erreur } = lireMenu(req.body);
     if (erreur) return res.status(400).json({ message: erreur });
     const maj = mongoose.isValidObjectId(req.params.id)
-      ? await MenuType.findByIdAndUpdate(req.params.id, { $set: { ...menu, auteur: req.user.id } }, { returnDocument: 'after', runValidators: true })
+      ? await MenuType.findByIdAndUpdate(req.params.id, { $set: { ...menu, auteur: req.user.id, validePar: null, valideLe: null, remarque: '' } }, { returnDocument: 'after', runValidators: true })
       : null;
-    if (!maj) return res.status(404).json({ message: "Menu introuvable." });
+    if (!maj) return res.status(404).json({ message: "Idée de repas introuvable." });
+    await journaliser(req, { action: 'Modification', entite: 'Idée de repas', entiteId: maj._id, resume: `Idée de repas « ${maj.titre} » modifiée : ${maj.statut.toLowerCase()}` });
     return res.status(200).json(maj);
   } catch (error) {
     console.error("Erreur modifierMenu:", error);
@@ -217,20 +224,48 @@ async function modifierMenu(req, res) {
   }
 }
 
-// DELETE /api/admin/nutrition/menus/:id
+// DELETE /api/admin/repas/:id : une idée publiée ne se supprime que par l'admin
 async function supprimerMenu(req, res) {
   try {
-    const supprime = mongoose.isValidObjectId(req.params.id) ? await MenuType.findByIdAndDelete(req.params.id) : null;
-    if (!supprime) return res.status(404).json({ message: "Menu introuvable." });
-    return res.status(200).json({ message: "Menu supprimé." });
+    const idee = mongoose.isValidObjectId(req.params.id) ? await MenuType.findById(req.params.id) : null;
+    if (!idee) return res.status(404).json({ message: "Idée de repas introuvable." });
+    if (idee.statut === 'Publié' && req.user.role !== 'admin') return res.status(403).json({ message: "Une idée publiée ne se supprime que par l'admin." });
+    await idee.deleteOne();
+    await journaliser(req, { action: 'Suppression', entite: 'Idée de repas', entiteId: idee._id, resume: `Idée de repas « ${idee.titre} » supprimée` });
+    return res.status(200).json({ message: "Idée de repas supprimée." });
   } catch (error) {
     console.error("Erreur supprimerMenu:", error);
     return res.status(500).json({ message: "Erreur lors de la suppression du menu." });
   }
 }
 
+// POST /api/admin/repas/:id/decision  { decision: 'publier' | 'renvoyer', remarque } : admin seulement (le porteur valide)
+async function deciderMenu(req, res) {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Seul l'admin publie une idée de repas." });
+    const { decision } = req.body;
+    const remarque = typeof req.body.remarque === 'string' ? req.body.remarque.trim().slice(0, 500) : '';
+    if (!['publier', 'renvoyer'].includes(decision)) return res.status(400).json({ message: "Décision invalide." });
+    if (decision === 'renvoyer' && remarque.length < 3) return res.status(400).json({ message: "Indiquez ce qu'il faut revoir." });
+    const idee = mongoose.isValidObjectId(req.params.id) ? await MenuType.findById(req.params.id) : null;
+    if (!idee) return res.status(404).json({ message: "Idée de repas introuvable." });
+    if (decision === 'publier') {
+      if (idee.statut === 'Publié') return res.status(400).json({ message: "Cette idée est déjà publiée." });
+      Object.assign(idee, { statut: 'Publié', validePar: req.user.id, valideLe: new Date(), remarque: '' });
+    } else {
+      Object.assign(idee, { statut: 'Brouillon', validePar: null, valideLe: null, remarque });
+    }
+    await idee.save();
+    await journaliser(req, { action: 'Validation', entite: 'Idée de repas', entiteId: idee._id, resume: `Idée de repas « ${idee.titre} » ${decision === 'publier' ? 'publiée' : `renvoyée en brouillon : ${remarque}`}` });
+    return res.status(200).json({ message: decision === 'publier' ? "Idée de repas publiée." : "Idée renvoyée en brouillon." , idee });
+  } catch (error) {
+    console.error("Erreur deciderMenu:", error);
+    return res.status(500).json({ message: "Erreur lors de la décision." });
+  }
+}
+
 module.exports = {
   monSuivi, enregistrerProfil, supprimerMonSuivi,
   listerClientsSuivis, ficheClient, ajouterSuivi,
-  listerMenus, creerMenu, modifierMenu, supprimerMenu
+  listerMenus, creerMenu, modifierMenu, supprimerMenu, deciderMenu
 };
