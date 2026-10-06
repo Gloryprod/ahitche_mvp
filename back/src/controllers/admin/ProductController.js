@@ -2,6 +2,19 @@ const mongoose = require('mongoose');
 const Product = require('../../models/product');
 const { TYPES_PRODUIT, STATUTS_PRODUIT, PACKS } = require('../../models/product');
 const { echapperRegex } = require('../../utils/texte');
+const { journaliser } = require('../../services/journalService');
+
+// Champs suivis au journal : prix, quantités par pack, statut, seuil d'alerte, type
+function differences(avant, apres) {
+  const lignes = [];
+  const comparer = (libelle, a, b) => { if ((a ?? null) !== (b ?? null)) lignes.push(`${libelle} : ${a ?? 'vide'} → ${b ?? 'vide'}`); };
+  comparer('prix', avant.priceUnit, apres.priceUnit);
+  for (const pack of PACKS) comparer(`quantité ${pack}`, avant.quantites?.[pack], apres.quantites?.[pack]);
+  comparer('statut', avant.statut, apres.statut);
+  comparer('seuil', avant.seuilAlerte, apres.seuilAlerte);
+  comparer('type', avant.type, apres.type);
+  return lignes;
+}
 
 // Nombre positif ou vide (null) : une cellule vide n'est jamais transformée en 0
 function nombreOuVide(valeur) {
@@ -88,6 +101,7 @@ async function createProduct(req, res) {
       return res.status(400).json({ message: `La référence ${produit.reference} existe déjà.` });
     }
     const newProduct = await Product.create(produit);
+    await journaliser(req, { action: 'Création', entite: 'Produit', entiteId: newProduct._id, resume: `Produit ${[newProduct.reference, newProduct.name].filter(Boolean).join(' · ')} créé (prix ${newProduct.priceUnit ?? 'vide'})` });
     return res.status(201).json(newProduct);
   } catch (error) {
     console.error("Erreur createProduct:", error);
@@ -103,8 +117,19 @@ async function updateProduct(req, res) {
     if (produit.reference && await Product.exists({ reference: produit.reference, deletedAt: null, _id: { $ne: req.params.id } })) {
       return res.status(400).json({ message: `La référence ${produit.reference} existe déjà.` });
     }
+    const avant = await Product.findOne({ _id: req.params.id, deletedAt: null }).lean();
+    if (!avant) return res.status(404).json({ message: "Produit introuvable." });
     const updatedProduct = await Product.findOneAndUpdate({ _id: req.params.id, deletedAt: null }, produit, { new: true, runValidators: true });
     if (!updatedProduct) return res.status(404).json({ message: "Produit introuvable." });
+    const changements = differences(avant, updatedProduct.toObject());
+    if (changements.length) {
+      await journaliser(req, {
+        action: 'Modification', entite: 'Produit', entiteId: updatedProduct._id,
+        resume: `Produit ${[updatedProduct.reference, updatedProduct.name].filter(Boolean).join(' · ')} : ${changements.join(' ; ')}`,
+        avant: { priceUnit: avant.priceUnit, quantites: avant.quantites, statut: avant.statut, seuilAlerte: avant.seuilAlerte },
+        apres: { priceUnit: updatedProduct.priceUnit, quantites: updatedProduct.quantites, statut: updatedProduct.statut, seuilAlerte: updatedProduct.seuilAlerte }
+      });
+    }
     return res.status(200).json(updatedProduct);
   } catch (error) {
     console.error("Erreur updateProduct:", error);
@@ -117,6 +142,7 @@ async function deleteProduct(req, res) {
   try {
     const deletedProduct = await Product.findOneAndUpdate({ _id: req.params.id, deletedAt: null }, { deletedAt: new Date() }, { new: true });
     if (!deletedProduct) return res.status(404).json({ message: "Produit introuvable." });
+    await journaliser(req, { action: 'Suppression', entite: 'Produit', entiteId: deletedProduct._id, resume: `Produit ${[deletedProduct.reference, deletedProduct.name].filter(Boolean).join(' · ')} supprimé` });
     return res.status(200).json({ message: "Produit supprimé avec succès." });
   } catch (error) {
     console.error("Erreur deleteProduct:", error);

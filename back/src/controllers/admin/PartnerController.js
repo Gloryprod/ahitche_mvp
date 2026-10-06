@@ -1,6 +1,9 @@
 const Partner = require('../../models/partner');
 const { TYPES_PRESTATAIRE, MODES_PAIEMENT_PRESTATAIRE } = require('../../models/partner');
 const { echapperRegex } = require('../../utils/texte');
+const { journaliser } = require('../../services/journalService');
+
+const COORDONNEES = ['telephone', 'ifuRccm', 'quartier', 'notes'];
 
 const CHAMPS_MODIFIABLES = ['nom', 'type', 'telephone', 'quartier', 'ifuRccm', 'modePaiement', 'notes', 'actif'];
 
@@ -66,6 +69,7 @@ async function creerPrestataire(req, res) {
     if (await nomDejaPris(fiche.nom)) return res.status(400).json({ message: "Un prestataire porte déjà ce nom." });
 
     const prestataire = await Partner.create(fiche);
+    await journaliser(req, { action: 'Création', entite: 'Prestataire', entiteId: prestataire._id, resume: `Fiche « ${prestataire.nom} » (${prestataire.type}) créée` });
     return res.status(201).json(prestataire);
   } catch (error) {
     console.error("Erreur creerPrestataire:", error);
@@ -83,6 +87,7 @@ async function modifierPrestataire(req, res) {
       return res.status(400).json({ message: "Un autre prestataire porte déjà ce nom." });
     }
 
+    const avant = await Partner.findOne({ _id: req.params.id, deletedAt: null }).lean();
     const prestataire = await Partner.findOneAndUpdate(
       { _id: req.params.id, deletedAt: null },
       { $set: fiche },
@@ -90,6 +95,16 @@ async function modifierPrestataire(req, res) {
     );
     if (!prestataire) return res.status(404).json({ message: "Prestataire introuvable." });
 
+    const changes = Object.keys(fiche).filter(c => String(avant?.[c] ?? '') !== String(prestataire[c] ?? ''));
+    if (changes.length) {
+      await journaliser(req, {
+        action: 'Modification', entite: 'Prestataire', entiteId: prestataire._id,
+        resume: `Fiche « ${prestataire.nom} » modifiée : ${changes.join(', ')}`,
+        // Coordonnées (téléphone, IFU, quartier, notes) : le journal cite le champ, pas sa valeur
+        avant: Object.fromEntries(changes.filter(c => !COORDONNEES.includes(c)).map(c => [c, avant?.[c] ?? null])),
+        apres: Object.fromEntries(changes.filter(c => !COORDONNEES.includes(c)).map(c => [c, prestataire[c] ?? null]))
+      });
+    }
     return res.status(200).json(prestataire);
   } catch (error) {
     console.error("Erreur modifierPrestataire:", error);
@@ -107,6 +122,7 @@ async function supprimerPrestataire(req, res) {
     );
     if (!prestataire) return res.status(404).json({ message: "Prestataire introuvable." });
 
+    await journaliser(req, { action: 'Suppression', entite: 'Prestataire', entiteId: prestataire._id, resume: `Fiche « ${prestataire.nom} » supprimée` });
     return res.status(200).json({ message: "Prestataire supprimé." });
   } catch (error) {
     console.error("Erreur supprimerPrestataire:", error);
