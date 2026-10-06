@@ -37,6 +37,7 @@ const { data, isLoading } = useQuery({
 const { data: prestataires } = useQuery({
   queryKey: ['prestataires', 'tous-actifs'],
   queryFn: async (): Promise<Prestataire[]> => (await api.get('/api/admin/prestataires', { params: { actif: 'true', limit: 200 } })).data.prestataires,
+  enabled: computed(() => props.ecriture), // Seulement pour le formulaire d'ajout (l'auditeur n'a pas accès aux prestataires)
 })
 
 const rafraichir = () => {

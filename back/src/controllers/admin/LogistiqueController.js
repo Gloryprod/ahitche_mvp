@@ -5,6 +5,7 @@ const Partner = require('../../models/partner');
 const User = require('../../models/user');
 const Zone = require('../../models/zone');
 const { dateDuCreneau } = require('../../services/commandeService');
+const { livreurDuCompte } = require('../../services/perimetreService');
 
 // Statuts qui se planifient (créneau + livreur) : avant le départ en livraison.
 // Une commande en échec repasse d'abord en « Confirmée », ce qui libère son ancien créneau.
@@ -57,14 +58,20 @@ async function obtenirPlanning(req, res) {
     const zones = await Zone.find().lean();
     const zonesParCode = new Map(zones.map(z => [z.code, z]));
 
+    // Gestionnaire livreur (D-17) : ses tournées, les commandes sans livreur et ses compensations
+    const livreurId = await livreurDuCompte(req);
+    const sesTournees = livreurId ? { livreurId } : {};
+    const aPlanifierVisibles = livreurId ? { livreurId: { $in: [null, livreurId] } } : {};
+
     const [duJour, aPlanifier, aConfirmer, compensations] = await Promise.all([
-      Order.find({ deletedAt: null, 'creneau.date': jour, statut: { $ne: 'Annulée' } }).populate(POPULATE).sort({ 'creneau.periode': 1 }),
+      Order.find({ deletedAt: null, 'creneau.date': jour, statut: { $ne: 'Annulée' }, ...sesTournees }).populate(POPULATE).sort({ 'creneau.periode': 1 }),
       Order.find({
         deletedAt: null,
-        $or: [{ statut: { $in: ['Confirmée', 'En préparation'] }, 'creneau.date': null }, { statut: 'Échec' }]
+        $or: [{ statut: { $in: ['Confirmée', 'En préparation'] }, 'creneau.date': null }, { statut: 'Échec' }],
+        ...aPlanifierVisibles
       }).populate(POPULATE).sort({ createdAt: 1 }),
       Order.countDocuments({ deletedAt: null, statut: 'En attente' }),
-      Order.find({ 'compensation.statut': 'À appliquer' }).populate({ path: 'userId', select: 'username telephone' }).select('reference userId compensation dateLivraison').lean()
+      Order.find({ 'compensation.statut': 'À appliquer', ...sesTournees }).populate({ path: 'userId', select: 'username telephone' }).select('reference userId compensation dateLivraison').lean()
     ]);
 
     return res.status(200).json({

@@ -163,6 +163,8 @@ const { data: parametres } = useQuery({
   queryFn: async (): Promise<{ objectifClients: number | null }> => (await api.get('/api/admin/parametres')).data,
   enabled: computed(() => peutLire(authStore.role.value, 'parametres')),
 })
+// Chiffre d'affaires et marges : pas pour les gestionnaires (D-17), mêmes droits que les simulateurs
+const voirMarges = computed(() => peutLire(authStore.role.value, 'simulateurs'))
 const targetClients = computed(() => parametres.value?.objectifClients ?? null)
 
 const estimatedRevenue = computed(() => {
@@ -233,7 +235,8 @@ const formulaQueries = useQueries({
       const response = await api.get(`/api/admin/formulas/${pack.key}`)
       return response.data
     },
-    staleTime: 1000 * 60 * 5 // Cache 5 minutes
+    staleTime: 1000 * 60 * 5, // Cache 5 minutes
+    enabled: voirMarges
   }))
 })
 
@@ -335,7 +338,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
           </div>
         </div>
 
-        <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
+        <div v-if="voirMarges" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
           <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">CA ESTIMÉ / CYCLE</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ estimatedRevenue.toLocaleString('fr-FR') }}</span>
@@ -422,7 +425,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
             </div>
 
             <!-- MARGE BRUTE -->
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
+            <div v-if="voirMarges" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
             <div class="flex items-center justify-between border-b border-gray-100 pb-2">
                 <div>
                 <h2 class="font-bold text-noir text-sm">Marge brute</h2>

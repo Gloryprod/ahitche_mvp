@@ -15,6 +15,8 @@ const userSchema = new mongoose.Schema({
     // Admin principal : seul compte de l'équipe sans déconnexion après 1 h d'inactivité (services/sessionService.js).
     // Posé par scripts/createAdmin.js, ou par scripts/migrerDonnees.js sur le plus ancien admin.
     adminPrincipal: { type: Boolean, default: false },
+    // Gestionnaire qui livre (D-17) : fiche livreur reliée ; il ne voit alors que les clients de ses livraisons
+    livreurId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner', default: null },
     resetPasswordToken: {
         type: String,
         default: null
