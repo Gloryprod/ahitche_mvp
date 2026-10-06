@@ -617,7 +617,7 @@ onMounted(async () => {
 
         <div v-else>
           <!-- VUE DE DESKTOP (Cache sur mobile) -->
-          <div class="hidden md:block overflow-x-auto">
+          <div v-defilable="'Historique de mes commandes'" class="hidden md:block overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="text-gris text-xs font-bold uppercase tracking-wider border-b border-gray-100 pb-3">
@@ -647,7 +647,7 @@ onMounted(async () => {
                       <button 
                         @click="annulerCommande(commande._id)" 
                         title="Annuler la commande"
-                        class="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center justify-center border border-red-100/50"
+                        class="p-2.5 bg-red-50 text-red-800 rounded-xl hover:bg-red-600 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center justify-center border border-red-100/50"
                       >
                         <XIcon class="w-4 h-4" />
                       </button>
@@ -697,7 +697,7 @@ onMounted(async () => {
                 <button 
                   v-if='ANNULABLES_PAR_CLIENT.includes(commande.statut)'
                   @click="annulerCommande(commande._id)"
-                  class="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all active:scale-95"
+                  class="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-800 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all active:scale-95"
                 >
                   <XIcon class="w-3.5 h-3.5" />
                   <span>Annuler</span>

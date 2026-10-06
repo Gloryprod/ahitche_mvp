@@ -138,7 +138,7 @@ const exporterPdf = () => synthese.value && genererSynthesePDF(lignes.value ?? [
       <button @click="exporterPdf" :disabled="!synthese" class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-foret text-white text-xs font-bold disabled:opacity-50"><FileText class="w-3.5 h-3.5" /> Synthèse audit (PDF)</button>
     </div>
 
-    <div class="flex gap-2 overflow-x-auto pb-1" role="tablist">
+    <div v-onglets class="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Sections des finances">
       <button v-for="o in [{ id: 'budget', label: 'Budget Next Impact' }, { id: 'exploitation', label: 'Exploitation' }, { id: 'taux', label: 'Taux & journal' }]"
         :key="o.id" role="tab" :aria-selected="onglet === o.id" @click="onglet = o.id as any"
         :class="['cursor-pointer px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border', onglet === o.id ? 'bg-foret text-white border-foret' : 'bg-white text-gris border-creme2']">

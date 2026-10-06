@@ -267,7 +267,7 @@ const showNotification = (text: string, type: string) => {
         <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl m-4 border">
           Erreur lors de la récupération des bons de commande.
         </div>
-        <div v-else class="p-4 overflow-x-auto">
+        <div v-defilable="'Bons de commande'" v-else class="p-4 overflow-x-auto">
           <div v-if="!data?.bonsCommande || data.bonsCommande.length === 0" class="text-center py-8 text-sm text-gris">
             Aucun bon de commande trouvé.
           </div>

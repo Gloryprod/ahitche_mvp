@@ -51,12 +51,12 @@ const ancre = (cible: string) => (route.path === '/' ? cible : '/' + cible)
         </div>
 
         <div>
-          <h3 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Horaires</h3>
+          <h2 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Horaires</h2>
           <p class="text-gris text-sm leading-relaxed">{{ HORAIRES }}</p>
         </div>
 
         <div>
-          <h3 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Zone de livraison</h3>
+          <h2 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Zone de livraison</h2>
           <p class="text-gris text-sm leading-relaxed">
             Cotonou &amp; Abomey-Calavi<br />
             <span class="text-savane font-medium">22 zones de livraison</span>
@@ -64,7 +64,7 @@ const ancre = (cible: string) => (route.path === '/' ? cible : '/' + cible)
         </div>
 
         <div>
-          <h3 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Liens utiles</h3>
+          <h2 class="text-sm font-bold text-foret uppercase tracking-wider mb-3 font-body">Liens utiles</h2>
           <ul class="space-y-2 text-sm">
             <li><a :href="ancre('#formules')" class="text-gris hover:text-savane transition-colors">Nos formules</a></li>
             <li><a :href="ancre('#comment')" class="text-gris hover:text-savane transition-colors">Comment ça marche</a></li>

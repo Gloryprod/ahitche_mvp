@@ -278,7 +278,7 @@ const showNotification = (text: string, type: string) => {
         <div v-if="isLoading" class="text-sm font-medium text-gris p-6 text-center">Chargement des contenus...</div>
         <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl m-4 border">Erreur: {{ error?.message }}</div>
 
-        <div v-else class="p-4 overflow-x-auto">
+        <div v-defilable="'Contenus publiés'" v-else class="p-4 overflow-x-auto">
           <table class="w-full text-left border-collapse min-w-162.5">
             <thead>
               <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">

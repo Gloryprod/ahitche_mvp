@@ -102,7 +102,7 @@ const champ = 'mt-1 w-full px-3 py-2 rounded-lg border border-creme2 bg-white te
       </form>
 
       <p v-if="!props.lignes.length" class="text-center text-gris py-6 border border-dashed border-creme2 rounded-xl text-xs">Aucune ligne : importez le budget de la convention.</p>
-      <div v-else class="overflow-x-auto">
+      <div v-defilable="'Lignes budgétaires'" v-else class="overflow-x-auto">
         <table class="w-full text-left text-xs border-collapse min-w-180">
           <thead>
             <tr class="text-[10px] uppercase tracking-wider text-gris border-b border-creme2">

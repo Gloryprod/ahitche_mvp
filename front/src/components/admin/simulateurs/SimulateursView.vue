@@ -254,7 +254,7 @@ const etiquette = 'text-[10px] font-bold uppercase text-gris'
       <label :class="etiquette">Commission Mobile Money (%)<input v-model.number="frais.commission" type="number" min="0" max="100" step="0.1" placeholder="à renseigner" :class="champ" /></label>
     </div>
 
-    <div class="flex gap-2 overflow-x-auto pb-1" role="tablist">
+    <div v-onglets class="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Simulateurs">
       <button v-for="o in ONGLETS" :key="o.id" role="tab" :aria-selected="onglet === o.id" @click="onglet = o.id as any"
         :class="['cursor-pointer px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border', onglet === o.id ? 'bg-foret text-white border-foret' : 'bg-white text-gris border-creme2']">
         {{ o.label }}
@@ -305,7 +305,7 @@ const etiquette = 'text-[10px] font-bold uppercase text-gris'
         <p v-if="simulation.prixManquants" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5">{{ simulation.prixManquants }} produit(s) sans prix au catalogue : coût incomplet.</p>
         <p v-if="simulation.produitsSansAchat" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5">* {{ simulation.produitsSansAchat }} produit(s) sans achat enregistré : leur coût réel reprend le prix catalogue.</p>
         <p v-if="!simulation.lignes.length" class="text-xs text-gris text-center py-4 border border-dashed border-creme2 rounded-xl">Aucun produit dans la composition : complétez le catalogue (Produits).</p>
-        <div v-else class="overflow-x-auto">
+        <div v-defilable="'Composition et coûts du pack'" v-else class="overflow-x-auto">
           <table class="w-full text-left text-xs border-collapse min-w-130">
             <thead><tr class="text-[10px] uppercase tracking-wider text-gris border-b border-creme2">
               <th class="py-2 pr-2">Produit</th><th class="py-2 pr-2 text-right">Quantité</th><th class="py-2 pr-2 text-right">Coût catalogue</th><th class="py-2 text-right">Coût réel</th>
@@ -343,7 +343,7 @@ const etiquette = 'text-[10px] font-bold uppercase text-gris'
           <button @click="exporterAchats" class="cursor-pointer ml-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-foret text-white text-xs font-bold"><FileText class="w-3.5 h-3.5" /> PDF</button>
         </div>
         <p v-if="achats.prixManquants" class="text-xs text-amber-800">{{ achats.prixManquants }} produit(s) sans prix : coût total incomplet.</p>
-        <div class="overflow-x-auto">
+        <div v-defilable="'Besoins et achats'" class="overflow-x-auto">
           <table class="w-full text-left text-xs border-collapse min-w-130">
             <thead><tr class="text-[10px] uppercase tracking-wider text-gris border-b border-creme2">
               <th class="py-2 pr-2">Produit</th><th class="py-2 pr-2 text-right">Besoin</th><th class="py-2 pr-2 text-right">En stock</th><th class="py-2 pr-2 text-right">À acheter</th><th class="py-2 text-right">Coût estimé</th>

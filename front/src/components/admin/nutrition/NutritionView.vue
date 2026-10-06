@@ -99,10 +99,11 @@ const lienWhatsApp = (telephone: string, nom: string, texte: string) =>
       <p class="text-xs text-gris flex items-start gap-1.5"><ShieldCheck class="w-3.5 h-3.5 shrink-0 mt-0.5 text-savane" /> Seuls les clients qui ont rempli le questionnaire et donné leur accord apparaissent ici. Aucune donnée de santé n'est collectée tant que l'autorisation de l'APDP n'est pas obtenue.</p>
     </div>
 
-    <div class="flex gap-2" role="tablist">
-      <button role="tab" aria-selected="true" class="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border bg-foret text-white border-foret">Clients suivis ({{ clients?.length ?? 0 }})</button>
+    <!-- Navigation entre les deux écrans de la nutrition (pas des onglets : les idées de repas ont leur page) -->
+    <nav aria-label="Nutrition" class="flex gap-2">
+      <span aria-current="page" class="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border bg-foret text-white border-foret">Clients suivis ({{ clients?.length ?? 0 }})</span>
       <RouterLink to="/dashboard/admin/idees-repas" class="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border bg-white text-gris border-creme2">Idées de repas →</RouterLink>
-    </div>
+    </nav>
 
     <!-- CLIENTS SUIVIS -->
     <div v-if="onglet === 'clients'" class="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">

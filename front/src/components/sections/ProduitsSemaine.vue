@@ -22,7 +22,7 @@ const produits = [
       <p class="text-gris mb-8">À ajouter à votre formule, livré avec elle.</p>
 
       <!-- Mobile : rangée à faire glisser ; ordinateur : grille -->
-      <ul class="flex lg:grid lg:grid-cols-5 gap-3 lg:gap-4 -mx-6 px-6 lg:max-w-[960px] lg:mx-auto lg:px-0 mb-10 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-px-6 pb-2 [scrollbar-width:none]">
+      <ul tabindex="0" aria-label="Produits de la semaine" class="flex lg:grid lg:grid-cols-5 gap-3 lg:gap-4 -mx-6 px-6 lg:max-w-[960px] lg:mx-auto lg:px-0 mb-10 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-px-6 pb-2 [scrollbar-width:none]">
         <li
           v-for="prod in produits"
           :key="prod.nom"

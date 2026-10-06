@@ -88,13 +88,21 @@
 
 <script setup lang="ts">
 import PanneauMarque from '@/components/ui/PanneauMarque.vue'
-import { ref } from 'vue';
+import { ref, h, defineAsyncComponent } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 import LienAccueil from '@/components/ui/LienAccueil.vue';
-import { VueTelInput } from 'vue-tel-input';
-import 'vue-tel-input/vue-tel-input.css';
+// Champ téléphone chargé après l'affichage de la page : il embarque la numérotation de tous les pays (~150 Ko),
+// ce qui retardait l'affichage sur mobile. Pendant le chargement, un champ de même taille évite le décalage.
+const VueTelInput = defineAsyncComponent({
+  loader: async () => {
+    const [module] = await Promise.all([import('vue-tel-input'), import('vue-tel-input/vue-tel-input.css')])
+    return module.VueTelInput
+  },
+  loadingComponent: { render: () => h('div', { class: 'champ-telephone h-12 w-full', 'aria-busy': 'true' }) },
+  delay: 0,
+})
 
 const formRegister = ref({ username: '', email: '', password: '', telephone:'' })
 const isLoading = ref(false)

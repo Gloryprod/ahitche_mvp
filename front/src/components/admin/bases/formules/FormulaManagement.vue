@@ -151,7 +151,7 @@ const getPeriodText = computed(() => {
           <Layers class="w-4 h-4 text-gris" /> Composition de la dotation commerciale
         </h3>
         
-        <div class="overflow-x-auto">
+        <div v-defilable="'Composition du pack'" class="overflow-x-auto">
           <table class="w-full text-left border-collapse min-w-137.5">
             <thead>
               <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
@@ -197,7 +197,7 @@ const getPeriodText = computed(() => {
           
           <!-- Prix système généré -->
           <div>
-            <span class="text-[10px] block opacity-70">COÛT DES MATIÈRES (PRIX DU CATALOGUE)</span>
+            <span class="text-[10px] block font-bold">COÛT DES MATIÈRES (PRIX DU CATALOGUE)</span>
             <h2 class="text-2xl font-black tracking-tight font-mono">
               {{ data?.prixCalcule?.toLocaleString('fr-FR') }} <span class="text-sm font-bold">FCFA</span>
             </h2>

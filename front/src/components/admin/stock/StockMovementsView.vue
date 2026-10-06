@@ -96,8 +96,8 @@ const formatDateHeure = (dateStr: string) => {
       
       <!-- Sélecteur de filtre de type de flux -->
       <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
-        <label class="text-gris font-bold uppercase text-[10px] tracking-wider hidden sm:inline">Filtrer par :</label>
-        <select v-model="typeFiltre" class="px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret focus:bg-white transition-all w-full sm:w-48">
+        <label for="filtre-mouvements" class="text-gris font-bold uppercase text-[10px] tracking-wider hidden sm:inline">Filtrer par :</label>
+        <select id="filtre-mouvements" v-model="typeFiltre" aria-label="Filtrer par type de mouvement" class="px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret focus:bg-white transition-all w-full sm:w-48">
           <option value="">Tous les flux</option>
           <option value="entree">📥 Entrées de stock</option>
           <option value="sortie">📤 Sorties de stock (FIFO)</option>
@@ -123,7 +123,7 @@ const formatDateHeure = (dateStr: string) => {
           Aucun mouvement de stock enregistré pour ce filtre.
         </div>
 
-        <div v-else class="space-y-4 overflow-x-auto">
+        <div v-defilable="'Mouvements de stock'" v-else class="space-y-4 overflow-x-auto">
           <table class="w-full text-left border-collapse">
             <thead>
               <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">

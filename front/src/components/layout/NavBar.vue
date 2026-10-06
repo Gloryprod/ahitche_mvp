@@ -18,7 +18,9 @@ const router = useRouter()
 const route = useRoute()
 // Ancre de l'accueil : telle quelle sur l'accueil, précédée de « / » ailleurs (blog, mentions, page 404…)
 const ancre = (cible: string) => (route.path === '/' ? cible : `/${cible}`)
-const isScrolled = ref(false)
+const defile = ref(false)
+// Menu opaque dès qu'on défile, et toujours hors de l'accueil : le texte blanc n'est lisible que sur la photo du hero
+const fondPlein = computed(() => defile.value || route.path !== '/')
 const isMenuOpen = ref(false)
 const scrollProgress = ref(0)
 const authStore = useAuthStore()
@@ -38,7 +40,7 @@ const handleScroll = () => {
   const scrollTop = window.scrollY
   const docHeight = document.documentElement.scrollHeight - window.innerHeight
   scrollProgress.value = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0
-  isScrolled.value = scrollTop > 50
+  defile.value = scrollTop > 50
 }
 
 const toggleMenu = () => {
@@ -124,13 +126,13 @@ onUnmounted(() => {
     id="navbar" 
     :class="[
       'fixed top-0 left-0 right-0 z-100 padding py-3.5 transition-all duration-250',
-      isScrolled ? 'bg-creme/96 backdrop-blur-md shadow-[0_2px_20px_rgba(26,92,56,0.09)]' : 'bg-transparent'
+      fondPlein ? 'bg-creme/96 backdrop-blur-md shadow-[0_2px_20px_rgba(26,92,56,0.09)]' : 'bg-transparent'
     ]"
   >
     <div class="max-w-[1160px] mx-auto px-6 flex justify-between items-center gap-4">
       <a :href="route.path === '/' ? '#accueil' : '/'" class="flex items-center gap-2 font-display text-2xl font-bold tracking-tight shrink-0" aria-label="Ahitché — Accueil">
         <img src="/logo-ahitche-96.webp" alt="" width="40" height="40" class="w-9 h-9 sm:w-10 sm:h-10" />
-        <span class="hidden min-[400px]:inline"><span :class="isScrolled ? 'text-foret' : 'text-white'">Ahi</span><span :class="isScrolled ? 'text-or-deep' : 'text-or'">tché</span></span>
+        <span class="hidden min-[400px]:inline"><span :class="fondPlein ? 'text-foret' : 'text-white'">Ahi</span><span :class="fondPlein ? 'text-or-deep' : 'text-or'">tché</span></span>
       </a>
 
       <!-- Liens (ordinateur) -->
@@ -139,7 +141,7 @@ onUnmounted(() => {
           v-for="lien in LIENS"
           :key="lien.href"
           :href="ancre(lien.href)"
-          :class="['text-sm font-semibold transition-colors duration-250', isScrolled ? 'text-gris hover:text-foret' : 'text-white/85 hover:text-white']"
+          :class="['text-sm font-semibold transition-colors duration-250', fondPlein ? 'text-gris hover:text-foret' : 'text-white/85 hover:text-white']"
         >
           {{ lien.texte }}
         </a>
@@ -155,7 +157,7 @@ onUnmounted(() => {
           :aria-label="libelleCompte"
           :class="[
             'cursor-pointer inline-flex items-center justify-center gap-2 min-w-11 min-h-11 px-2 md:px-3 rounded-full text-sm font-semibold transition-colors duration-250',
-            isScrolled ? 'text-foret hover:bg-foret/8' : 'text-white hover:bg-white/12'
+            fondPlein ? 'text-foret hover:bg-foret/8' : 'text-white hover:bg-white/12'
           ]"
         >
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
@@ -179,9 +181,9 @@ onUnmounted(() => {
           :aria-expanded="isMenuOpen ? 'true' : 'false'"
           aria-label="Menu"
         >
-          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', isScrolled ? 'bg-foret' : 'bg-white', isMenuOpen ? 'w-[22px] translate-y-[7px] rotate-45' : 'w-[22px]']"></span>
-          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', isScrolled ? 'bg-foret' : 'bg-white', isMenuOpen ? 'opacity-0 scale-x-0' : 'w-[22px]']"></span>
-          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', isScrolled ? 'bg-foret' : 'bg-white', isMenuOpen ? 'w-[22px] -translate-y-[7px] -rotate-45' : 'w-[22px]']"></span>
+          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', fondPlein ? 'bg-foret' : 'bg-white', isMenuOpen ? 'w-[22px] translate-y-[7px] rotate-45' : 'w-[22px]']"></span>
+          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', fondPlein ? 'bg-foret' : 'bg-white', isMenuOpen ? 'opacity-0 scale-x-0' : 'w-[22px]']"></span>
+          <span :class="['block h-0.5 rounded-sm transition-all duration-300 origin-center', fondPlein ? 'bg-foret' : 'bg-white', isMenuOpen ? 'w-[22px] -translate-y-[7px] -rotate-45' : 'w-[22px]']"></span>
         </button>
       </div>
     </div>

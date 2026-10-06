@@ -184,7 +184,7 @@ function showNotification(text: string, type: string) {
         <div v-else-if="isError" class="p-4 m-4 bg-red-50 text-red-800 rounded-xl border">Erreur : {{ error?.message }}</div>
         <div v-else class="p-4">
           <p class="mb-3 font-semibold">Produits au catalogue : <span class="px-2 py-0.5 bg-foret/10 text-foret rounded-full font-bold">{{ data?.total || 0 }}</span></p>
-          <div class="overflow-x-auto">
+          <div v-defilable="'Produits'" class="overflow-x-auto">
             <table class="w-full text-left border-collapse min-w-200">
               <thead>
                 <tr class="border-b border-creme2 text-[10px] font-bold uppercase tracking-wider text-gris">

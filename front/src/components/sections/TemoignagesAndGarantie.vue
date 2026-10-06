@@ -22,7 +22,7 @@ const COULEURS_AVATAR = ['bg-foret text-or', 'bg-or text-noir', 'bg-savane text-
         </div>
 
         <!-- Mobile : cartes à faire glisser ; ordinateur : trois colonnes -->
-        <ul class="flex md:grid md:grid-cols-3 gap-4 md:gap-6 -mx-4 px-4 md:mx-0 md:px-0 mb-10 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-px-4 pb-2 [scrollbar-width:none]">
+        <ul tabindex="0" aria-label="Avis de clients" class="flex md:grid md:grid-cols-3 gap-4 md:gap-6 -mx-4 px-4 md:mx-0 md:px-0 mb-10 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-px-4 pb-2 [scrollbar-width:none]">
           <li
             v-for="(t, i) in TEMOIGNAGES"
             :key="t.prenom"

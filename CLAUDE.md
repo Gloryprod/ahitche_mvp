@@ -56,6 +56,7 @@ Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`,
 ## Conventions
 - Le code, les commentaires et les messages sont en français. On garde le style existant (`async function` + `module.exports` côté back, `<script setup lang="ts">` côté front).
 - La commande se fait principalement par WhatsApp (`wa.me/22998136635`) avec un message pré-rempli.
+- Les prix publics figurent aussi dans `front/public/llms.txt` (résumé pour les assistants IA) : à tenir à jour avec la vitrine.
 - Les prix des packs sont définis à deux endroits : dans `front/src/config/formules.ts` (vitrine : cartes et prix d'appel du hero) et en base (`Formule`, référentiel dans `back/src/scripts/createFormules.js`). Toute modification de prix doit être faite aux deux endroits.
 - Prix de vente = `prixCommercial` s'il est fixé par l'admin, sinon `prixActuel`. `GET /api/admin/formulas/:pack` est en lecture seule et renvoie la valeur issue du catalogue dans `prixCalcule`.
 - Une commande client est enregistrée par le serveur, qui fixe lui-même le prix et la référence `CMD-xxx` (`orderReferenceService`). Les packs `bientotDisponible` (Réserve, Fraîcheur) sont visibles mais ne peuvent pas être commandés.
@@ -68,6 +69,6 @@ Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`,
 - Idées de repas (section `repas`) : rédigées par les gestionnaires et le nutritionniste, publiées par l'admin seulement, avec la mention « Ces conseils ne remplacent pas l'avis d'un professionnel de santé. »
 - Simulateurs : paramètres enregistrés côté serveur, vides par défaut ; méthode du référentiel (matières × coefficient, ÷ (1 − marge cible)).
 - Nutrition : aucune donnée de santé ni conviction religieuse sans autorisation préalable de l'APDP (Code du numérique, art. 394).
-- Écrans admin : vérifier l'affichage à 375 px ; la Logistique est conçue d'abord pour le téléphone.
+- Écrans admin : vérifier l'affichage à 375 px ; la Logistique est conçue d'abord pour le téléphone. Accessibilité : `v-defilable="'Nom'"` sur une zone qui défile sans élément cliquable (admin ; attributs statiques sur l'accueil, pour la vitesse), `v-onglets` sur une barre `role="tablist"` ; couleurs de texte de la charte (`text-gris`, jamais `text-gray-*`) ; un h1 par page ; titre d'onglet dans `TITRES` du routeur.
 - Navigation et session : la déconnexion passe par `useDeconnexion` (retour à l'accueil, cache vidé, session gardée si le serveur ne confirme pas). Toute page affichée sans le menu du site (`hideNavigation`) propose `LienAccueil`. Une page protégée renvoie vers `/login?redirect=…` (et `&session=expiree` sur un 401) ; seuls les chemins internes sont acceptés comme `redirect`.
 - Session : `GET /api/auth/session` (toujours 200, `user: null` pour un visiteur) sert à l'affichage (« Mon espace » dans le menu du site). Cookie et jeton passent par `back/src/services/sessionService.js` : 1 jour pour les clients et l'admin principal (`User.adminPrincipal`), 1 h glissante pour le reste de l'équipe, avec déconnexion côté navigateur après 1 h sans activité (`useDeconnexionInactivite`, avertissement 2 min avant, `/login?session=inactivite`).

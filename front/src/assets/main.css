@@ -80,3 +80,6 @@ section[id] {
 .Vue-Toastification__container .Vue-Toastification__toast--error { background-color: #B42318; }
 .Vue-Toastification__container .Vue-Toastification__toast--warning { background-color: #8A5A00; }
 .Vue-Toastification__container .Vue-Toastification__toast--info { background-color: #2E7D4F; }
+
+/* Zone qui défile horizontalement, atteinte au clavier : contour visible */
+[data-defilable]:focus-visible, ul[tabindex="0"]:focus-visible { outline: 2px solid var(--color-foret); outline-offset: 2px; border-radius: 0.75rem; }

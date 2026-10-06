@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 // Seul l'accueil est dans le paquet principal : les autres pages se chargent à la demande
 import HomeView from '../views/HomeView.vue'
+// Page 404 dans le paquet principal (très légère) : pas de décalage du pied de page pendant son chargement
+import NotFoundView from '../views/NotFoundView.vue'
 import { useAuthStore } from '../stores/auth';
 import { ACCES, EQUIPE, espaceParDefaut, type Role } from '@/config/roles';
 
@@ -171,7 +173,7 @@ const router = createRouter({
     {
       path: '/:cheminInconnu(.*)*',
       name: 'page-introuvable',
-      component: () => import('@/views/NotFoundView.vue'),
+      component: NotFoundView,
     },
   ],
 })

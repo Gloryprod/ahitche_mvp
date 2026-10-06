@@ -310,7 +310,7 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
         </div>
         <div v-else class="p-4">
           <p v-if="!data?.lots?.length" class="text-center py-6 text-sm text-gris">Aucun lot ne correspond.</p>
-          <div v-else class="overflow-x-auto">
+          <div v-defilable="'Lots de stock'" v-else class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
@@ -333,7 +333,7 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
                   <td class="py-3 px-3 text-center whitespace-nowrap">
                     <span v-if="estACompter(lot)" class="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-bold">à compter</span>
                     <template v-else>
-                      <span :class="[lot.quantiteRestante === 0 ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-noir', 'px-2 py-0.5 rounded font-mono font-bold']">{{ lot.quantiteRestante }}</span>
+                      <span :class="[lot.quantiteRestante === 0 ? 'bg-red-50 text-red-800' : 'bg-gray-100 text-noir', 'px-2 py-0.5 rounded font-mono font-bold']">{{ lot.quantiteRestante }}</span>
                       <span class="text-gris font-mono text-[10px]"> / {{ lot.quantiteInitiale }} {{ uniteLot(lot) }}</span>
                     </template>
                   </td>

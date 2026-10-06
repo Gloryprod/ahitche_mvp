@@ -233,7 +233,7 @@ const handleOrderSuccess = () => {
         Aucune commande ne correspond à ces critères.
       </div>
 
-      <div v-else class="overflow-x-auto">
+      <div v-defilable="'Commandes'" v-else class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-xs">
           <thead>
             <tr class="border-b border-gray-100 text-[10px] text-gris font-bold uppercase tracking-wider">

@@ -181,7 +181,7 @@ const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
     </div>
 
     <!-- Onglets -->
-    <div class="flex gap-2 overflow-x-auto pb-1" role="tablist">
+    <div v-onglets class="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Vues de la logistique">
       <button v-for="o in [
           { id: 'tournees', label: `Tournées (${data?.duJour.length ?? 0})` },
           { id: 'planifier', label: `À planifier (${data?.aPlanifier.length ?? 0})` },

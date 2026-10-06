@@ -441,7 +441,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                 Calcul des coûts et marges par formule...
             </div>
 
-            <div v-else class="overflow-x-auto">
+            <div v-defilable="'Marge brute par formule'" v-else class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="border-b border-gray-100 text-[10px] font-bold text-gris uppercase tracking-wider">

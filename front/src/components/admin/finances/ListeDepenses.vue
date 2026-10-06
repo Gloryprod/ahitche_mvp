@@ -247,7 +247,7 @@ const etiquette = 'font-bold uppercase text-[10px] text-gris'
     <!-- Liste -->
     <p v-if="isLoading" class="text-center text-gris py-6">Chargement...</p>
     <p v-else-if="!data?.depenses.length" class="text-center text-gris py-6 border border-dashed border-creme2 rounded-xl">Aucune dépense pour ce filtre.</p>
-    <div v-else class="overflow-x-auto">
+    <div v-defilable="'Dépenses'" v-else class="overflow-x-auto">
       <table class="w-full text-left text-xs border-collapse min-w-190">
         <thead>
           <tr class="text-[10px] uppercase tracking-wider text-gris border-b border-creme2">

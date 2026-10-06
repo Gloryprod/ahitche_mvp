@@ -121,7 +121,7 @@ const closePanels = () => {
             <div class="w-px h-4 bg-gray-200"></div>
             <div class="flex items-center gap-2">
               <span class="text-red-700">Alertes Actives :</span>
-              <span class="px-2.5 py-1 bg-red-50 text-red-600 rounded-full font-bold text-[11px] border border-red-100">
+              <span class="px-2.5 py-1 bg-red-50 text-red-800 rounded-full font-bold text-[11px] border border-red-100">
                 {{ totalAlertes }}
               </span>
             </div>
@@ -139,7 +139,7 @@ const closePanels = () => {
           Erreur : {{ error?.message || "Impossible de générer le bilan de l'inventaire." }}
         </div>
 
-        <div v-else class="p-4 overflow-x-auto">
+        <div v-defilable="'Inventaire'" v-else class="p-4 overflow-x-auto">
             <table class="w-full text-left border-collapse">
             <thead>
                 <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
