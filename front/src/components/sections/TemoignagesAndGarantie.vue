@@ -67,7 +67,7 @@ const COULEURS_AVATAR = ['bg-foret text-or', 'bg-or text-noir', 'bg-savane text-
           <div class="text-center md:text-left">
             <h3 class="text-xl font-bold font-body text-or mb-2">Garantie Ahitché</h3>
             <p class="text-white/90 text-sm md:text-base leading-relaxed">
-              Si votre formule est incomplète ou livrée avec plus de 24&nbsp;h de retard, le produit manquant ou un bon de compensation vous est offert à la prochaine livraison. <strong class="text-white font-bold">Sans discussion.</strong>
+              Si un produit de votre formule manque ou arrive abîmé, il est remplacé à l'identique à la prochaine livraison. <strong class="text-white font-bold">Sans discussion.</strong>
             </p>
           </div>
         </div>

@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import BaseButton from '../ui/BaseButton.vue'
 import PhotoAFournir from '../ui/PhotoAFournir.vue'
-import { lienWhatsApp, MESSAGES_WHATSAPP, DELAI_LIVRAISON } from '@/config/contact'
+import { lienWhatsApp, MESSAGES_WHATSAPP, LIVRAISON_ANNONCE } from '@/config/contact'
 import { PRIX_D_APPEL, PRODUITS_INCLUS, formaterPrix } from '@/config/formules'
 import { PHOTOS } from '@/config/photos'
 
 // Les trois engagements qui lèvent les freins à la première commande
 const reassurances = [
   { texte: 'Paiement à la livraison', icone: 'paiement' },
-  { texte: `Livraison sous ${DELAI_LIVRAISON}`, icone: 'livraison' },
-  { texte: 'Satisfait ou compensé', icone: 'garantie' },
+  { texte: LIVRAISON_ANNONCE, icone: 'livraison' },
+  { texte: 'Produit manquant remplacé', icone: 'garantie' },
 ] as const
 </script>
 
@@ -35,7 +35,7 @@ const reassurances = [
 
         <p class="text-base sm:text-lg text-white/90 mb-8 md:max-w-xl">
           Pour une alimentation suivie et organisée sans stress&nbsp;: {{ PRODUITS_INCLUS.length }} produits de base
-          composés selon votre foyer, dès <strong class="text-or font-bold text-xl whitespace-nowrap">{{ formaterPrix(PRIX_D_APPEL) }} FCFA</strong>.
+          composés selon votre foyer, dès <strong class="text-or font-bold text-xl whitespace-nowrap">{{ formaterPrix(PRIX_D_APPEL) }} FCFA</strong> par semaine.
         </p>
 
         <div class="flex flex-col sm:flex-row gap-3 justify-center md:justify-start mb-8">

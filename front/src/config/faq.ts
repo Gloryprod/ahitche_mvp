@@ -1,6 +1,6 @@
 // Questions fréquentes de l'accueil : réponses fondées sur les règles validées (docs/conception-menu-admin.md).
 // Elles alimentent aussi les données structurées FAQPage (référencement local).
-import { DELAI_LIVRAISON, HORAIRES } from './contact'
+import { JOURS_LIVRAISON, PAIEMENT_ANNONCE, HORAIRES } from './contact'
 import { PRODUITS_INCLUS } from './formules'
 
 export interface QuestionFaq {
@@ -16,23 +16,23 @@ export const FAQ: QuestionFaq[] = [
   },
   {
     question: 'Quand et comment je paie ?',
-    reponse: 'Vous payez à la livraison, une fois vos vivres reçus, par MTN MoMo ou Moov Money. Rien n\'est à régler à l\'avance.',
+    reponse: `Vous payez à la livraison, une fois vos vivres reçus, par ${PAIEMENT_ANNONCE}. Rien n'est à régler à l'avance.`,
   },
   {
     question: 'Où livrez-vous ?',
     reponse: 'À Cotonou et à Abomey-Calavi, dans 22 zones de livraison couvrant leurs arrondissements. Indiquez votre quartier à la commande : nous confirmons la zone avec vous.',
   },
   {
-    question: 'Quels sont les délais de livraison ?',
-    reponse: `Vous êtes livré sous ${DELAI_LIVRAISON} après confirmation de la commande. Le livreur vous appelle avant d'arriver. Nous répondons sur WhatsApp : ${HORAIRES}.`,
+    question: 'Quand suis-je livré ?',
+    reponse: `Nous livrons à jour fixe${JOURS_LIVRAISON ? `, ${JOURS_LIVRAISON}` : ''} : le jour et le créneau vous sont confirmés à la commande. Le livreur vous appelle avant d'arriver. Nous répondons sur WhatsApp : ${HORAIRES}.`,
   },
   {
     question: 'Que contient un pack ?',
     reponse: `Les ${PRODUITS_INCLUS.length} produits de base (riz local, gari, haricots, huile, tomates, oignons…), en quantités adaptées à la formule et à la taille de votre foyer. Le contenu exact peut varier selon les saisons. La formule Essentiel ne contient pas d'huile de palme.`,
   },
   {
-    question: 'Et si un produit manque ou si la livraison est en retard ?',
-    reponse: 'C\'est la garantie Ahitché : si votre formule est incomplète ou livrée avec plus de 24 h de retard, le produit manquant ou un bon de compensation vous est offert à la livraison suivante.',
+    question: 'Et si un produit manque ou arrive abîmé ?',
+    reponse: 'C\'est la garantie Ahitché : tout produit manquant ou abîmé est remplacé à l\'identique à la livraison suivante.',
   },
   {
     question: 'Comment se passe le renouvellement ?',

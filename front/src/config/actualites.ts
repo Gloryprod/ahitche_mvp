@@ -1,6 +1,6 @@
 // Trois actualités de l'accueil (faits vérifiés, sans date inventée). Les articles complets restent dans le blog
 // (/blog, gérés depuis le back-office « Contenus & Médias »).
-import { DELAI_LIVRAISON, RESEAUX_SOCIAUX } from './contact'
+import { LIVRAISON_ANNONCE, RESEAUX_SOCIAUX } from './contact'
 import { PRODUITS_INCLUS } from './formules'
 
 export interface Actualite {
@@ -16,7 +16,7 @@ export const ACTUALITES: Actualite[] = [
     categorie: 'Lancement',
     icone: 'lancement',
     titre: 'Ahitché livre à Cotonou et Abomey-Calavi',
-    resume: `Trois formules, ${PRODUITS_INCLUS.length} produits de base, livraison sous ${DELAI_LIVRAISON} et paiement à la livraison : le ravitaillement de votre foyer, sans passer vos samedis au marché.`,
+    resume: `Trois formules, ${PRODUITS_INCLUS.length} produits de base, ${LIVRAISON_ANNONCE.toLowerCase()} et paiement à la livraison : le ravitaillement de votre foyer, sans passer vos samedis au marché.`,
     lien: { texte: 'Découvrir les formules', vers: '#formules' },
   },
   {

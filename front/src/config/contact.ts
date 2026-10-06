@@ -23,4 +23,8 @@ export const RESEAUX_SOCIAUX = [
 ] as const
 
 export const HORAIRES = 'Lundi – Samedi, 9h00 – 18h00'
-export const DELAI_LIVRAISON = '24 h' // Délai de livraison annoncé sur l'accueil (espace insécable)
+// Livraison à jour fixe (D-07) : les jours de tournée se fixent avec le livreur ; vide tant qu'ils ne sont pas confirmés
+export const JOURS_LIVRAISON = '' // Ex : « le mardi et le samedi »
+export const LIVRAISON_ANNONCE = JOURS_LIVRAISON ? `Livraison ${JOURS_LIVRAISON}` : 'Livraison à jour fixe'
+// Paiement à la livraison (D-06) : Mobile Money ou espèces
+export const PAIEMENT_ANNONCE = 'MTN MoMo, Moov Money ou espèces'

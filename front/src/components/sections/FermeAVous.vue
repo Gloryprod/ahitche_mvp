@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PhotoAFournir from '../ui/PhotoAFournir.vue'
 import { PHOTOS } from '@/config/photos'
-import { DELAI_LIVRAISON } from '@/config/contact'
+import { LIVRAISON_ANNONCE } from '@/config/contact'
 import { vApparition } from '@/directives/apparition'
 
 // Le chemin des vivres en 5 étapes : rendre la chaîne visible pour justifier la qualité et le prix
@@ -9,7 +9,7 @@ const etapes = [
   { icone: 'production', titre: 'Production', texte: 'Nous sélectionnons les produits locaux auprès de producteurs du Bénin : riz, maïs, gari, tomates…', photo: PHOTOS.fermeProduction },
   { icone: 'recolte', titre: 'Récolte et tri', texte: 'Les produits frais sont choisis et triés pour ne garder que ce que nous servirions chez nous.', photo: PHOTOS.fermeRecolte },
   { icone: 'preparation', titre: 'Préparation', texte: 'Votre pack est composé selon la taille de votre foyer, vérifié puis emballé.', photo: PHOTOS.fermePreparation },
-  { icone: 'livraison', titre: 'Livraison', texte: `Livré chez vous sous ${DELAI_LIVRAISON} à Cotonou et Abomey-Calavi ; le livreur vous appelle avant d'arriver.`, photo: PHOTOS.fermeLivraison },
+  { icone: 'livraison', titre: 'Livraison', texte: `${LIVRAISON_ANNONCE}, chez vous à Cotonou et Abomey-Calavi ; le livreur vous appelle avant d'arriver.`, photo: PHOTOS.fermeLivraison },
   { icone: 'reception', titre: 'Réception', texte: 'Vous payez à la livraison, et nous suivons votre alimentation semaine après semaine.', photo: PHOTOS.fermeReception },
 ] as const
 </script>

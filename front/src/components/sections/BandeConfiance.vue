@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PAIEMENT_ANNONCE } from '@/config/contact'
 // Bande de confiance, juste sous le hero : rassurer avant le choix d'une formule.
 // Soutien institutionnel cité en texte (logos des partenaires seulement avec leur autorisation).
 const elements = [
@@ -10,12 +11,12 @@ const elements = [
   {
     icone: 'paiement',
     titre: 'Vous payez à la livraison',
-    texte: 'MTN MoMo ou Moov Money, une fois vos vivres reçus.',
+    texte: `${PAIEMENT_ANNONCE}, une fois vos vivres reçus.`,
   },
   {
     icone: 'garantie',
     titre: 'Garantie Ahitché',
-    texte: 'Produit manquant ou retard de plus de 24 h : compensé à la livraison suivante.',
+    texte: "Produit manquant ou abîmé : remplacé à l'identique à la livraison suivante.",
   },
 ] as const
 </script>

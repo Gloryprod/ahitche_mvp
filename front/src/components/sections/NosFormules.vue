@@ -3,7 +3,7 @@ import { ref, computed, nextTick } from 'vue'
 import FormuleCard from '../ui/FormuleCard.vue'
 import {
   FORMULES as formules, PRODUITS_INCLUS as produitsInclus, EXCLUS_ESSENTIEL as exclusEssentiel,
-  TAILLES_FOYER, formaterPrix, prixParJour, type TailleFoyer,
+  TAILLES_FOYER, formaterPrix, type TailleFoyer,
 } from '@/config/formules'
 
 // Comparateur « taille du foyer » : conseille une formule et la met en avant
@@ -39,7 +39,7 @@ async function choisirFoyer(valeur: TailleFoyer) {
         </h2>
       </div>
 
-      <!-- Comparateur : taille du foyer → formule conseillée et prix par jour -->
+      <!-- Comparateur : taille du foyer → formule conseillée et prix par semaine -->
       <fieldset class="max-w-2xl mx-auto mb-10 text-center">
         <legend class="w-full text-base font-bold text-noir mb-4">Combien êtes-vous à la maison ?</legend>
         <div class="flex flex-wrap justify-center gap-2">
@@ -61,8 +61,7 @@ async function choisirFoyer(valeur: TailleFoyer) {
           <Transition name="fondu" mode="out-in">
             <span v-if="conseillee" :key="conseillee.nom">
               Pour {{ libelleFoyer }}, nous conseillons <strong class="text-foret">{{ conseillee.nom }}</strong> :
-              {{ formaterPrix(conseillee.prix) }} FCFA par mois, soit environ
-              <strong class="text-foret whitespace-nowrap">{{ formaterPrix(prixParJour(conseillee)) }} FCFA par jour</strong>.
+              <strong class="text-foret whitespace-nowrap">{{ formaterPrix(conseillee.prix) }} FCFA par semaine</strong>.
             </span>
             <span v-else key="invite">Choisissez la taille de votre foyer : nous vous indiquons la formule adaptée.</span>
           </Transition>
