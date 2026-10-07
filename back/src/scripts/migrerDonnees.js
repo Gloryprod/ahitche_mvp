@@ -19,7 +19,8 @@ dotenv.config();
 
 // Étape 1 : l'ancien index unique sur le téléphone bloquait tous les comptes sans téléphone
 async function migrerIndexTelephone() {
-  const index = await User.collection.indexes();
+  // Base neuve : pas encore de collection des comptes, donc pas d'ancien index
+  const index = await User.collection.indexes().catch(e => (e.codeName === 'NamespaceNotFound' ? [] : Promise.reject(e)));
   const ancien = index.find(i => i.name === 'telephone_1');
   if (ancien) {
     await User.collection.dropIndex('telephone_1');
