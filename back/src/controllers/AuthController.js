@@ -62,9 +62,19 @@ async function login(req, res) {
         // Jeton JWT dans un cookie HttpOnly : 1 jour, ou 1 h glissante pour l'équipe (sauf l'admin principal)
         const inactivite = ouvrirSession(res, user);
 
-        // On renvoie l'utilisateur au front, MAIS SANS LE TOKEN textuel
+        // On renvoie l'utilisateur au front, MAIS SANS LE TOKEN textuel.
+        // Les champs profil sont nécessaires au dashboard pour pré-remplir la fiche client.
         res.json({
-            user: { id: user._id, username: user.username, email: user.email, role: user.role || 'user' },
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                role: user.role || 'user',
+                telephone: user.telephone || '',
+                quartier: user.quartier || '',
+                adresse: user.adresse || '',
+                formuleHabituelle: user.formuleHabituelle || ''
+            },
             message: "Connexion réussie !",
             inactivite // Minutes d'inactivité avant déconnexion automatique (null : pas de limite)
         });

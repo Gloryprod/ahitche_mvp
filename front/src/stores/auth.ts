@@ -61,7 +61,23 @@ export function useAuthStore() {
     // En cas d'erreur, c'est le composant appelant qui affiche le message (un seul toast).
     const response = await axios.post('/api/auth/login', credentials);
     inactivite.value = response.data.inactivite ?? null;
-    user.value = response.data.user ; 
+    const sessionUser = response.data.user ?? null;
+
+    if (sessionUser) {
+      user.value = {
+        id: sessionUser.id,
+        email: sessionUser.email,
+        username: sessionUser.username,
+        role: sessionUser.role || 'user',
+        adresse: sessionUser.adresse || '',
+        quartier: sessionUser.quartier || '',
+        telephone: sessionUser.telephone || '',
+        formuleHabituelle: sessionUser.formuleHabituelle || '',
+      };
+    } else {
+      user.value = null;
+    }
+
     return response.data;
   }
 
