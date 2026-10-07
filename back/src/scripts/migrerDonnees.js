@@ -195,6 +195,17 @@ async function migrerIdeesRepas() {
   console.log(res.modifiedCount ? `  ⚠ ${res.modifiedCount} ancien(s) menu(s) passé(s) « à valider » : plus visibles des clients avant validation` : '  ✔ Aucun ancien menu à reprendre');
 }
 
+// Étape 10 : prix de vente fixé par l'admin. L'ancien code lisait « prixCommercial ? prixCommercial : prixActuel » :
+// un 0 voulait dire « pas de prix fixé ». Le code actuel (prixCommercial ?? prixActuel) le lirait comme un prix de 0 FCFA.
+// Le 0 devient donc vide ; un vrai prix saisi par l'admin est gardé et signalé (à comparer au référentiel, D-01).
+async function migrerPrixCommercial() {
+  const Formule = require('../models/formules');
+  const res = await Formule.updateMany({ prixCommercial: 0 }, { $set: { prixCommercial: null } });
+  console.log(res.modifiedCount ? `  ✔ ${res.modifiedCount} formule(s) : prix admin à 0 (ancien « pas de prix ») remis à vide` : '  ✔ Aucun prix admin à 0');
+  const fixes = await Formule.find({ prixCommercial: { $ne: null } }).select('slug prixCommercial prixActuel').lean();
+  for (const f of fixes) console.log(`  ⚠ ${f.slug} : prix fixé par l'admin ${f.prixCommercial} FCFA (référentiel ${f.prixActuel ?? 'vide'}) : c'est lui qui s'applique`);
+}
+
 const ETAPES = [
   ['Index du téléphone', migrerIndexTelephone],
   ['Fournisseurs vers Prestataires', migrerFournisseurs],
@@ -205,6 +216,7 @@ const ETAPES = [
   ['Quantités des produits par pack', migrerQuantitesProduits],
   ['Numéros de lot uniques', migrerIndexLots],
   ['Idées de repas', migrerIdeesRepas],
+  ["Prix fixés par l'admin", migrerPrixCommercial],
 ];
 
 async function migrer() {

@@ -32,10 +32,11 @@ node src/scripts/createFormules.js  # upsert des formules (prix, « Bientôt »,
 node src/scripts/migrerDonnees.js   # migration idempotente (téléphone, fournisseurs, zones, statuts, taux, admin principal)
 STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <role> [--livreur "<fiche livreur>"]  # compte de l'équipe
 STAFF_PASSWORD=… node src/scripts/importerDonnees.js ../docs-internes/imports [--appliquer] [--attendu <json>]  # import 01 à 11 (simulation sans --appliquer)
+node src/scripts/decisionsMiseEnService.js ../docs-internes/imports [--appliquer]  # décisions du porteur après l'import (prix admin, anciens lots et règles, commandes d'essai, compte admin générique)
 node src/scripts/controlerDonnees.js [--attendu <json>]  # contrôles B.4, lecture seule
 MONGO_URI=<lecture seule> node src/scripts/inventaireBase.js  # inventaire d'une base (nombres seulement, aucune donnée personnelle)
 ```
-L'import ne touche jamais la production sans `--appliquer` : la simulation s'exécute dans une transaction annulée et affiche les écarts. Les fichiers CSV et les valeurs attendues des contrôles restent dans `docs-internes/` (exclu de Git).
+L'import ne touche jamais la production sans `--appliquer` : la simulation s'exécute dans une transaction annulée et affiche les écarts. Ordre de mise en service : sauvegarde, migrerDonnees, createFormules, import, decisionsMiseEnService, controlerDonnees ; à répéter d'abord sur la base de recette `ahitche_recette` (la production est la base `test` du cluster Atlas). Atlas annule toute transaction de plus de 60 s : les scripts chargent chaque liste une fois par étape au lieu d'une requête par ligne. Les fichiers CSV et les valeurs attendues des contrôles restent dans `docs-internes/` (exclu de Git).
 Les transactions MongoDB (livraison + sortie de stock FIFO) exigent un replica set : c'est le cas sur Atlas ; en local, utiliser `MongoMemoryReplSet` ou un replica set à un nœud.
 Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL`, `CLOUDINARY_*`, `ADMIN_PASSWORD`, `NODE_ENV`, `PORT`, et `INACTIVITE_MINUTES` (facultative, 60 par défaut : déconnexion de l'équipe après inactivité).
 

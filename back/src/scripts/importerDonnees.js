@@ -81,12 +81,12 @@ function lire(dossier, nom) {
 async function importerCategories(lignes, s) {
   const parNom = new Map();
   let crees = 0, maj = 0;
+  const existantes = await Category.find({ deletedAt: null }).session(s);
   for (const l of lignes) {
     const nom = texte(l.categorie);
     if (!nom) { ecart('01', l._ligne, 'catégorie sans nom'); continue; }
-    const existantes = await Category.find({ deletedAt: null }).session(s);
     let c = existantes.find(x => normaliser(x.name) === normaliser(nom));
-    if (c) { c.description = texte(l.description); maj++; } else { c = new Category({ name: nom, description: texte(l.description) }); crees++; }
+    if (c) { c.description = texte(l.description); maj++; } else { c = new Category({ name: nom, description: texte(l.description) }); existantes.push(c); crees++; }
     await c.save({ session: s });
     parNom.set(normaliser(nom), c._id);
   }
@@ -97,6 +97,7 @@ async function importerCategories(lignes, s) {
 async function importerRegles(lignes, s) {
   const parNom = new Map();
   let crees = 0, maj = 0;
+  const existantes = await CompositionRule.find({ deletedAt: null }).session(s);
   for (const l of lignes) {
     const nom = texte(l.regle);
     if (!nom) { ecart('02', l._ligne, 'règle sans nom'); continue; }
@@ -105,9 +106,8 @@ async function importerRegles(lignes, s) {
       multiplierConfort: nombre(l.multiplicateur_confort, '02', l._ligne, 'multiplicateur_confort'),
       description: texte(l.description)
     };
-    const existantes = await CompositionRule.find({ deletedAt: null }).session(s);
     let r = existantes.find(x => normaliser(x.name) === normaliser(nom));
-    if (r) { Object.assign(r, champs); maj++; } else { r = new CompositionRule({ name: nom, ...champs }); crees++; }
+    if (r) { Object.assign(r, champs); maj++; } else { r = new CompositionRule({ name: nom, ...champs }); existantes.push(r); crees++; }
     await r.save({ session: s });
     parNom.set(normaliser(nom), r._id);
   }
@@ -118,6 +118,7 @@ async function importerRegles(lignes, s) {
 async function importerProduits(lignes, categories, regles, s) {
   let crees = 0, maj = 0;
   const vus = new Set();
+  const actifs = await Product.find({ deletedAt: null }).session(s);
   for (const l of lignes) {
     const reference = texte(l.reference);
     const nom = texte(l.produit);
@@ -155,13 +156,12 @@ async function importerProduits(lignes, categories, regles, s) {
       quantites, commentaire: texte(l.commentaire)
     };
     // Produit existant : même référence, sinon même nom (ancien catalogue sans référence)
-    let p = await Product.findOne({ reference, deletedAt: null }).session(s);
+    let p = actifs.find(x => x.reference === reference);
     if (!p) {
-      const candidats = await Product.find({ deletedAt: null, $or: [{ reference: null }, { reference: '' }, { reference: { $exists: false } }] }).session(s);
-      p = candidats.find(x => normaliser(x.name) === normaliser(nom)) || null;
+      p = actifs.find(x => !x.reference && normaliser(x.name) === normaliser(nom)) || null;
       if (p) ecart('03', l._ligne, `${reference} : produit existant « ${p.name} » sans référence, repris et complété`);
     }
-    if (p) { Object.assign(p, champs); maj++; } else { p = new Product(champs); crees++; }
+    if (p) { Object.assign(p, champs); maj++; } else { p = new Product(champs); actifs.push(p); crees++; }
     await p.save({ session: s });
   }
 
@@ -171,28 +171,30 @@ async function importerProduits(lignes, categories, regles, s) {
     { reference: 'MP02', name: 'Arachide', unit: 'sac' }
   ];
   for (const m of matieres) {
-    if (await Product.exists({ reference: m.reference, deletedAt: null }).session(s)) continue;
-    await Product.create([{
+    if (actifs.some(x => x.reference === m.reference)) continue;
+    const [cree] = await Product.create([{
       ...m, type: 'extra', statut: 'indisponible', priceUnit: null, category: null, compositionRule: null,
       quantites: { essentiel: null, equilibre: null, confort: null, reserve: null, fraicheur: null },
       commentaire: 'Matière première (D-15) : stockée, non vendue ; catégorie et prix à renseigner'
     }], { session: s });
+    actifs.push(cree);
     crees++;
   }
   ecart('03', '-', 'D-15 : MP01 « Maïs trié » (kg) et MP02 « Arachide » (sac, unité de suivi à préciser) créés hors fichier, statut indisponible, sans prix ni catégorie');
 
   // Produits actifs hors référentiel (ancien catalogue) : signalés, jamais supprimés
   const references = new Set([...vus, ...matieres.map(m => m.reference)]);
-  const horsFichier = (await Product.find({ deletedAt: null }).session(s)).filter(p => !references.has(p.reference));
+  const horsFichier = actifs.filter(p => !references.has(p.reference));
   for (const p of horsFichier) ecart('03', '-', `produit actif hors référentiel v4 : « ${p.name} »${p.reference ? ` (${p.reference})` : ''} — à retirer ou garder`);
   bilan.push(`03 produits : ${crees} créé(s), ${maj} mis à jour, ${horsFichier.length} hors référentiel`);
 }
 
 async function importerFormules(lignes, s) {
   let maj = 0;
+  const formules = await Formule.find().session(s);
   for (const l of lignes) {
     const slug = texte(l.slug);
-    const f = await Formule.findOne({ slug }).session(s);
+    const f = formules.find(x => x.slug === slug);
     if (!f) { ecart('04', l._ligne, `formule ${slug} absente de la base : lancer createFormules.js avant l'import`); continue; }
     if (texte(l.prix_reference_fcfa)) ecart('04', l._ligne, `${slug} : prix_reference_fcfa renseigné mais non utilisé (le prix de vente fait foi)`);
     const prix = nombre(l.prix_vente_fcfa, '04', l._ligne, 'prix_vente_fcfa');
@@ -220,9 +222,10 @@ async function importerFormules(lignes, s) {
 
 async function importerZones(lignes, s) {
   let maj = 0;
+  const zones = await Zone.find().session(s);
   for (const l of lignes) {
     const code = texte(l.code_zone);
-    const z = await Zone.findOne({ code }).session(s);
+    const z = zones.find(x => x.code === code);
     if (!z) { ecart('05', l._ligne, `zone ${code} absente : lancer migrerDonnees.js (zones) avant l'import`); continue; }
     const tarif = nombre(l.tarif_course_fcfa, '05', l._ligne, 'tarif_course_fcfa');
     if (tarif !== null) z.tarifCourse = tarif;
@@ -241,6 +244,7 @@ async function importerZones(lignes, s) {
 async function importerPrestataires(lignes, s) {
   let crees = 0, maj = 0;
   const parNom = new Map();
+  const fiches = await Partner.find({ deletedAt: null }).session(s);
   for (const l of lignes) {
     const nom = texte(l.nom);
     if (!nom) { ecart('06', l._ligne, 'prestataire sans nom'); continue; }
@@ -253,11 +257,20 @@ async function importerPrestataires(lignes, s) {
       ...(Partner.MODES_PAIEMENT_PRESTATAIRE.includes(mode) ? { modePaiement: mode } : {}),
       notes: texte(l.notes), actif: ouiNon(l.actif) ?? true
     };
-    // Fusion avec une fiche existante : même nom (normalisé) ou même IFU
-    const fiches = await Partner.find({ deletedAt: null }).session(s);
-    let p = fiches.find(x => normaliser(x.nom) === normaliser(nom)) || (champs.ifuRccm ? fiches.find(x => x.ifuRccm && x.ifuRccm.replace(/\s+/g, '') === champs.ifuRccm.replace(/\s+/g, '')) : null);
+    // Fusion avec une fiche existante (Q 7.1 : compléter les fiches plutôt qu'en créer) : même nom (normalisé),
+    // même IFU, ou nom partiel d'une ancienne fiche sans IFU (tous ses mots, au moins deux, se retrouvent dans le
+    // nom du fichier : « AHOUANDJO DAVID » -> « AHOUANDJO Victorin David »). Toute fusion autre qu'à l'identique est signalée.
+    const mots = (t) => normaliser(t).replace(/[()&.,]/g, ' ').split(/\s+/).filter(Boolean);
+    const motsNom = new Set(mots(nom));
+    const nomPartiel = (x) => !x.ifuRccm && mots(x.nom).length >= 2 && mots(x.nom).every(m => motsNom.has(m));
+    let p = fiches.find(x => normaliser(x.nom) === normaliser(nom))
+      || (champs.ifuRccm ? fiches.find(x => x.ifuRccm && x.ifuRccm.replace(/\s+/g, '') === champs.ifuRccm.replace(/\s+/g, '')) : null);
     if (p && normaliser(p.nom) !== normaliser(nom)) ecart('06', l._ligne, `${nom} : fusionné avec la fiche « ${p.nom} » (même IFU)`);
-    if (p) { Object.assign(p, champs); maj++; } else { p = new Partner(champs); crees++; }
+    if (!p) {
+      p = fiches.find(nomPartiel) || null;
+      if (p) ecart('06', l._ligne, `${nom} : fusionné avec l'ancienne fiche « ${p.nom} » (nom partiel, sans IFU)`);
+    }
+    if (p) { Object.assign(p, champs); maj++; } else { p = new Partner(champs); fiches.push(p); crees++; }
     await p.save({ session: s });
     parNom.set(normaliser(nom), p);
   }
@@ -280,6 +293,7 @@ function categoriesDesLignes(depenses) {
 async function importerLignesBudget(lignes, depenses, s) {
   let crees = 0, maj = 0;
   const categories = categoriesDesLignes(depenses);
+  const existantes = await BudgetLine.find({ deletedAt: null }).session(s);
   for (const l of lignes) {
     const code = texte(l.code);
     if (!code) { ecart('07', l._ligne, 'ligne sans code'); continue; }
@@ -294,8 +308,8 @@ async function importerLignesBudget(lignes, depenses, s) {
     const cats = categories.get(code);
     if (cats && cats.size > 1) ecart('07', l._ligne, `${code} : catégories contradictoires dans 08 (${[...cats].join(', ')})`);
     if (cats && cats.size === 1) champs.categorieAd = [...cats][0];
-    let b = await BudgetLine.findOne({ code, deletedAt: null }).session(s);
-    if (b) { Object.assign(b, champs); maj++; } else { b = new BudgetLine({ code, ...champs }); crees++; }
+    let b = existantes.find(x => x.code === code);
+    if (b) { Object.assign(b, champs); maj++; } else { b = new BudgetLine({ code, ...champs }); existantes.push(b); crees++; }
     await b.save({ session: s });
   }
   ecart('07', '-', 'passation des lignes : absente des fichiers (tableau F.5 du document) : à saisir dans Finances');
@@ -304,12 +318,14 @@ async function importerLignesBudget(lignes, depenses, s) {
 
 async function importerDepenses(lignes, prestataires, admin, s) {
   let crees = 0, inchangees = 0;
+  const codesLignes = new Set((await BudgetLine.find({ deletedAt: null }).select('code').session(s)).map(b => b.code));
+  const enBase = await Expense.find({ deletedAt: null }).session(s);
   for (const l of lignes) {
     const libelle = texte(l.libelle);
     const categorie = texte(l.categorie);
     if (!['Budget', 'Exploitation'].includes(categorie) || !libelle) { ecart('08', l._ligne, `catégorie ou libellé invalide (« ${categorie} »)`); continue; }
     const code = texte(l.ligne_budgetaire);
-    if (categorie === 'Budget' && !(await BudgetLine.exists({ code, deletedAt: null }).session(s))) { ecart('08', l._ligne, `${libelle} : ligne ${code} absente de 07`); continue; }
+    if (categorie === 'Budget' && !codesLignes.has(code)) { ecart('08', l._ligne, `${libelle} : ligne ${code} absente de 07`); continue; }
     const partenaire = texte(l.prestataire) ? prestataires.get(normaliser(l.prestataire)) : null;
     if (texte(l.prestataire) && !partenaire) ecart('08', l._ligne, `${libelle} : prestataire « ${l.prestataire} » absent de 06`);
 
@@ -351,14 +367,15 @@ async function importerDepenses(lignes, prestataires, admin, s) {
     if (ouiNon(l.valide_pour_audit) === true) ecart('08', l._ligne, `${libelle} : « valide pour l'audit » à oui, mais aucune pièce n'est jointe : laissé à non`);
 
     // Clé naturelle : catégorie, ligne, n° de pièce et libellé (import relançable)
-    const existante = await Expense.findOne({ deletedAt: null, categorie, referenceLigne: champs.referenceLigne, numeroPiece: champs.numeroPiece, libelle }).session(s);
+    const existante = enBase.find(x => x.categorie === categorie && x.referenceLigne === champs.referenceLigne && x.numeroPiece === champs.numeroPiece && x.libelle === libelle);
     if (existante) {
       const differe = ['montantReelFcfa', 'montantPrevuFcfa', 'moisProjet'].some(k => (existante[k] ?? null) !== (champs[k] ?? null));
       if (differe) ecart('08', l._ligne, `${libelle} : déjà en base avec d'autres montants ou un autre mois : non modifiée`);
       inchangees++;
       continue;
     }
-    await Expense.create([{ ...champs, creePar: admin._id }], { session: s });
+    const [creee] = await Expense.create([{ ...champs, creePar: admin._id }], { session: s });
+    enBase.push(creee);
     crees++;
   }
   ecart('08', '-', 'dépenses importées payées sans justificatif joint (téléversement après la mise en service, stockage privé) : non retenues pour l\'audit tant que les pièces manquent');
@@ -368,11 +385,14 @@ async function importerDepenses(lignes, prestataires, admin, s) {
 async function importerStock(lignes, prestataires, s) {
   let crees = 0, presents = 0;
   const parPiece = new Map();
+  const produits = await Product.find({ deletedAt: null }).session(s);
+  const depenses = await Expense.find({ deletedAt: null }).session(s);
+  const lotsPresents = new Set((await LotStockFifo.find({ deletedAt: null }).select('numeroLot').session(s)).map(x => x.numeroLot));
   for (const l of lignes) {
     const numeroLot = texte(l.numero_lot);
     const reference = texte(l.reference_produit);
     if (!numeroLot) { ecart('09', l._ligne, 'lot sans numéro'); continue; }
-    const produit = await Product.findOne({ reference, deletedAt: null }).session(s);
+    const produit = produits.find(x => x.reference === reference);
     if (!produit) { ecart('09', l._ligne, `${numeroLot} : produit ${reference} introuvable`); continue; }
     if (texte(l.unite) && texte(l.unite) !== produit.unit) ecart('09', l._ligne, `${numeroLot} : unité ${l.unite} ≠ unité du produit (${produit.unit})`);
 
@@ -393,12 +413,13 @@ async function importerStock(lignes, prestataires, s) {
 
     // Rattachement à la dépense de la pièce (jamais de seconde dépense)
     const numeroPiece = texte(l.numero_piece);
-    const depense = numeroPiece ? await Expense.findOne({ numeroPiece, deletedAt: null }).session(s) : null;
+    const depense = numeroPiece ? depenses.find(x => x.numeroPiece === numeroPiece) || null : null;
     if (numeroPiece && !depense) ecart('09', l._ligne, `${numeroLot} : aucune dépense ne porte la pièce ${numeroPiece}`);
     if (depense && texte(l.ligne_budgetaire) && depense.referenceLigne !== texte(l.ligne_budgetaire)) ecart('09', l._ligne, `${numeroLot} : ligne ${l.ligne_budgetaire} ≠ ligne de la dépense (${depense.referenceLigne})`);
     if (depense) parPiece.set(numeroPiece, { depense, total: (parPiece.get(numeroPiece)?.total || 0) + (valeur || 0) });
 
-    if (await LotStockFifo.exists({ numeroLot, deletedAt: null }).session(s)) { presents++; continue; }
+    if (lotsPresents.has(numeroLot)) { presents++; continue; }
+    lotsPresents.add(numeroLot);
     const [lot] = await LotStockFifo.create([{
       numeroLot, product: produit._id,
       quantiteInitiale: quantite, quantiteRestante: quantite,
