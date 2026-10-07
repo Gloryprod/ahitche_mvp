@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { Search, Play, FileText, Newspaper, Calendar, ArrowRight, User } from 'lucide-vue-next'
 import api from '@/stores/api'
+import LienAccueil from '@/components/ui/LienAccueil.vue'
 import { useQuery, keepPreviousData } from '@tanstack/vue-query'
 
 export interface Post {
@@ -73,11 +74,12 @@ const embedVideoUrl = computed(() => {
 
 <template>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 font-sans text-gray-800">
-    
+    <LienAccueil />
+
     <!-- En-tête / Hero Section -->
     <div class="text-center max-w-2xl mx-auto space-y-3">
       <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">Actualités & Médias</h1>
-      <p class="text-sm text-gray-500">Découvrez nos derniers articles, publications de blog et contenus vidéo.</p>
+      <p class="text-sm text-gris">Découvrez nos derniers articles, publications de blog et contenus vidéo.</p>
     </div>
 
     <!-- Barre de Filtres & Recherche -->
@@ -87,29 +89,29 @@ const embedVideoUrl = computed(() => {
       <div class="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
         <button 
           @click="changeType('')" 
-          :class="[selectedType === '' ? 'bg-emerald-800 text-white shadow-xs' : 'bg-gray-50 text-gray-600 hover:bg-gray-100', 'px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer']">
+          :class="[selectedType === '' ? 'bg-emerald-800 text-white shadow-xs' : 'bg-gray-50 text-gris hover:bg-gray-100', 'px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer']">
           Tous
         </button>
         <button 
           @click="changeType('article')" 
-          :class="[selectedType === 'article' ? 'bg-emerald-800 text-white shadow-xs' : 'bg-gray-50 text-gray-600 hover:bg-gray-100', 'px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5']">
+          :class="[selectedType === 'article' ? 'bg-emerald-800 text-white shadow-xs' : 'bg-gray-50 text-gris hover:bg-gray-100', 'px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5']">
           <Newspaper class="w-3.5 h-3.5" /> Articles
         </button>
         <button 
           @click="changeType('blog')" 
-          :class="[selectedType === 'blog' ? 'bg-emerald-800 text-white shadow-xs' : 'bg-gray-50 text-gray-600 hover:bg-gray-100', 'px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5']">
+          :class="[selectedType === 'blog' ? 'bg-emerald-800 text-white shadow-xs' : 'bg-gray-50 text-gris hover:bg-gray-100', 'px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5']">
           <FileText class="w-3.5 h-3.5" /> Blogs
         </button>
         <button 
           @click="changeType('video')" 
-          :class="[selectedType === 'video' ? 'bg-emerald-800 text-white shadow-xs' : 'bg-gray-50 text-gray-600 hover:bg-gray-100', 'px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5']">
+          :class="[selectedType === 'video' ? 'bg-emerald-800 text-white shadow-xs' : 'bg-gray-50 text-gris hover:bg-gray-100', 'px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5']">
           <Play class="w-3.5 h-3.5" /> Vidéos
         </button>
       </div>
 
       <!-- Recherche -->
       <div class="relative w-full md:w-72">
-        <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gris" />
         <input 
           v-model="search" 
           type="text" 
@@ -119,10 +121,10 @@ const embedVideoUrl = computed(() => {
     </div>
 
     <!-- Contenu / Grille -->
-    <div v-if="isLoading" class="text-center py-20 text-gray-400 text-sm font-medium">Chargement des publications...</div>
-    <div v-else-if="isError" class="text-center py-20 text-red-500 text-sm">Une erreur est survenue lors de la récupération des articles.</div>
+    <div v-if="isLoading" class="text-center py-20 text-gris text-sm font-medium">Chargement des publications...</div>
+    <div v-else-if="isError" class="text-center py-20 text-red-700 text-sm">Une erreur est survenue lors de la récupération des articles.</div>
     <div v-else-if="!data?.posts?.length" class="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
-      <p class="text-gray-500 font-medium text-sm">Aucun contenu ne correspond à vos critères de recherche.</p>
+      <p class="text-gris font-medium text-sm">Aucun contenu ne correspond à vos critères de recherche.</p>
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -161,7 +163,7 @@ const embedVideoUrl = computed(() => {
 
           <!-- Contenu texte -->
           <div class="p-5 space-y-3">
-            <div class="flex items-center gap-3 text-[11px] text-gray-400 font-medium">
+            <div class="flex items-center gap-3 text-[11px] text-gris font-medium">
               <span class="flex items-center gap-1"><Calendar class="w-3.5 h-3.5" /> {{ new Date(post.createdAt).toLocaleDateString() }}</span>
               <span v-if="post.author" class="flex items-center gap-1"><User class="w-3.5 h-3.5" /> {{ post.author.prenom }} {{ post.author.nom }}</span>
             </div>
@@ -170,7 +172,7 @@ const embedVideoUrl = computed(() => {
               {{ post.title }}
             </h2>
 
-            <p class="text-xs text-gray-500 line-clamp-3 leading-relaxed">
+            <p class="text-xs text-gris line-clamp-3 leading-relaxed">
               {{ post.summary || post.content }}
             </p>
           </div>
@@ -191,7 +193,7 @@ const embedVideoUrl = computed(() => {
         class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold hover:bg-gray-50 disabled:opacity-40 transition-all cursor-pointer">
         ← Page précédente
       </button>
-      <span class="text-xs text-gray-500 font-medium">Page <strong class="text-gray-900">{{ page }}</strong></span>
+      <span class="text-xs text-gris font-medium">Page <strong class="text-gray-900">{{ page }}</strong></span>
       <button 
         :disabled="!data?.hasMore || isPlaceholderData" 
         @click="page++" 
@@ -204,14 +206,14 @@ const embedVideoUrl = computed(() => {
     <div v-if="selectedPost" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
       <div class="bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl overflow-y-auto p-6 space-y-6 relative">
         
-        <button @click="selectedPost = null" class="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-colors cursor-pointer">
+        <button @click="selectedPost = null" class="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 text-gris rounded-full transition-colors cursor-pointer">
           ✕
         </button>
 
         <div class="space-y-2">
           <span class="px-3 py-1 bg-emerald-50 text-emerald-800 text-[10px] font-bold rounded-lg uppercase tracking-wider">{{ selectedPost.category }}</span>
           <h2 class="text-2xl font-extrabold text-gray-900">{{ selectedPost.title }}</h2>
-          <p class="text-xs text-gray-400">Publié le {{ new Date(selectedPost.createdAt).toLocaleDateString() }}</p>
+          <p class="text-xs text-gris">Publié le {{ new Date(selectedPost.createdAt).toLocaleDateString() }}</p>
         </div>
 
         <!-- Integration lecteur Vidéo si c'est un format vidéo -->

@@ -1,20 +1,47 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import BaseButton from '../ui/BaseButton.vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import api from '@/stores/api'
+import FormuleCard from '../ui/FormuleCard.vue'
+import {
+  FORMULES as formules, PRODUITS_INCLUS as produitsInclus, EXCLUS_ESSENTIEL as exclusEssentiel,
+  TAILLES_FOYER, formaterPrix, type TailleFoyer,
+} from '@/config/formules'
 
-const produitsInclus = ref([
-  "Riz local", "Haricots", "Coquillettes", "Spaghetti",
-  "Couscous", "Gari", "Tapioca", "Huile végétale",
-  "Tomates", "Oignons", "Sucre", "Lait concentré",
-  "Œufs", "Épices Ahitché", "Assaisonnement", "Huile de palme"
-])
+// Prix barrés (D-03) : valeur estimée de chaque pack, calculée par le serveur ; sans réponse, rien n'est barré
+const valeursEstimees = ref<Record<string, number | null>>({})
+onMounted(async () => {
+  try {
+    valeursEstimees.value = (await api.get('/api/public/formules/valeurs')).data
+  } catch {
+    // Connexion lente ou serveur indisponible : les cartes s'affichent sans valeur estimée
+  }
+})
+
+// Comparateur « taille du foyer » : conseille une formule et la met en avant
+const foyer = ref<TailleFoyer | null>(null)
+const conseillee = computed(() => formules.find(f => f.foyer === foyer.value) ?? null)
+const libelleFoyer = computed(() => TAILLES_FOYER.find(t => t.valeur === foyer.value)?.libelle ?? '')
+
+// Sur mobile, les cartes défilent horizontalement : la formule conseillée est amenée à l'écran
+const cartes: HTMLElement[] = [] // Rempli par index, dans l'ordre des formules
+async function choisirFoyer(valeur: TailleFoyer) {
+  foyer.value = valeur
+  await nextTick()
+  const index = formules.findIndex(f => f.foyer === valeur)
+  const carte = cartes[index]
+  const rangee = carte?.parentElement
+  if (!carte || !rangee || rangee.scrollWidth <= rangee.clientWidth) return // Ordinateur : les trois cartes sont visibles
+  const reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const decalage = carte.getBoundingClientRect().left - rangee.getBoundingClientRect().left
+  rangee.scrollTo({ left: rangee.scrollLeft + decalage - (rangee.clientWidth - carte.clientWidth) / 2, behavior: reduit ? 'auto' : 'smooth' })
+}
 </script>
 
 <template>
   <section id="formules" class="py-20 bg-creme2/40">
     <div class="max-w-6xl mx-auto px-4">
-      <div class="text-center mb-16">
-        <span class="text-xs font-bold tracking-wider text-savane uppercase bg-savane/10 px-3 py-1 rounded-full">
+      <div class="text-center mb-10">
+        <span class="text-xs font-bold tracking-wider text-foret uppercase bg-savane/10 px-3 py-1 rounded-full">
           Nos formules
         </span>
         <h2 class="mt-4 text-4xl md:text-5xl font-display font-bold text-foret leading-tight">
@@ -23,142 +50,83 @@ const produitsInclus = ref([
         </h2>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch mb-16">
-        
-        <div class="flex flex-col justify-between bg-white rounded-3xl p-8 border border-creme2 shadow-sm transition-all duration-300 hover:shadow-md">
-          <div>
-            <div class="flex items-center gap-4 mb-4">
-              <span class="text-3xl" aria-hidden="true">🌿</span>
-              <div>
-                <h3 class="text-xl font-bold text-foret font-body tracking-tight">AHI ESSENTIEL</h3>
-                <p class="text-sm text-gris">1 personne · par semaine</p>
-              </div>
-            </div>
-            <p class="text-sm italic text-gris mb-6">« Un suivi alimentaire simple, pour commencer. »</p>
-            
-            <div class="grid grid-cols-2 gap-4 border-y border-creme2 py-4 mb-6">
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">20–30</span>
-                <span class="text-xs text-gris">repas possibles</span>
-              </div>
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">2–4h</span>
-                <span class="text-xs text-gris">économisées</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="mb-6">
-              <span class="block text-sm text-gris-lt line-through">24 000 FCFA</span>
-              <span class="text-3xl font-bold text-foret font-body">10 800 <small class="text-sm font-semibold">FCFA</small></span>
-            </div>
-            <BaseButton 
-              href="https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20ESSENTIEL%20(10%20800%20FCFA).%20Pouvez-vous%20me%20confirmer%20les%20d%C3%A9tails%20%3F"
-              variant="secondary"
-              external
-              class="w-full"
-            >
-              Commander — WhatsApp
-            </BaseButton>
-          </div>
+      <!-- Comparateur : taille du foyer → formule conseillée et prix par semaine -->
+      <fieldset class="max-w-2xl mx-auto mb-10 text-center">
+        <legend class="w-full text-base font-bold text-noir mb-4">Combien êtes-vous à la maison ?</legend>
+        <div class="flex flex-wrap justify-center gap-2">
+          <label v-for="t in TAILLES_FOYER" :key="t.valeur" class="cursor-pointer">
+            <input
+              type="radio"
+              name="taille-foyer"
+              class="peer sr-only"
+              :value="t.valeur"
+              :checked="foyer === t.valeur"
+              @change="choisirFoyer(t.valeur)"
+            />
+            <span class="inline-flex items-center min-h-11 px-5 rounded-full border-2 border-foret/20 bg-white text-sm font-semibold text-foret transition-all duration-200 hover:border-foret peer-checked:bg-foret peer-checked:border-foret peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-or active:scale-97">
+              {{ t.libelle }}
+            </span>
+          </label>
         </div>
+        <p class="mt-4 min-h-12 text-sm text-gris" aria-live="polite">
+          <Transition name="fondu" mode="out-in">
+            <span v-if="conseillee" :key="conseillee.nom">
+              Pour {{ libelleFoyer }}, nous conseillons <strong class="text-foret">{{ conseillee.nom }}</strong> :
+              <strong class="text-foret whitespace-nowrap">{{ formaterPrix(conseillee.prix) }} FCFA par semaine</strong>.
+            </span>
+            <span v-else key="invite">Choisissez la taille de votre foyer : nous vous indiquons la formule adaptée.</span>
+          </Transition>
+        </p>
+      </fieldset>
 
-        <div class="relative flex flex-col justify-between bg-white rounded-3xl p-8 border-2 border-or shadow-xl transition-all duration-300 hover:shadow-2xl md:-translate-y-4">
-          <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-or text-foret text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
-            ⭐ Le plus choisi
-          </div>
-          <div>
-            <div class="flex items-center gap-4 mb-4 mt-2">
-              <span class="text-3xl" aria-hidden="true">🌾</span>
-              <div>
-                <h3 class="text-xl font-bold text-foret font-body tracking-tight">AHI ÉQUILIBRÉ</h3>
-                <p class="text-sm text-gris">2–3 personnes · par semaine</p>
-              </div>
-            </div>
-            <p class="text-sm italic text-gris mb-6">« Mieux manger sans compliquer votre quotidien. »</p>
-            
-            <div class="grid grid-cols-2 gap-4 border-y border-creme2 py-4 mb-6">
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">35–50</span>
-                <span class="text-xs text-gris">repas possibles</span>
-              </div>
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">4–6h</span>
-                <span class="text-xs text-gris">économisées</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="mb-6">
-              <span class="block text-sm text-gris-lt line-through">50 000 FCFA</span>
-              <span class="text-3xl font-bold text-foret font-body">22 500 <small class="text-sm font-semibold">FCFA</small></span>
-            </div>
-            <BaseButton 
-              href="https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20%C3%89QUILIBR%C3%89%20(22%20500%20FCFA).%20Pouvez-vous%20me%20confirmer%20les%20d%C3%A9tails%20%3F"
-              variant="primary"
-              external
-              class="w-full"
-            >
-              Commander — WhatsApp
-            </BaseButton>
-          </div>
+      <!-- Mobile : cartes côte à côte, à faire glisser ; ordinateur : grille de trois colonnes -->
+      <div
+        class="flex md:grid md:grid-cols-3 gap-4 md:gap-8 items-stretch overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-4 px-4 pt-6 pb-4 md:pb-0 mb-12 [scrollbar-width:none]"
+        role="list"
+        aria-label="Formules Ahitché"
+      >
+        <div
+          v-for="(formule, i) in formules"
+          :key="formule.nom"
+          :ref="el => { if (el) cartes[i] = el as HTMLElement }"
+          role="listitem"
+          class="snap-center shrink-0 w-[85%] sm:w-[60%] md:w-auto flex"
+        >
+          <FormuleCard
+            :formule="formule"
+            :valeur-estimee="valeursEstimees[formule.slug] ?? null"
+            :conseillee="conseillee?.nom === formule.nom"
+            :autre-conseillee="!!conseillee && conseillee.nom !== formule.nom"
+            class="w-full"
+          />
         </div>
-
-        <div class="flex flex-col justify-between bg-white rounded-3xl p-8 border border-creme2 shadow-sm transition-all duration-300 hover:shadow-md">
-          <div>
-            <div class="flex items-center gap-4 mb-4">
-              <span class="text-3xl" aria-hidden="true">👑</span>
-              <div>
-                <h3 class="text-xl font-bold text-foret font-body tracking-tight">AHI CONFORT</h3>
-                <p class="text-sm text-gris">Famille 4–6 · par semaine</p>
-              </div>
-            </div>
-            <p class="text-sm italic text-gris mb-6">« Un ravitaillement complet, pensé pour toute la famille. »</p>
-            
-            <div class="grid grid-cols-2 gap-4 border-y border-creme2 py-4 mb-6">
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">60–90</span>
-                <span class="text-xs text-gris">repas possibles</span>
-              </div>
-              <div>
-                <span class="block text-2xl font-bold text-foret font-body">6–10h</span>
-                <span class="text-xs text-gris">économisées</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="mb-6">
-              <span class="block text-sm text-gris-lt line-through">110 000 FCFA</span>
-              <span class="text-3xl font-bold text-foret font-body">50 300 <small class="text-sm font-semibold">FCFA</small></span>
-            </div>
-            <BaseButton 
-              href="https://wa.me/22998136635?text=Bonjour%20Ahitch%C3%A9%20!%20Je%20souhaite%20commander%20la%20formule%20AHI%20CONFORT%20(50%20300%20FCFA).%20Pouvez-vous%20me%20confirmer%20les%20d%C3%A9tails%20%3F"
-              variant="secondary"
-              external
-              class="w-full"
-            >
-              Commander — WhatsApp
-            </BaseButton>
-          </div>
-        </div>
-
       </div>
 
       <div class="bg-white rounded-3xl p-8 border border-creme2 text-center max-w-4xl mx-auto shadow-xs">
-        <p class="text-foret font-bold mb-6 font-body">Composition adaptée à vos besoins, plus de 16 produits garantis</p>
+        <p class="text-foret font-bold mb-2 font-body">Composition adaptée à vos besoins : {{ produitsInclus.length }} produits de base</p>
+        <p class="text-gris text-sm mb-6">Les quantités varient selon la formule et la taille de votre foyer.</p>
         <div class="flex flex-wrap justify-center gap-2">
-          <span 
-            v-for="produit in produitsInclus" 
+          <span
+            v-for="produit in produitsInclus"
             :key="produit"
             class="bg-creme text-foret text-sm font-medium px-4 py-2 rounded-full border border-creme2/60 transition-colors duration-200 hover:bg-creme2"
           >
-            {{ produit }}
+            {{ produit }}<span v-if="exclusEssentiel.includes(produit)" aria-hidden="true">*</span>
           </span>
         </div>
+        <p class="text-gris text-xs mt-5">* Non incluse dans la formule AHI Essentiel.</p>
       </div>
     </div>
   </section>
 </template>
+
+<style scoped>
+.fondu-enter-active,
+.fondu-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fondu-enter-from,
+.fondu-leave-to {
+  opacity: 0;
+}
+</style>

@@ -22,7 +22,8 @@ async function createAdmin() {
       username: "SuperAdmin",
       email: adminEmail,
       password: hashedPassword,
-      role: "admin"
+      role: "admin",
+      adminPrincipal: true // Sans déconnexion automatique après 1 h d'inactivité
     };
     
     // Insertion en BDD (Exemple Mongoose : await User.create(adminData))

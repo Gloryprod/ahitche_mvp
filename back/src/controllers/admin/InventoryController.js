@@ -1,6 +1,8 @@
 const { LotStockFifo, MouvementStock } = require('../../models/stock');
 const PurchaseOrder = require('../../models/purchaseOrder');
 const Product = require('../../models/product');
+const { trouverFournisseur } = require('../../services/fournisseurService');
+const { echapperRegex } = require('../../utils/texte');
 
 /**
  * 1. ÉTAT DE L'INVENTAIRE GLOBAL & ALERTES
@@ -8,23 +10,26 @@ const Product = require('../../models/product');
  */
 async function obtenirInventaireGlobal(req, res) {
   try {
-    // Agrégation Mongoose pour grouper le stock restant par produit
+    // Stock restant par produit ; les lots à compter (quantité vide) et à vérifier sont signalés à part
     const etatStock = await LotStockFifo.aggregate([
-      { $match: { deletedAt: null, quantiteRestante: { $gt: 0 } } },
+      { $match: { deletedAt: null, $or: [{ quantiteRestante: { $gt: 0 } }, { quantiteRestante: null }, { aConfirmer: { $gt: '' } }] } },
       {
         $group: {
           _id: "$product",
-          stockTotal: { $sum: "$quantiteRestante" },
-          nbLotsActifs: { $sum: 1 }
+          stockTotal: { $sum: { $ifNull: ["$quantiteRestante", 0] } },
+          nbLotsActifs: { $sum: { $cond: [{ $gt: [{ $ifNull: ["$quantiteRestante", 0] }, 0] }, 1, 0] } },
+          lotsACompter: { $sum: { $cond: [{ $eq: [{ $ifNull: ["$quantiteRestante", null] }, null] }, 1, 0] } },
+          lotsAConfirmer: { $sum: { $cond: [{ $gt: [{ $ifNull: ["$aConfirmer", ''] }, ''] }, 1, 0] } },
+          // Valeur au prix d'achat ; un lot à compter compte pour sa valeur facturée
+          valeurFcfa: { $sum: { $cond: [{ $eq: [{ $ifNull: ["$quantiteRestante", null] }, null] }, { $ifNull: ["$valeurFcfa", 0] }, { $multiply: ["$quantiteRestante", { $ifNull: ["$prixAchatUnitaire", 0] }] }] } }
         }
       }
     ]);
 
-    // Remplir les détails des produits et vérifier les seuils d'alerte
-    // Note : On suppose que ton modèle Product possède un champ 'seuilAlerte' (ex: 10 kg)
+    // Seuil d'alerte propre à chaque produit, dans son unité ; vide = pas d'alerte (seuil à renseigner)
     const inventaireComplet = await Promise.all(etatStock.map(async (item) => {
-      const produit = await Product.findById(item._id).select('name unit seuilAlerte');
-      const seuil = produit?.seuilAlerte || 15; // Seuil par défaut si non défini
+      const produit = await Product.findById(item._id).select('name unit seuilAlerte reference');
+      const seuil = produit?.seuilAlerte ?? null;
 
       return {
         productId: item._id,
@@ -32,8 +37,12 @@ async function obtenirInventaireGlobal(req, res) {
         unite: produit ? produit.unit : "unité",
         stockTotal: item.stockTotal,
         nbLotsActifs: item.nbLotsActifs,
+        lotsACompter: item.lotsACompter,
+        lotsAConfirmer: item.lotsAConfirmer,
+        valeurFcfa: Math.round(item.valeurFcfa),
         seuilAlerte: seuil,
-        enAlerte: item.stockTotal <= seuil // Flag pour l'affichage UI (badge rouge)
+        reference: produit?.reference || null,
+        enAlerte: seuil !== null && item.stockTotal <= seuil // Badge rouge ; jamais d'alerte sur un seuil inconnu
       };
     }));
 
@@ -56,12 +65,14 @@ async function obtenirHistoriqueMouvements(req, res) {
     const skip = (page - 1) * limit;
 
     let filtre = {};
-    if (type) filtre.type = type; // 'entree', 'sortie', 'correction_negative'
+    if (type === 'correction') filtre.type = { $in: ['correction_positive', 'correction_negative'] };
+    else if (type === 'transformation') filtre.type = { $in: ['transformation_sortie', 'transformation_entree'] };
+    else if (typeof type === 'string' && type) filtre.type = type;
     if (productId) filtre.product = productId;
 
     const mouvements = await MouvementStock.find(filtre)
       .populate('product', 'name unit')
-      .populate('lotId', 'numeroLot')
+      .populate('lotId', 'numeroLot fournisseur')
       .sort({ createdAt: -1 }) // Du plus récent au plus ancien
       .skip(skip)
       .limit(limit + 1);
@@ -81,17 +92,23 @@ async function obtenirHistoriqueMouvements(req, res) {
  */
 async function creerBonCommande(req, res) {
   try {
-    const { fournisseur, items } = req.body;
+    const { fournisseurId, items } = req.body;
 
-    if (!fournisseur || !items || items.length === 0) {
+    if (!fournisseurId || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Données du bon de commande incomplètes." });
+    }
+
+    const fournisseurFiche = await trouverFournisseur(fournisseurId);
+    if (!fournisseurFiche) {
+      return res.status(400).json({ message: "Fournisseur introuvable ou inactif (voir Prestataires)." });
     }
 
     const numeroBon = `BC-${Date.now().toString().slice(-6)}`; // Identifiant court unique
 
     const nouveauBon = await PurchaseOrder.create({
       numeroBon,
-      fournisseur,
+      fournisseurId: fournisseurFiche._id,
+      fournisseur: fournisseurFiche.nom,
       items
     });
 
@@ -104,10 +121,15 @@ async function creerBonCommande(req, res) {
 
 async function modifierBonCommande(req, res) {
   try {
-    const { fournisseur, items } = req.body;
+    const { fournisseurId, items } = req.body;
+    const fournisseurFiche = await trouverFournisseur(fournisseurId);
+    if (!fournisseurFiche || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Fournisseur introuvable ou articles manquants." });
+    }
+
     const bon = await PurchaseOrder.findByIdAndUpdate(
       req.params.id,
-      { fournisseur, items },
+      { fournisseurId: fournisseurFiche._id, fournisseur: fournisseurFiche.nom, items },
       { new: true }
     ).populate('items.productId', 'name unit');
 
@@ -159,8 +181,8 @@ async function obtenirBonsCommande(req, res) {
     
     if (search) {
       query.$or = [
-        { numeroBon: { $regex: search, $options: 'i' } },
-        { fournisseur: { $regex: search, $options: 'i' } },
+        { numeroBon: { $regex: echapperRegex(search), $options: 'i' } },
+        { fournisseur: { $regex: echapperRegex(search), $options: 'i' } },
       ];
     }
 

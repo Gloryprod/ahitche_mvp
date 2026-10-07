@@ -1,7 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/user');
-const Category = require('../models/category');
 const userC = require('../controllers/admin/UserController');
 const categoryC = require('../controllers/admin/CategoryController');
 const compositionRuleC = require('../controllers/admin/CompositionRuleController');
@@ -11,12 +9,35 @@ const orderC = require('../controllers/admin/OrderController');
 const stockC = require('../controllers/admin/StockController');
 const invC = require('../controllers/admin/InventoryController');
 const postC = require('../controllers/admin/PostController');
-const { verifyToken } = require('../middlewares/auth');
+const partnerC = require('../controllers/admin/PartnerController');
+const zoneC = require('../controllers/ZoneController');
+const logistiqueC = require('../controllers/admin/LogistiqueController');
+const financeC = require('../controllers/admin/FinanceController');
+const simulateurC = require('../controllers/admin/SimulateurController');
+const parametresC = require('../controllers/admin/ParametresController');
+const nutritionC = require('../controllers/NutritionController');
+const { verifyToken, checkRole, acces } = require('../middlewares/auth');
+const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
 // Importation du middleware Multer/Cloudinary
 const upload = require('../config/cloudinary');
 
-router.use(verifyToken);
+// Toutes les routes admin exigent une session valide ET un rôle de l'équipe
+router.use(verifyToken, checkRole(EQUIPE));
+
+// Droits par section (lecture = GET, écriture = autres méthodes), voir config/roles.js
+router.use('/users', acces(ACCES.clients));
+router.use(['/commandes', '/orders'], acces(ACCES.commandes));
+router.use(['/categories', '/composition-rules', '/products', '/formulas'], acces(ACCES.donneesBase));
+router.use(['/posts', '/upload'], acces(ACCES.contenus));
+router.use(['/stock', '/inventory', '/mouvements', '/bons-commande'], acces(ACCES.stock));
+router.use('/prestataires', acces(ACCES.prestataires));
+router.use(['/zones', '/logistique'], acces(ACCES.logistique));
+router.use('/finances', acces(ACCES.finances));
+router.use('/simulateurs', acces(ACCES.simulateurs));
+router.use('/nutrition', acces(ACCES.nutrition));
+router.use('/parametres', acces(ACCES.parametres));
+router.use('/repas', acces(ACCES.repas));
 
 // Users
 router.get('/users', userC.index);
@@ -26,6 +47,7 @@ router.get('/commandes', userC.getOrders)
 router.post('/orders', orderC.createAdminOrder);
 router.put('/orders/:id', orderC.updateAdminOrder);
 router.patch('/orders/:id/status', orderC.updateOrderStatus);
+router.patch('/orders/:id/remise', orderC.deciderRemise); // Admin seulement (contrôlé dans le contrôleur)
 router.delete('/orders/:id', orderC.deleteAdminOrder);
 
 // Category
@@ -75,6 +97,11 @@ router.route('/stock/lots')
 router.route('/stock/lots/:id')
   .put(stockC.modifierLotStock)
   .delete(stockC.supprimerLotStock);
+router.post('/stock/lots/:id/comptage', stockC.compterLot);
+router.post('/stock/lots/:id/correction', stockC.corrigerLot);
+router.post('/stock/essais', stockC.enregistrerEssai);
+router.get('/stock/prevision-achats', simulateurC.simulerAchats); // Besoins et achats pour N commandes, sans marge
+router.post('/stock/transformations', stockC.enregistrerTransformation);
 
 // État et Historique
 router.get('/inventory/global', invC.obtenirInventaireGlobal);
@@ -85,6 +112,75 @@ router.post('/bons-commande', invC.creerBonCommande);
 router.get('/bons-commande', invC.obtenirBonsCommande);
 router.put('/bons-commande/:id', invC.modifierBonCommande);
 router.delete('/bons-commande/:id', invC.supprimerBonCommande);
+
+// Prestataires (fournisseurs, livreurs, autres)
+router.route('/prestataires')
+  .get(partnerC.listerPrestataires)
+  .post(partnerC.creerPrestataire);
+
+router.route('/prestataires/:id')
+  .put(partnerC.modifierPrestataire)
+  .delete(partnerC.supprimerPrestataire);
+
+// Zones de livraison (tarif de course, priorité, activation)
+router.get('/zones', zoneC.listerZonesAdmin);
+router.put('/zones/:code', zoneC.modifierZone);
+
+// Logistique : planning du jour et planification (créneau + livreur)
+router.get('/logistique', logistiqueC.obtenirPlanning);
+router.patch('/logistique/commandes/:id/planification', logistiqueC.planifierCommande);
+
+// Finances : budget Next Impact, exploitation, taux USD/FCFA, journal des modifications
+router.get('/finances/synthese', financeC.obtenirSynthese);
+router.get('/finances/journal', financeC.obtenirJournal);
+router.route('/finances/taux')
+  .get(financeC.obtenirTaux)
+  .post(financeC.enregistrerTaux);
+router.post('/finances/lignes/import', financeC.importerLignes);
+router.route('/finances/lignes')
+  .get(financeC.listerLignes)
+  .post(financeC.creerLigne);
+router.route('/finances/lignes/:id')
+  .put(financeC.modifierLigne)
+  .delete(financeC.supprimerLigne);
+router.get('/finances/depenses/export', financeC.exporterDepenses);
+// Registres obligatoires (livre de caisse, factures, achats) et clôture mensuelle
+router.get('/finances/registres/caisse', financeC.exporterLivreCaisse);
+router.get('/finances/registres/factures', financeC.exporterRegistreFactures);
+router.get('/finances/registres/achats', financeC.exporterRegistreAchats);
+router.get('/finances/clotures', financeC.listerClotures);
+router.post('/finances/clotures/:mois', financeC.changerCloture);
+router.route('/finances/depenses')
+  .get(financeC.listerDepenses)
+  .post(financeC.creerDepense);
+router.route('/finances/depenses/:id')
+  .put(financeC.modifierDepense)
+  .delete(financeC.supprimerDepense);
+router.patch('/finances/depenses/:id/effectuer', financeC.effectuerDepense);
+router.patch('/finances/depenses/:id/audit', financeC.changerValiditeAudit);
+// Justificatifs en stockage privé : ajout, lien signé temporaire, suppression
+router.post('/finances/depenses/:id/justificatifs', upload.uploadJustificatif.single('fichier'), financeC.ajouterJustificatif);
+router.get('/finances/depenses/:id/justificatifs/:jid/lien', financeC.lienJustificatif);
+router.delete('/finances/depenses/:id/justificatifs/:jid', financeC.supprimerJustificatif);
+
+// Simulateurs (lecture seule : aucun enregistrement, aucun prix modifié)
+router.get('/simulateurs/pack/:type', simulateurC.simulerPack);
+router.route('/parametres')
+  .get(parametresC.obtenirParametres)
+  .put(parametresC.modifierParametres);
+
+// Nutrition : clients suivis (avec leur accord), journal de suivi, menus types
+router.get('/nutrition/clients', nutritionC.listerClientsSuivis);
+router.get('/nutrition/clients/:userId', nutritionC.ficheClient);
+router.post('/nutrition/clients/:userId/suivi', nutritionC.ajouterSuivi);
+// Idées de repas (D-18) : section séparée, sans accès aux données des clients
+router.route('/repas')
+  .get(nutritionC.listerMenus)
+  .post(nutritionC.creerMenu);
+router.route('/repas/:id')
+  .put(nutritionC.modifierMenu)
+  .delete(nutritionC.supprimerMenu);
+router.post('/repas/:id/decision', nutritionC.deciderMenu); // Admin seulement (contrôlé dans le contrôleur)
 
 module.exports = router;
         

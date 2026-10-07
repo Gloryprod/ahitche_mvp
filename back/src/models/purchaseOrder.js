@@ -2,10 +2,12 @@ const mongoose = require('mongoose');
 
 const purchaseOrderSchema = new mongoose.Schema({
   numeroBon: { type: String, required: true, unique: true }, // Ex: BC-2026-001
+  // Fiche prestataire du fournisseur ; le nom est recopié pour garder l'historique lisible
+  fournisseurId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner', default: null },
   fournisseur: { 
     type: String, 
     required: true, 
-    enum: ['ETS EUROHI & FILS', 'AHOUANDJO DAVID', 'Hananim Distribution', 'Autre'] 
+    trim: true 
   },
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },

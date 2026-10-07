@@ -1,69 +1,42 @@
-const mongoose = require('mongoose'); 
+const mongoose = require('mongoose');
 
+// Formules (packs) du référentiel packs v4 (30/06/2026). Les valeurs absentes restent vides : prix de Fraîcheur
+// « à définir », accroches de Réserve et Fraîcheur à valider (D-05), etc. Plus de prix barré (D-03).
 const formuleSchema = new mongoose.Schema({
   // Identifiant unique textuel (ex: "ahi-essentiel", "ahi-equilibre")
-  slug: { 
-    type: String, 
-    required: true, 
-    unique: true,
-    trim: true 
-  },
-  nom: { 
-    type: String, 
-    required: true,
-    trim: true 
-  },
-  emoji: { 
-    type: String, 
-    default: '🌾' 
-  },
-  cible: { 
-    type: String, 
-    required: true // Ex: "1 personne · par semaine"
-  },
-  phraseAccroche: { 
-    type: String, 
-    required: true // Ex: "Les bases de votre semaine..."
-  },
-  // Données chiffrées pour le tableau et les cartes
+  slug: { type: String, required: true, unique: true, trim: true },
+  nom: { type: String, required: true, trim: true },
+  emoji: { type: String, default: '🌾' },
+  cible: { type: String, required: true }, // Ex : "1 personne · par semaine"
+  phraseAccroche: { type: String, default: '' }, // Vide : à valider (D-05)
+  promesse: { type: String, default: '' },
+  foyersCibles: { type: String, default: '' },
+  logiqueCommande: { type: String, default: '' }, // Ex : "Quantités pour 1 personne et 1 semaine"
+  // Limites de personnalisation par pack (Architecture des offres) ; vide = non fixé
+  changementsMax: { type: Number, min: 0, default: null },
+  variationQuantitePct: { type: Number, min: 0, default: null },
+  // Repas possibles et heures gagnées, par semaine (étude marketing) ; vide pour Réserve et Fraîcheur
   estimationRepas: {
-    min: { type: Number, required: true }, // Ex: 20
-    max: { type: Number, required: true }  // Ex: 30
+    min: { type: Number, default: null },
+    max: { type: Number, default: null }
   },
   heuresEconomisees: {
-    min: { type: Number, required: true }, // Ex: 2
-    max: { type: Number, required: true }  // Ex: 4
+    min: { type: Number, default: null },
+    max: { type: Number, default: null }
   },
-  // Tarification
-  ancienPrix: { 
-    type: Number, // Stocker en Number (24000) c'est mieux pour des calculs futurs
-    required: true 
-  },
-  prixActuel: { 
-    type: Number, // Ex: 10800
-    required: true 
-  },
-  prixCommercial: { 
-    type: Number, // Ex: 10800
-    required: false // Peut être null si pas de prix personnalisé
-  },
-  // Gestion d'affichage
-  estRecommandee: { 
-    type: Boolean, 
-    default: false 
-  },
-  statut: { 
-    type: String, 
-    enum: ['actif', 'inactif'], 
-    default: 'actif' 
-  },
-  // Lien WhatsApp pré-généré ou généré dynamiquement
-  lienWhatsApp: { 
-    type: String,
-    required: true
-  }
+  ancienPrix: { type: Number, default: null }, // Ancien prix barré : n'est plus affiché (D-03)
+  prixActuel: { type: Number, min: 0, default: null }, // Prix affiché du référentiel ; vide = à définir (Fraîcheur)
+  prixCommercial: { type: Number, min: 0, required: false }, // Prix fixé par l'admin (journalisé)
+  estRecommandee: { type: Boolean, default: false },
+  statut: { type: String, enum: ['actif', 'inactif'], default: 'actif' },
+  // Cycle du pack en jours : 7 (hebdomadaire) ou 30 (Réserve) ; relance du client à l'échéance (alerte à J-5)
+  cycleJours: { type: Number, default: 7, min: 1 },
+  // Formule annoncée mais pas encore ouverte : visible côté client, non commandable
+  bientotDisponible: { type: Boolean, default: false },
+  // Lien WhatsApp pré-rempli
+  lienWhatsApp: { type: String, required: true }
 }, {
-  timestamps: true // Crée automatiquement createdAt et updatedAt
+  timestamps: true
 });
 
 module.exports = mongoose.model('Formule', formuleSchema);

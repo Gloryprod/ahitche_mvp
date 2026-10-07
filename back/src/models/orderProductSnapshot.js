@@ -6,8 +6,8 @@ const orderProductSnapshotSchema = new mongoose.Schema({
   name: { type: String, required: true },
   quantity: { type: Number, required: true },
   unit: { type: String, required: true },
-  unitPrice: { type: Number, required: true },
-  totalPrice: { type: Number, required: true },
+  unitPrice: { type: Number, default: null }, // Vide si le prix du produit est à renseigner
+  totalPrice: { type: Number, default: null },
   isExtra: { type: Boolean, default: false }
 }, { timestamps: true });
 

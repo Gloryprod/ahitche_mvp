@@ -3,37 +3,47 @@ import { ref, onMounted, computed, reactive } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
-import Swal from 'sweetalert2';
 import api from '@/stores/api';
 import { 
   MapPinIcon, Edit3Icon, PhoneIcon, MailIcon, 
   ShoppingBagIcon, ArrowRightIcon, HistoryIcon, 
-  LogOutIcon, XIcon, DownloadIcon 
+  LogOutIcon, XIcon, DownloadIcon, GlobeIcon
 } from 'lucide-vue-next';
 import { genererRecuPDF } from '@/services/pdfRecuCommande';
+import { ANNULABLES_PAR_CLIENT, classeStatut, type StatutCommande } from '@/config/commandes';
+import SuiviAlimentaire from '@/components/client/SuiviAlimentaire.vue';
+import { useDeconnexion } from '@/composables/useDeconnexion';
+import { lienWhatsApp } from '@/config/contact';
 
 interface Commande {
   id: string;
   _id: string;
+  reference?: string;
   formule: string
   date: string;
   total: string;
-  statut: "En attente" | "Livré" ;
+  statut: StatutCommande;
   facture_url?: string;
   createdAt: Date
 }
 
 interface Formule {
   _id: string;
+  slug: string;
   nom: string;
   emoji: string;
-  prixActuel: string;
+  prixActuel: number | null; // Vide : prix à définir
+  prixCommercial?: number | null;
+  bientotDisponible?: boolean;
   cible: string;
 }
 
+// Prix de vente affiché et facturé : prix commercial fixé par l'admin, sinon prix officiel
+const prixDeVente = (formule: Formule) => formule.prixCommercial ?? formule.prixActuel ?? null;
+const formaterFCFA = (montant: number) => `${montant.toLocaleString('fr-FR')} FCFA`;
+
 // 1. Authentification et Routage
 const authStore = useAuthStore();
-const isLoading = ref(false);
 const router = useRouter();
 const toast = useToast();
 const estEnEdition = ref(false);
@@ -49,8 +59,26 @@ const clientInfos = ref({
   quartier: '',
   adresse: '',
   formuleHabituelle: '',
-  telephone:''
+  telephone:'',
+  zone: null as string | null,
+  lienLocalisation: ''
 });
+
+// Zones de livraison (arrondissements de Cotonou et d'Abomey-Calavi) pour le choix du quartier
+interface ZoneLivraison {
+  code: string;
+  commune: string;
+  nom: string;
+  quartiers: string[];
+  prioritaire: boolean;
+}
+const zones = ref<ZoneLivraison[]>([]);
+const AUTRE_QUARTIER = '__autre__';
+
+const nomZone = (code: string | null) => {
+  const zone = zones.value.find(z => z.code === code);
+  return zone ? `${zone.nom}, ${zone.commune}` : '';
+};
 
 // Extraction de l'initiale du nom pour l'avatar
 const avatarInitiale = computed(() => {
@@ -69,21 +97,26 @@ const fetchDashboardData = async () => {
     adresse: authStore.user?.value?.adresse || '',
     telephone: authStore.user?.value?.telephone || '',
     formuleHabituelle: authStore.user?.value?.formuleHabituelle || 'AHI ÉQUILIBRÉ',
+    zone: authStore.user?.value?.zone || null,
+    lienLocalisation: authStore.user?.value?.lienLocalisation || '',
   };
   chargementInfos.value = false;
 
   try {
-    const [commandesRes,formulesRes] = await Promise.all([
+    const [commandesRes, formulesRes, zonesRes] = await Promise.all([
       api.get('/api/auth/my-orders', { withCredentials: true }),  // Récupère l'historique de ses commandes
-      api.get('/api/auth/formules')                                     // Récupère la liste des formules actives
+      api.get('/api/auth/formules'),                                    // Récupère la liste des formules actives
+      api.get('/api/public/zones')                                      // Quartiers proposés pour l'adresse
     ]);
+    zones.value = zonesRes.data;
 
     // 2. Assignation de l'historique des commandes
     commandes.value = commandesRes.data.map((cmd : Commande) => ({
       _id: cmd._id,
+      reference: cmd.reference,
       formule: cmd.formule,
       date: new Date(cmd.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }),
-      total: `${cmd.total.toLocaleString()} FCFA`,
+      total: formaterFCFA(Number(cmd.total)),
       statut: cmd.statut,
     }));
     chargementCommandes.value = false;
@@ -99,146 +132,144 @@ const fetchDashboardData = async () => {
   }
 };
 
-// Action de Déconnexion
-const handleLogout = async () => {
-  // 💡 Boîte de dialogue SweetAlert2 moderne et stylée
-  const result = await Swal.fire({
-    title: 'Êtes-vous sûr ?',
-    text: "Vous allez être déconnecté de votre espace.",
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#1e3a1f', // Adapte avec ta couleur "foret"
-    cancelButtonColor: '#d33',
-    confirmButtonText: 'Oui, me déconnecter',
-    cancelButtonText: 'Annuler',
-    background: '#ffffff',
-    customClass: {
-      popup: 'rounded-2xl font-body'
-    }
-  });
-
-  if (result.isConfirmed) {
-    isLoading.value = true;
-    try {
-      await authStore.logout();      
-      router.push('/login');
-      toast.success("À bientôt ! Déconnexion réussie.");
-    } catch (error) {
-      // 💡 Alerte SweetAlert2 en cas d'erreur serveur
-      Swal.fire({
-        title: 'Erreur',
-        text: 'Impossible de vous déconnecter pour le moment.',
-        icon: 'error',
-        confirmButtonColor: '#1e3a1f'
-      });
-    } finally {
-      isLoading.value = false;
-    }
-  }
-};
+// Déconnexion : confirmation, fermeture de la session puis retour à l'accueil du site
+const { seDeconnecter, deconnexionEnCours } = useDeconnexion();
 
 // Initialisation des Infos du formulaire
 const formFormulaire = reactive({
   telephone: '',
-  quartier: '',
-  adresse: ''
+  choixQuartier: '', // "code-zone|Quartier" ou AUTRE_QUARTIER
+  quartierLibre: '',
+  adresse: '',
+  lienLocalisation: ''
 });
 
 // Activer le mode édition en pré-remplissant avec les infos existantes
 const activerEdition = () => {
   formFormulaire.telephone = clientInfos.value.telephone || '';
-  formFormulaire.quartier = clientInfos.value.quartier || '';
+  const { zone, quartier } = clientInfos.value;
+  formFormulaire.choixQuartier = zone ? `${zone}|${quartier}` : (quartier ? AUTRE_QUARTIER : '');
+  formFormulaire.quartierLibre = zone ? '' : quartier || '';
   formFormulaire.adresse = clientInfos.value.adresse || '';
+  formFormulaire.lienLocalisation = clientInfos.value.lienLocalisation || '';
   estEnEdition.value = true;
 };
 
 // Fonction pour sauvegarder les infos (Appel API vers ton back Express)
 const sauvegarderInfos = async () => {
+  const autre = formFormulaire.choixQuartier === AUTRE_QUARTIER;
+  const [zone, quartierListe] = autre ? [null, ''] : formFormulaire.choixQuartier.split('|');
+  const payload = {
+    telephone: formFormulaire.telephone,
+    quartier: autre ? formFormulaire.quartierLibre : quartierListe,
+    zone,
+    adresse: formFormulaire.adresse,
+    lienLocalisation: formFormulaire.lienLocalisation
+  };
+
   enCoursDeSauvegarde.value = true;
   try {
-    // Remplacer par ton appel axios réel, ex:
-    const response = await api.post('/api/auth/user/delivery-info', formFormulaire);
-    
-    // Simulation de réussite : on met à jour l'affichage principal
-    clientInfos.value.telephone = formFormulaire.telephone;
-    clientInfos.value.quartier = formFormulaire.quartier;
-    clientInfos.value.adresse = formFormulaire.adresse;
-    
+    const response = await api.post('/api/auth/user/delivery-info', payload);
+
+    // On met à jour l'affichage principal avec ce que le serveur a enregistré
+    const enregistre = response.data.user;
+    clientInfos.value.telephone = enregistre.telephone;
+    clientInfos.value.quartier = enregistre.quartier;
+    clientInfos.value.adresse = enregistre.adresse;
+    clientInfos.value.zone = enregistre.zone;
+    clientInfos.value.lienLocalisation = enregistre.lienLocalisation;
+
     estEnEdition.value = false; // On ferme le formulaire
     toast.success(response.data.message)
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur lors de l'enregistrement des infos", error);
-    toast.error(error);
+    toast.error(error.response?.data?.message || "Impossible d'enregistrer vos informations de livraison.");
   } finally {
     enCoursDeSauvegarde.value = false;
   }
 };
 
-// Fonction pour générer le lien Whatsapp de commande avec le message dynamique contenant les infos de livraison
-const genererLienWhatsApp = computed(() => {
-  const numeroWhatsApp = "22998136635";
-  
+// Génère le lien WhatsApp de commande avec les infos de livraison.
+// Le montant et la référence proviennent de la commande enregistrée par le serveur quand elle existe.
+const genererLienWhatsApp = (commande?: { reference: string; total: number }) => {
   // On cherche les infos de la formule actuellement sélectionnée dans notre liste API
-  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle) || { prixActuel: '22 500' };
+  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle);
+  const montant = commande?.total ?? (formuleChoisie ? prixDeVente(formuleChoisie) : null);
 
   // Construction du texte personnalisé
   let message = `Bonjour Ahitché ! 👋\n\n`;
-  message += `Je souhaite commander la formule *${clientInfos.value.formuleHabituelle}* (${formuleChoisie.prixActuel} FCFA).\n\n`;
+  message += `Je souhaite commander la formule *${clientInfos.value.formuleHabituelle}*`;
+  message += montant ? ` (${formaterFCFA(montant)}).\n` : `.\n`;
+  message += commande ? `Référence de commande : *${commande.reference}*\n\n` : `\n`;
   
   // Si les infos de livraison sont remplies, on les greffe proprement au message
   if (clientInfos.value.quartier || clientInfos.value.telephone) {
     message += `📍 *Infos de livraison :*\n`;
-    message += `- *Quartier :* ${clientInfos.value.quartier || 'Non spécifié'}\n`;
+    const zone = nomZone(clientInfos.value.zone);
+    message += `- *Quartier :* ${clientInfos.value.quartier || 'Non spécifié'}${zone ? ` (${zone})` : ''}\n`;
     message += `- *Repères/Maison :* ${clientInfos.value.adresse || 'Non spécifié'}\n`;
+    if (clientInfos.value.lienLocalisation) message += `- *Localisation :* ${clientInfos.value.lienLocalisation}\n`;
     message += `- *Contact de livraison :* ${clientInfos.value.telephone || 'Non spécifié'}`;
   } else {
     message += `⚠️ _Je n'ai pas encore renseigné mes détails de livraison, nous ferons le point ici._`;
   }
 
-  // Encodage strict au format URL
-  return `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(message)}`;
-});
+  return lienWhatsApp(message);
+};
 
 // Fonction pour générer le lien WhatsApp d'annulation pour une commande spécifique
 const genererLienAnnulation = (commande: Commande) => {
-  const numeroWhatsApp = "22998136635";
-  
   // Construction du texte d'annulation clair et précis
   let message = `Bonjour Ahitché ! ❌\n\n`;
-  message += `Je souhaite annuler ma commande *${commande._id}*.\n\n`;
+  message += `Je souhaite annuler ma commande *${commande.reference || commande._id}*.\n\n`;
   message += `📍 *Détails de la commande à annuler :*\n`;
   message += `- *Formule :* ${commande.formule || clientInfos.value.formuleHabituelle}\n`;
   message += `- *Montant :* ${commande.total}\n`;
   message += `- *Date du lancement :* ${commande.date}\n\n`;
   message += `Merci de prendre en compte ma demande d'annulation.`;
 
-  // Encodage au format URL WhatsApp
-  return `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(message)}`;
+  return lienWhatsApp(message);
 };
 
-const lancerCommande = async () => {
-  // 1. Trouver les détails de la formule choisie dans formulesApi
-  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle);
-  
-  const payload = {
-    formule: clientInfos.value.formuleHabituelle,
-    total: formuleChoisie ? formuleChoisie.prixActuel : 22500
-  };
+const commandeEnCours = ref(false);
 
+const lancerCommande = async () => {
+  if (commandeEnCours.value) return;
+
+  // 1. Formule choisie : on envoie son slug, le serveur fixe lui-même le prix
+  const formuleChoisie = formulesApi.value.find(f => f.nom === clientInfos.value.formuleHabituelle);
+  const payload = { formule: formuleChoisie?.slug || clientInfos.value.formuleHabituelle };
+
+  // 2. On ouvre l'onglet WhatsApp tout de suite, pendant le clic : ouvert après l'appel API,
+  //    il serait bloqué par les navigateurs mobiles
+  const fenetreWhatsApp = window.open('', '_blank');
+  if (fenetreWhatsApp) fenetreWhatsApp.opener = null;
+
+  commandeEnCours.value = true;
+  let lien: string;
   try {
-    // 2. Enregistrement silencieux dans ta base de données locale
-    await api.post('/api/auth/save/orders', payload);
-    console.log("Commande enregistrée!");
-  } catch (error) {
-    console.error("Impossible d'enregistrer la commande", error);
-  } finally {  
-    window.open(genererLienWhatsApp.value, '_blank');
-    await fetchDashboardData();   
+    // 3. Enregistrement de la commande en base
+    const response = await api.post('/api/auth/save/orders', payload);
+    const { reference, total } = response.data.commande;
+    toast.success(`Commande ${reference} enregistrée. Finalisez-la sur WhatsApp.`);
+    lien = genererLienWhatsApp({ reference, total });
+  } catch (error: any) {
+    // La commande reste possible sur WhatsApp, mais le client sait qu'elle n'est pas dans son historique
+    toast.error(error.response?.data?.message || "Votre commande n'a pas pu être enregistrée. Vous pouvez la finaliser directement sur WhatsApp.");
+    lien = genererLienWhatsApp();
+  } finally {
+    commandeEnCours.value = false;
   }
+
+  if (fenetreWhatsApp) {
+    fenetreWhatsApp.location.href = lien;
+  } else {
+    window.location.href = lien; // Popup refusée : on bascule dans l'onglet courant
+  }
+  await fetchDashboardData();
 };
 
 const annulerCommande = async (commande_id : string) => {
-  console.log(commande_id);
   const commande = commandes.value.find(c => c._id === commande_id);
 
   if (!commande) {
@@ -247,12 +278,12 @@ const annulerCommande = async (commande_id : string) => {
   }
   
   try {
-    await api.delete(`/api/auth/delete/order/${commande_id}`);
-    console.error("Commande supprimée avec succès !");
-  } catch (error) {
-    console.error("Impossible de supprimer la commande", error);
-    toast.error("Impossible de supprimer la commande")
-  } finally {  
+    const response = await api.delete(`/api/auth/delete/order/${commande_id}`);
+    toast.success(response.data.message);
+  } catch (error: any) {
+    console.error("Impossible d'annuler la commande", error);
+    toast.error(error.response?.data?.message || "Impossible d'annuler la commande")
+  } finally {
     window.open(genererLienAnnulation(commande), '_blank');
     await fetchDashboardData();   
   }
@@ -297,7 +328,7 @@ const telechargerRecu = (commande: Commande) => {
 onMounted(async () => {
   await authStore.checkSession();
   
-  if (!authStore.isAuthenticated) {
+  if (!authStore.isAuthenticated.value) {
     // 💡 Toast d'avertissement si l'utilisateur tente de forcer l'accès
     toast.error("Accès refusé. Veuillez vous connecter.");
     router.push('/');
@@ -338,14 +369,24 @@ onMounted(async () => {
             </p>
           </div>
         </div>
-        <button 
-          @click="handleLogout" 
-          :disabled="isLoading"
-          class="cursor-pointer w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-200 text-gris hover:text-red-600 hover:bg-red-50 hover:border-red-100 font-semibold transition-all duration-200 text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          <LogOutIcon class="w-4 h-4" />
-          <span>{{ isLoading ? 'Déconnexion...' : 'Déconnexion' }}</span>
-        </button>
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <!-- Consulter le site sans se déconnecter : « Mon espace », dans le menu du site, ramène ici -->
+          <RouterLink
+            to="/"
+            class="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-foret/20 text-foret hover:bg-foret/5 font-semibold transition-all duration-200 text-sm flex items-center justify-center gap-2"
+          >
+            <GlobeIcon class="w-4 h-4" />
+            <span>Voir le site</span>
+          </RouterLink>
+          <button 
+            @click="seDeconnecter" 
+            :disabled="deconnexionEnCours"
+            class="cursor-pointer w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-200 text-gris hover:text-red-600 hover:bg-red-50 hover:border-red-100 font-semibold transition-all duration-200 text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <LogOutIcon class="w-4 h-4" />
+            <span>{{ deconnexionEnCours ? 'Déconnexion...' : 'Déconnexion' }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- SECTIONS ACTIONS INTERACTIVES -->
@@ -382,7 +423,11 @@ onMounted(async () => {
             <div v-else-if="!estEnEdition" class="">
               <div v-if="clientInfos.telephone || clientInfos.quartier" class="p-4 rounded-xl border border-gray-100/50">
                 <p class="font-bold text-foret text-base mb-1">{{ clientInfos.quartier || "" }}</p>
+                <p v-if="nomZone(clientInfos.zone)" class="text-xs text-gris mb-1">{{ nomZone(clientInfos.zone) }}</p>
                 <p class="text-gris text-sm leading-relaxed mb-3 font-medium">{{ clientInfos.adresse || "" }}</p>
+                <a v-if="clientInfos.lienLocalisation" :href="clientInfos.lienLocalisation" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs font-semibold text-savane underline mb-3">
+                  <MapPinIcon class="w-3.5 h-3.5" /> Voir ma localisation
+                </a>
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-sm font-semibold shadow-2xl">
                   <PhoneIcon class="w-4 h-4 text-foret opacity-80" />
                   <span>{{ clientInfos.telephone }}</span>
@@ -396,7 +441,7 @@ onMounted(async () => {
             <!-- Mode Formulaire épuré avec focus moderne -->
             <form v-else @submit.prevent="sauvegarderInfos" class="space-y-4 animate-fadeIn">
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Téléphone (WhatsApp)</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Téléphone (WhatsApp)</label>
                 <input 
                   v-model="formFormulaire.telephone" 
                   type="tel" 
@@ -407,25 +452,55 @@ onMounted(async () => {
               </div>
 
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Quartier / Ville</label>
-                <input 
-                  v-model="formFormulaire.quartier" 
-                  type="text" 
-                  placeholder="Ex: Akassato, Calavi" 
+                <label for="livraison-quartier" class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Quartier</label>
+                <select
+                  id="livraison-quartier"
+                  v-model="formFormulaire.choixQuartier"
+                  required
+                  class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium"
+                >
+                  <option value="" disabled>Choisissez votre quartier</option>
+                  <optgroup v-for="zone in zones" :key="zone.code" :label="`${zone.nom} · ${zone.commune}`">
+                    <option v-for="q in zone.quartiers" :key="q" :value="`${zone.code}|${q}`">{{ q }}</option>
+                  </optgroup>
+                  <option :value="AUTRE_QUARTIER">Autre quartier (je le saisis)</option>
+                </select>
+              </div>
+
+              <div v-if="formFormulaire.choixQuartier === AUTRE_QUARTIER">
+                <label for="livraison-quartier-libre" class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Nom du quartier</label>
+                <input
+                  id="livraison-quartier-libre"
+                  v-model="formFormulaire.quartierLibre"
+                  type="text"
+                  placeholder="Ex : Calavi Kpota"
                   required
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium"
                 />
               </div>
 
               <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Précisions (Maison, repère...)</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Précisions (Maison, repère...)</label>
                 <textarea 
                   v-model="formFormulaire.adresse" 
                   rows="2"
-                  placeholder="Ex: Maison verte en face de la pharmacie..." 
+                  placeholder="Ex: Maison verte en face de la pharmacie..."
                   required
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium resize-none"
                 ></textarea>
+              </div>
+
+              <div>
+                <label for="livraison-lien" class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Lien de localisation (facultatif)</label>
+                <input
+                  id="livraison-lien"
+                  v-model="formFormulaire.lienLocalisation"
+                  type="url"
+                  inputmode="url"
+                  placeholder="https://maps.app.goo.gl/…"
+                  class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-2 focus:ring-foret/10 bg-gray-50/30 transition-all font-medium"
+                />
+                <p class="text-[11px] text-gris mt-1">Lien Google Maps ou position partagée sur WhatsApp : votre livreur vous trouve plus vite.</p>
               </div>
 
               <div class="flex items-center gap-3 pt-2">
@@ -476,23 +551,30 @@ onMounted(async () => {
                 v-for="formule in formulesApi" 
                 :key="formule._id"
                 :class="[
-                  'flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all duration-200 select-none transform hover:-translate-y-0.5',
-                  clientInfos.formuleHabituelle === formule.nom 
-                    ? 'border-foret bg-foret/[0.02] shadow-sm ring-2 ring-foret/20' 
-                    : 'border-gray-100 hover:border-gray-300 hover:shadow-sm bg-white'
+                  'flex items-center justify-between gap-3 p-4 rounded-xl border transition-all duration-200 select-none',
+                  formule.bientotDisponible
+                    ? 'border-dashed border-gray-200 bg-creme/50 opacity-70 cursor-not-allowed'
+                    : clientInfos.formuleHabituelle === formule.nom
+                      ? 'cursor-pointer transform hover:-translate-y-0.5 border-foret bg-foret/[0.02] shadow-sm ring-2 ring-foret/20'
+                      : 'cursor-pointer transform hover:-translate-y-0.5 border-gray-100 hover:border-gray-300 hover:shadow-sm bg-white'
                 ]"
-                @click="changerFormule(formule)"
+                :aria-disabled="formule.bientotDisponible ? 'true' : undefined"
+                @click="!formule.bientotDisponible && changerFormule(formule)"
               >
                 <div class="flex items-center gap-4">
-                  <span class="text-2xl filter drop-shadow-sm select-none">{{ formule.emoji }}</span>
+                  <span class="text-2xl filter drop-shadow-sm select-none" aria-hidden="true">{{ formule.emoji }}</span>
                   <div>
                     <p class="font-bold text-sm" :class="clientInfos.formuleHabituelle === formule.nom ? 'text-foret' : 'text-noir'">{{ formule.nom }}</p>
-                    <p class="text-xs text-gris font-medium mt-0.5">{{ formule.prixActuel }} FCFA · {{ formule.cible.split('·')[0] }}</p>
+                    <p class="text-xs text-gris font-medium mt-0.5">{{ prixDeVente(formule) === null ? 'Prix à définir' : formaterFCFA(prixDeVente(formule)!) }} · {{ formule.cible.split('·')[0] }}</p>
                   </div>
                 </div>
-                
+
+                <span v-if="formule.bientotDisponible" class="text-[11px] font-bold uppercase tracking-wider text-savane bg-savane/10 px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
+                  Bientôt
+                </span>
+
                 <!-- Radio moderne -->
-                <div 
+                <div v-else
                   :class="[
                     'w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-200',
                     clientInfos.formuleHabituelle === formule.nom ? 'border-foret bg-foret' : 'border-gray-300'
@@ -505,10 +587,11 @@ onMounted(async () => {
           </div>
 
           <button 
-            @click="lancerCommande" 
-            class="cursor-pointer inline-flex items-center justify-center gap-2 w-full px-5 py-3.5 bg-foret text-white font-bold rounded-xl hover:bg-savane shadow-sm hover:shadow transition-all duration-200 text-sm active:scale-[0.99]"
+            @click="lancerCommande"
+            :disabled="commandeEnCours"
+            class="cursor-pointer inline-flex items-center justify-center gap-2 w-full px-5 py-3.5 bg-foret text-white font-bold rounded-xl hover:bg-savane shadow-sm hover:shadow transition-all duration-200 text-sm active:scale-[0.99] disabled:opacity-50"
           >
-            <span>Confirmer et commander</span>
+            <span>{{ commandeEnCours ? 'Enregistrement...' : 'Confirmer et commander' }}</span>
             <ArrowRightIcon class="w-4 h-4" />
           </button>
         </div>        
@@ -534,10 +617,10 @@ onMounted(async () => {
 
         <div v-else>
           <!-- VUE DE DESKTOP (Cache sur mobile) -->
-          <div class="hidden md:block overflow-x-auto">
+          <div v-defilable="'Historique de mes commandes'" class="hidden md:block overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="text-gray-400 text-xs font-bold uppercase tracking-wider border-b border-gray-100 pb-3">
+                <tr class="text-gris text-xs font-bold uppercase tracking-wider border-b border-gray-100 pb-3">
                   <th class="pb-3 font-bold">N° Commande</th>
                   <th class="pb-3 font-bold">Pack Commandé</th>
                   <th class="pb-3 font-bold">Date</th>
@@ -549,33 +632,28 @@ onMounted(async () => {
               <tbody class="divide-y divide-gray-50 text-sm font-medium">
                 <tr v-for="commande in commandes" :key="commande._id" class="hover:bg-gray-50/50 transition-colors group">
                   <td class="py-4 font-bold text-foret">
-                    {{ `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}
+                    {{ commande.reference || `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}
                   </td>
                   <td class="py-4 text-gray-700">{{ commande.formule }}</td>
                   <td class="py-4 text-gris font-normal">{{ commande.date }}</td>
                   <td class="py-4 font-bold">{{ commande.total }}</td>
                   <td class="py-4">
-                    <span :class="[
-                      'px-3 py-1 rounded-full text-xs font-bold tracking-wide inline-block shadow-sm',
-                      commande.statut === 'Livré' ? 'bg-green-50 text-green-700 border border-green-100' :
-                      commande.statut === 'En attente' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
-                      'bg-red-50 text-red-700 border border-red-100'
-                    ]">
+                    <span :class="['px-3 py-1 rounded-full text-xs font-bold tracking-wide inline-block whitespace-nowrap', classeStatut(commande.statut)]">
                       {{ commande.statut }}
                     </span>
                   </td>
                   <td class="py-4 text-right">
-                    <div v-if='commande.statut === "En attente"' class="opacity-80 group-hover:opacity-100 transition-opacity">
+                    <div v-if='ANNULABLES_PAR_CLIENT.includes(commande.statut)' class="opacity-80 group-hover:opacity-100 transition-opacity">
                       <button 
                         @click="annulerCommande(commande._id)" 
                         title="Annuler la commande"
-                        class="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center justify-center border border-red-100/50"
+                        class="p-2.5 bg-red-50 text-red-800 rounded-xl hover:bg-red-600 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center justify-center border border-red-100/50"
                       >
                         <XIcon class="w-4 h-4" />
                       </button>
                     </div>
 
-                    <div v-if="commande.statut === 'Livré'" class="opacity-80 group-hover:opacity-100 transition-opacity">
+                    <div v-if="commande.statut === 'Livrée'" class="opacity-80 group-hover:opacity-100 transition-opacity">
                       <button 
                         @click="telechargerRecu(commande)" 
                         class="p-2.5 bg-green-50 text-green-700 rounded-xl hover:bg-green-600 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95 inline-flex items-center justify-center border border-green-100/50 text-xs font-bold gap-1.5"
@@ -595,42 +673,37 @@ onMounted(async () => {
             <div v-for="commande in commandes" :key="commande._id" class="bg-gray-50/60 rounded-xl p-4 border border-gray-100 flex flex-col gap-3 relative">
               <div class="flex justify-between items-start">
                 <div>
-                  <span class="text-xs text-gray-400 font-bold uppercase block">ID Unique</span>
-                  <span class="font-bold text-foret">{{ `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}</span>
+                  <span class="text-xs text-gris font-bold uppercase block">ID Unique</span>
+                  <span class="font-bold text-foret">{{ commande.reference || `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}</span>
                 </div>
-                <span :class="[
-                  'px-3 py-1 rounded-full text-xs font-bold tracking-wide shadow-sm',
-                  commande.statut === 'Livré' ? 'bg-green-50 text-green-700 border border-green-100' :
-                  commande.statut === 'En attente' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
-                  'bg-red-50 text-red-700 border border-red-100'
-                ]">
+                <span :class="['px-3 py-1 rounded-full text-xs font-bold tracking-wide whitespace-nowrap', classeStatut(commande.statut)]">
                   {{ commande.statut }}
                 </span>
               </div>
               
               <div class="grid grid-cols-2 gap-2 border-t border-b border-gray-100/80 py-2.5 my-0.5 text-sm">
                 <div>
-                  <span class="text-[11px] text-gray-400 font-bold uppercase block">Formule</span>
+                  <span class="text-[11px] text-gris font-bold uppercase block">Formule</span>
                   <span class="font-semibold text-gray-800">{{ commande.formule }}</span>
                 </div>
                 <div>
-                  <span class="text-[11px] text-gray-400 font-bold uppercase block">Prix payé</span>
-                  <span class="font-bold text-noir">{{ commande.total }} FCFA</span>
+                  <span class="text-[11px] text-gris font-bold uppercase block">Prix payé</span>
+                  <span class="font-bold text-noir">{{ commande.total }}</span>
                 </div>
               </div>
 
               <div class="flex items-center justify-between text-xs pt-1">
                 <span class="text-gris font-medium">{{ commande.date }}</span>
                 <button 
-                  v-if='commande.statut === "En attente"'
+                  v-if='ANNULABLES_PAR_CLIENT.includes(commande.statut)'
                   @click="annulerCommande(commande._id)"
-                  class="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all active:scale-95"
+                  class="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-800 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all active:scale-95"
                 >
                   <XIcon class="w-3.5 h-3.5" />
                   <span>Annuler</span>
                 </button>
                 <button 
-                  v-else-if="commande.statut === 'Livré'"
+                  v-else-if="commande.statut === 'Livrée'"
                   @click="telechargerRecu(commande)"
                   class="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-xl font-bold hover:bg-green-600 hover:text-white transition-all active:scale-95"
                 >
@@ -643,6 +716,9 @@ onMounted(async () => {
 
         </div>
       </div>
+
+      <!-- SUIVI ALIMENTAIRE (questionnaire, conseils, menus) -->
+      <SuiviAlimentaire />
     </div>
 
   </div>

@@ -1,4 +1,9 @@
 const CompositionRule = require('../../models/compositionRule');
+const { journaliser } = require('../../services/journalService');
+const { echapperRegex } = require('../../utils/texte');
+
+// Multiplicateur facultatif (D-14 : simple libellé) : vide -> null ; invalide -> NaN
+const multiplicateur = (v) => (v === undefined || v === null || v === '' ? null : Number(v) >= 0 ? Number(v) : NaN);
 
 // 1. Récupérer toutes les règles (Paginées et Filtrées)
 async function getAllRules(req, res) {
@@ -54,13 +59,13 @@ async function createRule(req, res) {
       return res.status(400).json({ message: "Le nom de la règle est obligatoire." });
     }
 
-    if (multiplierEquilibre === undefined || multiplierConfort === undefined) {
-      return res.status(400).json({ message: "Les multiplicateurs Équilibré et Confort sont obligatoires." });
+    if ([multiplierEquilibre, multiplierConfort].some(m => Number.isNaN(multiplicateur(m)))) {
+      return res.status(400).json({ message: "Multiplicateurs : nombres positifs ou vides." });
     }
 
     // Anti-doublon sur le nom
     const existingRule = await CompositionRule.findOne({ 
-      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
+      name: { $regex: new RegExp(`^${echapperRegex(name.trim())}$`, 'i') },
       deletedAt: null
     });
 
@@ -70,12 +75,13 @@ async function createRule(req, res) {
 
     const newRule = new CompositionRule({
       name: name.trim(),
-      multiplierEquilibre: Number(multiplierEquilibre),
-      multiplierConfort: Number(multiplierConfort),
+      multiplierEquilibre: multiplicateur(multiplierEquilibre),
+      multiplierConfort: multiplicateur(multiplierConfort),
       description: description ? description.trim() : ''
     });
 
     await newRule.save();
+    await journaliser(req, { action: 'Création', entite: 'Règle de composition', entiteId: newRule._id, resume: `Règle « ${newRule.name} » créée (×${newRule.multiplierEquilibre} / ×${newRule.multiplierConfort})` });
     return res.status(201).json(newRule);
   } catch (error) {
     console.error("Erreur createRule:", error);
@@ -96,7 +102,7 @@ async function updateRule(req, res) {
     // Vérifier si le nouveau nom n'est pas pris par une autre règle active
     const duplicate = await CompositionRule.findOne({
       _id: { $ne: id },
-      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
+      name: { $regex: new RegExp(`^${echapperRegex(name.trim())}$`, 'i') },
       deletedAt: null
     });
 
@@ -104,12 +110,13 @@ async function updateRule(req, res) {
       return res.status(400).json({ message: "Une autre règle porte déjà ce nom." });
     }
 
+    const avant = await CompositionRule.findById(id).lean();
     const updatedRule = await CompositionRule.findByIdAndUpdate(
       id,
       { 
         name: name.trim(), 
-        multiplierEquilibre: Number(multiplierEquilibre),
-        multiplierConfort: Number(multiplierConfort),
+        multiplierEquilibre: multiplicateur(multiplierEquilibre),
+        multiplierConfort: multiplicateur(multiplierConfort),
         description: description ? description.trim() : ''
       },
       { new: true } // Retourne l'objet mis à jour
@@ -119,6 +126,12 @@ async function updateRule(req, res) {
       return res.status(404).json({ message: "Règle introuvable." });
     }
 
+    await journaliser(req, {
+      action: 'Modification', entite: 'Règle de composition', entiteId: updatedRule._id,
+      resume: `Règle « ${updatedRule.name} » : ×${avant?.multiplierEquilibre} / ×${avant?.multiplierConfort} → ×${updatedRule.multiplierEquilibre} / ×${updatedRule.multiplierConfort}`,
+      avant: avant && { name: avant.name, multiplierEquilibre: avant.multiplierEquilibre, multiplierConfort: avant.multiplierConfort },
+      apres: { name: updatedRule.name, multiplierEquilibre: updatedRule.multiplierEquilibre, multiplierConfort: updatedRule.multiplierConfort }
+    });
     return res.status(200).json(updatedRule);
   } catch (error) {
     console.error("Erreur updateRule:", error);
@@ -144,6 +157,7 @@ async function deleteRule(req, res) {
       return res.status(404).json({ message: "Règle introuvable." });
     }
 
+    await journaliser(req, { action: 'Suppression', entite: 'Règle de composition', entiteId: deletedRule._id, resume: `Règle « ${deletedRule.name} » supprimée` });
     return res.status(200).json({ message: "Règle supprimée avec succès." });
   } catch (error) {
     console.error("Erreur deleteRule:", error);

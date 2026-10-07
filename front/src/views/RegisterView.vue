@@ -1,16 +1,6 @@
 <template>
     <div class="min-h-screen flex md:flex-row">
-        <div class="hidden md:block md:w-1/2 relative bg-foret min-h-112.5">
-            <img 
-                src="/beautiful-couple-looking-their-laptop.jpg" 
-                alt="Plat Ahitché" 
-                class="w-full h-full object-cover"
-            />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-8 text-white">
-                <h3 class="font-display text-2xl font-bold mb-2">Prêt à commander ?</h3>
-                <p class="text-white/80 text-sm">Créez votre compte en un instant pour planifier et recevoir vos formules de la semaine.</p>
-            </div>
-        </div>
+        <PanneauMarque titre="Prêt à commander ?" texte="Créez votre compte en un instant pour planifier et recevoir vos formules." />
 
         <!-- Partie droite : Formulaire d'inscription -->
         <div class="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
@@ -20,13 +10,13 @@
                 <!-- <a href="/" class="nav-logo">
                     <span class="logo-mark">Ahi</span><span class="logo-accent">tché</span>
                 </a> -->
-                <a href="/" class="btn-retour ">← Retour à l'accueil</a>
+                <LienAccueil />
             </div>
         </nav>
 
         <div class="mb-6 text-center">
-            <h2 class="text-2xl font-bold text-foret font-display">Rejoignez Ahitché</h2>
-            <p class="text-sm text-gray-500 mt-1">Créez votre profil pour finaliser votre commande.</p>
+            <h1 class="text-2xl font-bold text-foret font-display">Rejoignez Ahitché</h1>
+            <p class="text-sm text-gris mt-1">Créez votre profil pour finaliser votre commande.</p>
         </div>
 
         <form @submit.prevent="handleRegister" class="flex flex-col gap-4">
@@ -54,10 +44,15 @@
 
             <div>
                 <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Numéro WhatsApp / Mobile Money <span class="required">*</span></label>
-                <div class="">
-                  <vue-tel-input class="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all" v-model="formRegister.telephone"></vue-tel-input>
-                </div>
-                <p class="text-xs text-gray-500 mt-1">Ce numéro sera utilisé pour vos commandes et livraisons.</p>
+                <vue-tel-input
+                  class="champ-telephone w-full text-sm"
+                  v-model="formRegister.telephone"
+                  default-country="BJ"
+                  mode="international"
+                  :input-options="{ placeholder: 'Ex : 01 97 00 00 00', type: 'tel' }"
+                  :dropdown-options="{ showFlags: true, showSearchBox: true, searchBoxPlaceholder: 'Rechercher un pays' }"
+                ></vue-tel-input>
+                <p class="text-xs text-gris mt-1">Ce numéro sera utilisé pour vos commandes et livraisons.</p>
             </div>
 
             <div>
@@ -81,7 +76,7 @@
         </form>
 
         <div class="flex items-center justify-center gap-1 mt-4">
-            <span class="text-sm text-gray-500">
+            <span class="text-sm text-gris">
                 Déjà inscrit ? <button @click="login" class="cursor-pointer text-foret hover:text-foret/90 font-bold">Se connecter</button>
             </span>
         </div>
@@ -92,10 +87,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import PanneauMarque from '@/components/ui/PanneauMarque.vue'
+import { ref, h, defineAsyncComponent } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
+import LienAccueil from '@/components/ui/LienAccueil.vue';
+// Champ téléphone chargé après l'affichage de la page : il embarque la numérotation de tous les pays (~150 Ko),
+// ce qui retardait l'affichage sur mobile. Pendant le chargement, un champ de même taille évite le décalage.
+const VueTelInput = defineAsyncComponent({
+  loader: async () => {
+    const [module] = await Promise.all([import('vue-tel-input'), import('vue-tel-input/vue-tel-input.css')])
+    return module.VueTelInput
+  },
+  loadingComponent: { render: () => h('div', { class: 'champ-telephone h-12 w-full', 'aria-busy': 'true' }) },
+  delay: 0,
+})
 
 const formRegister = ref({ username: '', email: '', password: '', telephone:'' })
 const isLoading = ref(false)
@@ -120,3 +127,27 @@ const login = () => {
   router.push('/login')
 }
 </script>
+<style scoped>
+/* Aligne vue-tel-input sur les autres champs du formulaire (charte Ahitché) */
+.champ-telephone {
+  border: 1px solid #e5e7eb; /* gray-200, comme les autres champs */
+  border-radius: 0.75rem;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.champ-telephone:focus-within {
+  border-color: var(--color-foret);
+  box-shadow: 0 0 0 1px var(--color-foret);
+}
+.champ-telephone :deep(.vti__dropdown) {
+  padding: 0 0.5rem 0 0.75rem;
+  border-radius: 0.75rem 0 0 0.75rem;
+}
+.champ-telephone :deep(.vti__input) {
+  padding: 0.75rem 1rem 0.75rem 0.5rem;
+  border-radius: 0 0.75rem 0.75rem 0;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: transparent;
+}
+</style>

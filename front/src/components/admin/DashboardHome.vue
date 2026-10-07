@@ -2,6 +2,11 @@
 import { computed } from 'vue'
 import { useQuery, keepPreviousData, useQueries } from '@tanstack/vue-query'
 import api from '@/stores/api'
+import { classeStatut } from '@/config/commandes'
+import { useAuthStore } from '@/stores/auth'
+import { peutLire, peutEcrire } from '@/config/roles'
+import { useTauxChange } from '@/composables/useTauxChange'
+import { useToast } from 'vue-toastification'
 import type { Commande } from '@/type'
 import { 
   AlertTriangle, 
@@ -76,17 +81,58 @@ const inventaireRaw = computed((): InventoryItem[] => {
 
 const stockAlerts = computed(() => inventaireRaw.value.filter(item => item.enAlerte))
 
-// --- 4. GESTION DES RENOUVELLEMENTS (Livrés + 30j -> Alerte si <= 5j) ---
+// Taux USD/FCFA en vigueur (section Finances), affiché seulement aux rôles qui y ont accès
+const authStore = useAuthStore()
+const toast = useToast()
+const { data: tauxData } = useQuery({
+  queryKey: ['finances', 'taux'],
+  queryFn: async () => (await api.get('/api/admin/finances/taux')).data as { courant: number; convention: number },
+  enabled: computed(() => peutLire(authStore.role.value, 'finances')),
+})
+const tauxUsd = computed(() => tauxData.value?.courant)
+const tauxConvention = computed(() => tauxData.value?.convention)
+
+// Admin et comptable : le taux se modifie d'un clic (nouveau taux ou retour au taux de la convention)
+const tauxModifiable = computed(() => peutEcrire(authStore.role.value, 'finances'))
+const { modifierTaux } = useTauxChange()
+const changerTaux = async () => {
+  if (!tauxData.value) return
+  try {
+    const message = await modifierTaux(tauxData.value.courant, tauxData.value.convention)
+    if (message) toast.success(message)
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Modification du taux impossible')
+  }
+}
+
+// --- 4. GESTION DES RENOUVELLEMENTS ---
+// Relance si le client ne se manifeste pas : 14 jours après la livraison (Essentiel, Fraîcheur) ou 30 jours
+// (autres packs), selon le cycle enregistré sur la formule ; alerte à J-5.
+const CYCLES_PAR_DEFAUT: Record<string, number> = { 'ahi-essentiel': 14, 'ahi-fraicheur': 14 }
+const cycleJours = (formuleSlug: string): number => {
+  const index = PACKS_CONFIG.findIndex(pack => `ahi-${pack.key}` === formuleSlug)
+  return formulaQueries.value[index]?.data?.formule?.cycleJours ?? CYCLES_PAR_DEFAUT[formuleSlug] ?? 30
+}
+
 const upcomingRenewals = computed(() => {
   const now = new Date()
-  
-  return ordersList.value
-    .filter(order => order.statut === 'Livré' && order.dateLivraison)
+  const commandesActives = ordersList.value.filter(o => o && o.deletedAt == null)
+
+  // Dernière commande de chaque client (la liste arrive de la plus récente à la plus ancienne) :
+  // une relance n'a de sens que s'il n'a rien commandé depuis
+  const derniereParClient = new Map<string, Commande>()
+  for (const order of commandesActives) {
+    const cle = order.userId ?? order.clientName
+    if (!derniereParClient.has(cle)) derniereParClient.set(cle, order)
+  }
+
+  return [...derniereParClient.values()]
+    .filter(order => order.statut === 'Livrée' && order.dateLivraison)
     .map(order => {
       const deliveryDate = new Date(order.dateLivraison)
-      // Échéance de l'abonnement à +30 jours
+      // Échéance du cycle de la formule
       const expiryDate = new Date(deliveryDate)
-      expiryDate.setDate(expiryDate.getDate() + 30)
+      expiryDate.setDate(expiryDate.getDate() + cycleJours(order.formuleSlug))
 
       // Calcul de la différence en jours
       const diffTime = expiryDate.getTime() - now.getTime()
@@ -111,7 +157,15 @@ const activeClientsCount = computed(() => {
   return uniqueClients.size
 })
 
-const targetClients = 20
+// Objectif de clients : paramètre enregistré (Simulateurs > Paramètres) ; rien d'affiché tant qu'il n'est pas renseigné
+const { data: parametres } = useQuery({
+  queryKey: ['parametres'],
+  queryFn: async (): Promise<{ objectifClients: number | null }> => (await api.get('/api/admin/parametres')).data,
+  enabled: computed(() => peutLire(authStore.role.value, 'parametres')),
+})
+// Chiffre d'affaires et marges : pas pour les gestionnaires (D-17), mêmes droits que les simulateurs
+const voirMarges = computed(() => peutLire(authStore.role.value, 'simulateurs'))
+const targetClients = computed(() => parametres.value?.objectifClients ?? null)
 
 const estimatedRevenue = computed(() => {
   return ordersList.value
@@ -166,11 +220,11 @@ const recentOrders = computed(() => {
 
 // Configuration des 5 formules
 const PACKS_CONFIG = [
-  { key: 'essentiel', label: 'ESSENTIEL', defaultLaunchPrice: 10800 },
-  { key: 'equilibre', label: 'ÉQUILIBRÉ', defaultLaunchPrice: 21600 },
-  { key: 'confort', label: 'CONFORT', defaultLaunchPrice: 35000 },
-  { key: 'reserve', label: 'RÉSERVE', defaultLaunchPrice: 0 },
-  { key: 'fraicheur', label: 'FRAÎCHEUR', defaultLaunchPrice: 0 }
+  { key: 'essentiel', label: 'ESSENTIEL' },
+  { key: 'equilibre', label: 'ÉQUILIBRÉ' },
+  { key: 'confort', label: 'CONFORT' },
+  { key: 'reserve', label: 'RÉSERVE' },
+  { key: 'fraicheur', label: 'FRAÎCHEUR' }
 ]
 
 // Exécution parallèle des requêtes pour chaque formule
@@ -181,7 +235,8 @@ const formulaQueries = useQueries({
       const response = await api.get(`/api/admin/formulas/${pack.key}`)
       return response.data
     },
-    staleTime: 1000 * 60 * 5 // Cache 5 minutes
+    staleTime: 1000 * 60 * 5, // Cache 5 minutes
+    enabled: voirMarges
   }))
 })
 
@@ -195,7 +250,7 @@ const grossMargins = computed(() => {
     const data = query?.data
 
     // Prix de vente (ou depuis l'API si disponible)
-    const launchPrice = data?.formule?.prixActuel ?? pack.defaultLaunchPrice
+    const launchPrice: number | null = data?.formule?.prixCommercial ?? data?.formule?.prixActuel ?? null // Vide : prix à définir
 
     // Calcul du coût réel de la dotation (somme des sous-totaux des produits)
     const realCost = data?.items
@@ -203,7 +258,7 @@ const grossMargins = computed(() => {
       : 0
 
     // Marge brute = Prix de vente - Coût réel
-    const margin = launchPrice - realCost
+    const margin = launchPrice === null ? null : launchPrice - realCost
 
     return {
       formula: pack.label,
@@ -235,13 +290,6 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
   window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank')
 }
 
-const getStatutClass = (statut: Commande['statut']) => {
-  switch (statut) {
-    case 'En attente': return 'bg-amber-100 text-amber-800'
-    case 'Livré': return 'bg-green-100 text-green-700'
-    default: return 'bg-gray-100 text-gray-700'
-  }
-}
 </script>
 
 <template>
@@ -251,23 +299,31 @@ const getStatutClass = (statut: Commande['statut']) => {
     <div class="bg-white p-4 rounded-2xl flex items-center justify-between border-b border-gray-200 shadow-2xs">
       <div>
         <h1 class="font-display font-bold text-xl text-noir">Tableau de bord</h1>
-        <p class="text-[11px] text-gray-400 font-medium">Aperçu opérationnel & logistique d'Ahitché</p>
+        <p class="text-[11px] text-gris font-medium">Aperçu opérationnel & logistique d'Ahitché</p>
       </div>
 
       <div class="flex items-center gap-3">
         <button @click="refreshAll" title="Actualiser" class="p-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-all cursor-pointer">
-          <RefreshCw :class="['w-4 h-4 text-gray-600', isLoadingOrders || isLoadingStock ? 'animate-spin' : '']" />
+          <RefreshCw :class="['w-4 h-4 text-gris', isLoadingOrders || isLoadingStock ? 'animate-spin' : '']" />
         </button>
 
-        <div class="bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 font-mono text-[11px]">
-          1 USD = <span class="font-bold text-noir">571 FCFA</span>
-        </div>
+        <component
+          :is="tauxModifiable ? 'button' : 'div'"
+          v-if="tauxUsd"
+          :type="tauxModifiable ? 'button' : undefined"
+          @click="tauxModifiable && changerTaux()"
+          :title="tauxModifiable ? 'Modifier le taux USD/FCFA' : undefined"
+          :class="['bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 text-gris font-mono text-[11px]', tauxModifiable ? 'cursor-pointer hover:border-foret' : '']"
+        >
+          1 USD = <span class="font-bold text-noir">{{ tauxUsd }} FCFA</span>
+          <span v-if="tauxUsd === tauxConvention" class="font-body text-savane"> · convention</span>
+        </component>
       </div>
     </div>
 
     <!-- CHARGEMENT INITIAL -->
     <div v-if="isLoadingOrders && isLoadingStock" class="text-center py-12 bg-white rounded-2xl border border-gray-100">
-      <span class="animate-pulse text-gray-500 font-medium">Synchronisation des données en cours...</span>
+      <span class="animate-pulse text-gris font-medium">Synchronisation des données en cours...</span>
     </div>
 
     <template v-else>
@@ -275,34 +331,34 @@ const getStatutClass = (statut: Commande['statut']) => {
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">CLIENTS ACTIFS</span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gris">CLIENTS ACTIFS</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ activeClientsCount }}</span>
-            <span class="text-[11px] text-gray-500">↑ obj. {{ targetClients }} pilote</span>
+            <span v-if="targetClients !== null" class="text-[11px] text-gris">↑ obj. {{ targetClients }} pilote</span>
           </div>
         </div>
 
-        <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">CA ESTIMÉ / CYCLE</span>
+        <div v-if="voirMarges" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gris">CA ESTIMÉ / CYCLE</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ estimatedRevenue.toLocaleString('fr-FR') }}</span>
-            <span class="text-[11px] text-gray-500">FCFA · {{ activeClientsCount }} clients</span>
+            <span class="text-[11px] text-gris">FCFA · {{ activeClientsCount }} clients</span>
           </div>
         </div>
 
         <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">COMMANDES EN ATTENTE</span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gris">COMMANDES EN ATTENTE</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ pendingOrdersCount }}</span>
-            <span class="text-[11px] text-amber-600 font-semibold">→ À préparer</span>
+            <span class="text-[11px] text-amber-800 font-semibold">→ À préparer</span>
           </div>
         </div>
 
         <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">RENOUVELLEMENTS (J-5)</span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gris">RENOUVELLEMENTS (J-5)</span>
           <div class="flex items-baseline justify-between">
             <span class="text-2xl font-display font-bold text-noir">{{ upcomingRenewals.length }}</span>
-            <span class="text-[11px] text-red-500 font-semibold">Client(s) concerné(s)</span>
+            <span class="text-[11px] text-red-700 font-semibold">Client(s) concerné(s)</span>
           </div>
         </div>
 
@@ -329,7 +385,7 @@ const getStatutClass = (statut: Commande['statut']) => {
         <!-- Alerte Renouvellements imminents (J-5) -->
         <div v-if="upcomingRenewals.length > 0 && upcomingRenewals[0]" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 flex items-center justify-between gap-2.5">
           <div class="flex items-center gap-2.5">
-            <Bell class="w-4 h-4 text-amber-600 shrink-0" />
+            <Bell class="w-4 h-4 text-amber-800 shrink-0" />
             <p class="leading-tight">
               <strong>{{ upcomingRenewals.length }} renouvellement(s) sous 5 jours</strong> — 
               <span>Prochain : {{ upcomingRenewals[0]?.clientName }} ({{ upcomingRenewals[0]?.formule }}) 
@@ -354,26 +410,26 @@ const getStatutClass = (statut: Commande['statut']) => {
             <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-4">
                 <div class="flex items-center justify-between border-b border-gray-100 pb-2">
                 <h2 class="font-bold text-noir text-sm">Répartition clients</h2>
-                <span class="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-md text-[10px]">par formule</span>
+                <span class="px-2 py-0.5 bg-gray-100 text-gris rounded-md text-[10px]">par formule</span>
                 </div>
 
                 <div class="space-y-3">
                 <div v-for="form in formulaDistribution" :key="form.name" class="flex items-center gap-3">
-                    <span class="w-20 font-bold text-[10px] uppercase text-gray-600 tracking-wider">{{ form.name }}</span>
+                    <span class="w-20 font-bold text-[10px] uppercase text-gris tracking-wider">{{ form.name }}</span>
                     <div class="flex-1 bg-gray-100 h-3 rounded-full overflow-hidden">
                     <div :class="[form.color, 'h-full transition-all duration-500 rounded-full']" :style="{ width: form.width }"></div>
                     </div>
-                    <span class="w-16 text-right font-semibold text-gray-500">{{ form.count }} client(s)</span>
+                    <span class="w-16 text-right font-semibold text-gris">{{ form.count }} client(s)</span>
                 </div>
                 </div>
             </div>
 
             <!-- MARGE BRUTE -->
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
+            <div v-if="voirMarges" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
             <div class="flex items-center justify-between border-b border-gray-100 pb-2">
                 <div>
                 <h2 class="font-bold text-noir text-sm">Marge brute</h2>
-                <p class="text-[10px] text-gray-400">Calculée dynamiquement selon les compositions des packs</p>
+                <p class="text-[10px] text-gris">Calculée dynamiquement selon les compositions des packs</p>
                 </div>
                 <span class="px-2.5 py-0.5 bg-amber-100 text-amber-800 font-bold rounded-full text-[10px]">
                 Phase 1 lancement
@@ -381,14 +437,14 @@ const getStatutClass = (statut: Commande['statut']) => {
             </div>
 
             <!-- Indication pendant le chargement -->
-            <div v-if="isLoadingFormulas" class="text-center py-6 text-gray-400 animate-pulse">
+            <div v-if="isLoadingFormulas" class="text-center py-6 text-gris animate-pulse">
                 Calcul des coûts et marges par formule...
             </div>
 
-            <div v-else class="overflow-x-auto">
+            <div v-defilable="'Marge brute par formule'" v-else class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <tr class="border-b border-gray-100 text-[10px] font-bold text-gris uppercase tracking-wider">
                     <th class="py-2 px-3">Formule</th>
                     <th class="py-2 px-3 text-right">Prix Vente</th>
                     <th class="py-2 px-3 text-right">Coût Réel (Dotation)</th>
@@ -401,18 +457,18 @@ const getStatutClass = (statut: Commande['statut']) => {
                     
                     <!-- Prix Lancement / Vente -->
                     <td class="py-2.5 px-3 text-right font-semibold">
-                        <span v-if="item.launchPrice === 0" class="text-gray-400 font-body text-[10px]">Variable / Pilote</span>
+                        <span v-if="item.launchPrice === null" class="text-gris font-body text-[10px]">Prix à définir</span>
                         <span v-else>{{ item.launchPrice.toLocaleString('fr-FR') }} F</span>
                     </td>
 
                     <!-- Coût Réel des produits du pack -->
-                    <td class="py-2.5 px-3 text-right text-gray-500">
+                    <td class="py-2.5 px-3 text-right text-gris">
                         {{ item.realCost.toLocaleString('fr-FR') }} F
                     </td>
 
                     <!-- Marge Brute Calculated -->
                     <td class="py-2.5 px-3 text-right">
-                        <span v-if="item.launchPrice === 0" class="text-gray-400 font-body text-[10px]">
+                        <span v-if="item.margin === null" class="text-gris font-body text-[10px]">
                         N/A
                         </span>
                         <span 
@@ -440,7 +496,7 @@ const getStatutClass = (statut: Commande['statut']) => {
           <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
             <div class="flex items-center justify-between border-b border-gray-100 pb-2">
               <h2 class="font-bold text-noir text-sm flex items-center gap-1.5">
-                <Clock class="w-4 h-4 text-amber-600" />
+                <Clock class="w-4 h-4 text-amber-800" />
                 Renouvellements J-5
               </h2>
               <span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-bold text-[10px]">
@@ -448,7 +504,7 @@ const getStatutClass = (statut: Commande['statut']) => {
               </span>
             </div>
 
-            <div v-if="upcomingRenewals.length === 0" class="text-center py-6 text-gray-400">
+            <div v-if="upcomingRenewals.length === 0" class="text-center py-6 text-gris">
               <p>Aucun renouvellement requis dans les 5 prochains jours.</p>
             </div>
 
@@ -461,12 +517,12 @@ const getStatutClass = (statut: Commande['statut']) => {
                 <div class="overflow-hidden">
                   <span class="font-bold text-noir block truncate">{{ item.clientName }}</span>
                   <div class="flex items-center gap-1.5 mt-0.5">
-                    <span class="px-1.5 py-0.2 bg-white border border-gray-200 rounded text-[9px] font-bold text-gray-600 uppercase">
+                    <span class="px-1.5 py-0.2 bg-white border border-gray-200 rounded text-[9px] font-bold text-gris uppercase">
                       {{ item.formule }}
                     </span>
                     <span 
                       :class="[
-                        item.daysRemaining <= 0 ? 'text-red-600 font-bold' : 'text-amber-600 font-semibold',
+                        item.daysRemaining <= 0 ? 'text-red-600 font-bold' : 'text-amber-800 font-semibold',
                         'text-[10px]'
                       ]"
                     >
@@ -490,12 +546,12 @@ const getStatutClass = (statut: Commande['statut']) => {
           <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
             <div class="flex items-center justify-between border-b border-gray-100 pb-2">
               <h2 class="font-bold text-noir text-sm">Dernières commandes</h2>
-              <router-link to="/commandes" class="text-[10px] text-foret font-bold hover:underline">Voir tout →</router-link>
+              <router-link to="/dashboard/admin/commandes" class="text-[10px] text-foret font-bold hover:underline">Voir tout →</router-link>
             </div>
 
             <table class="w-full text-left">
               <thead>
-                <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50">
+                <tr class="text-[10px] font-bold text-gris uppercase tracking-wider border-b border-gray-50">
                   <th class="pb-2">Client</th>
                   <th class="pb-2 text-center">Formule</th>
                   <th class="pb-2 text-right">Statut</th>
@@ -507,12 +563,12 @@ const getStatutClass = (statut: Commande['statut']) => {
                     <span class="font-bold text-noir block leading-tight">{{ cmd.clientName }}</span>
                   </td>
                   <td class="py-2.5 text-center">
-                    <span class="px-2 py-0.5 bg-gray-100 rounded text-[10px] font-bold text-gray-600 uppercase">
+                    <span class="px-2 py-0.5 bg-gray-100 rounded text-[10px] font-bold text-gris uppercase">
                       {{ cmd.formule }}
                     </span>
                   </td>
                   <td class="py-2.5 text-right">
-                    <span :class="[getStatutClass(cmd.statut), 'px-2 py-0.5 rounded text-[10px] font-bold']">
+                    <span :class="[classeStatut(cmd.statut), 'px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap']">
                       {{ cmd.statut }}
                     </span>
                   </td>

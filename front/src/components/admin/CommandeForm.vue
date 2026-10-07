@@ -2,16 +2,18 @@
 import { ref, computed, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/stores/api'
-import { X, User, CheckCircle2, ArrowRight, Plus, Minus, Trash2, PlusCircle } from 'lucide-vue-next'
-import type { Client, Product, Commande } from '@/type'
+import { X, User, CheckCircle2, ArrowRight, Plus, Minus, Trash2, PlusCircle, Layers } from 'lucide-vue-next'
+import type { Client, Product, Commande, ProductItem } from '@/type'
+import { useAuthStore } from '@/stores/auth'
+import { MODES_PAIEMENT } from '@/config/commandes'
 
 interface AdjustedItem {
   productId: string;
   name: string;
   quantity: number;
   unit: string;
-  unitPrice: number;
-  totalPrice: number;
+  unitPrice: number | null;
+  totalPrice: number | null;
   isExtra: boolean;
 }
 
@@ -36,6 +38,11 @@ const clientId = ref('')
 const selectedPackSlug = ref<'essentiel' | 'equilibre' | 'confort' | ''>('')
 const paiement = ref('Mobile Money')
 const notes = ref('')
+// Remise (D-10) : motif obligatoire ; saisie par l'admin, elle est validée d'office, sinon elle attend sa validation
+const remiseMontant = ref<number | null>(null)
+const remiseMotif = ref('')
+const authStore = useAuthStore()
+const estAdmin = computed(() => authStore.role.value === 'admin')
 
 // Pour l'ajout d'un produit hors-pack à l'étape 3
 const selectedExtraProductId = ref('')
@@ -64,6 +71,8 @@ watch(() => props.open, (isOpen) => {
       
       paiement.value = props.commande.modePaiement || 'Mobile Money'
       notes.value = props.commande.notes || ''
+      remiseMontant.value = props.commande.remise?.montant || null
+      remiseMotif.value = props.commande.remise?.motif || ''
       
       // Mapper l'historique des produits figés
       if (props.commande.productsSnapshot) {
@@ -109,25 +118,35 @@ const { data: packDetails, isLoading: isLoadingPack } = useQuery({
 // Initialise le panier modifiable uniquement à la sélection d'un pack en mode création et edition
 watch(packDetails, (newDetails) => {
   if ((props.mode === 'create' || props.mode === 'edit') && newDetails && newDetails.items) {
-    adjustedItems.value = newDetails.items.map((item: AdjustedItem) => {
-      const uPrice = item.unitPrice || (item.quantity > 0 ? Math.round(item.totalPrice / item.quantity) : 0)
+    // Composition du pack (catalogue) : prix unitaire du catalogue, vide s'il est à renseigner
+    adjustedItems.value = newDetails.items.map((item: ProductItem) => {
+      const uPrice = item.priceUnit
       return {
         productId: item.productId,
         name: item.name,
         quantity: item.quantity,
         unit: item.unit,
         unitPrice: uPrice,
-        totalPrice: item.totalPrice || (item.quantity * uPrice),
+        totalPrice: item.totalPrice,
         isExtra: false
       }
     })
   }
 }, { deep: true })  
 
-// CALCUL DYNAMIQUE DU PRIX TOTAL (Somme des items du panier)
-const finalPackPrice = computed(() => {
-  return adjustedItems.value.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)
+// Aperçu du prix (le serveur le recalcule) : prix de la formule + extras − remise validée
+const prixFormule = computed<number | null>(() => {
+  if (isReadOnly.value && props.commande) return props.commande.prixFormule ?? null
+  const f = packDetails.value?.formule
+  return f ? (f.prixCommercial ?? f.prixActuel ?? null) : null
 })
+const montantExtras = computed(() => adjustedItems.value.filter(i => i.isExtra).reduce((s, i) => s + (i.unitPrice ?? 0) * i.quantity, 0))
+const remiseAppliquee = computed(() => (estAdmin.value && (remiseMontant.value ?? 0) > 0 ? remiseMontant.value ?? 0 : 0))
+const finalPackPrice = computed(() => {
+  if (isReadOnly.value && props.commande) return props.commande.total
+  return prixFormule.value === null ? null : prixFormule.value + montantExtras.value - remiseAppliquee.value
+})
+const formateFcfa = (n: number | null) => (n === null ? 'prix à définir' : `${n.toLocaleString('fr-FR')} FCFA`)
 
 // --- ACTIONS SUR LES PRODUITS (Bloquées si lecture seule) ---
 const incrementQty = (index: number) => {
@@ -135,7 +154,7 @@ const incrementQty = (index: number) => {
   const item = adjustedItems.value[index]
   if (item) {
     item.quantity++
-    item.totalPrice = item.quantity * item.unitPrice
+    item.totalPrice = item.unitPrice === null ? null : item.quantity * item.unitPrice
   }
 }
 
@@ -145,7 +164,7 @@ const decrementQty = (index: number) => {
   if (item) {
     if (item.quantity > 1) {
       item.quantity--
-      item.totalPrice = item.quantity * item.unitPrice
+      item.totalPrice = item.unitPrice === null ? null : item.quantity * item.unitPrice
     } else {
       removeItem(index)
     }
@@ -161,7 +180,8 @@ const addExtraProduct = () => {
   if (isReadOnly.value || !selectedExtraProductId.value) return
   
   const prod = props.allProducts.find(p => String(p._id) === String(selectedExtraProductId.value))
-  if (prod) {
+  // Un produit sans prix (à renseigner) ou indisponible ne peut pas être ajouté : il compterait pour 0 FCFA
+  if (prod && prod.priceUnit !== null && prod.statut !== 'indisponible') {
     adjustedItems.value.push({
       productId: prod._id,
       name: prod.name,
@@ -181,12 +201,16 @@ const resetForm = () => {
   selectedPackSlug.value = ''
   paiement.value = 'Mobile Money'
   notes.value = ''
+  remiseMontant.value = null
+  remiseMotif.value = ''
   adjustedItems.value = []
   selectedExtraProductId.value = ''
 }
 
 // --- SOUMISSION DE LA COMMANDE ---
+const erreurEnvoi = ref('')
 const submitOrder = async () => {
+  erreurEnvoi.value = ''
   if (!clientId.value || !selectedPackSlug.value || isReadOnly.value) return
   isSubmitting.value = true
 
@@ -196,8 +220,8 @@ const submitOrder = async () => {
       formuleSlug: `ahi-${selectedPackSlug.value}`,
       modePaiement: paiement.value,
       notes: notes.value,
-      totalPrice: finalPackPrice.value,
-      productsSnapshot: adjustedItems.value
+      productsSnapshot: adjustedItems.value.map(i => ({ productId: i.productId, quantity: i.quantity, isExtra: i.isExtra })),
+      remise: { montant: remiseMontant.value || 0, motif: remiseMotif.value }
     }
 
     if (props.mode === 'edit' && props.commande?.id) {
@@ -212,8 +236,8 @@ const submitOrder = async () => {
     emit('success')
     resetForm()
     emit('close')
-  } catch (error) {
-    console.error("Erreur lors de la soumission de la commande:", error)
+  } catch (error: any) {
+    erreurEnvoi.value = error.response?.data?.message || "Enregistrement impossible."
   } finally {
     isSubmitting.value = false
   }
@@ -221,24 +245,24 @@ const submitOrder = async () => {
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-medium text-xs text-gray-600">
+  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-medium text-xs text-gris">
     <div class="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
       
       <div class="p-4 border-b border-gray-100 flex items-center justify-between">
         <div>
           <h3 class="font-display font-bold text-sm text-noir">{{ modalTitle }}</h3>
-          <p class="text-[10px] text-gray-400">
+          <p class="text-[10px] text-gris">
             {{ isReadOnly ? 'Consultation des détails de l\'historique' : 'Gestion de la tarification et du panier' }}
           </p>
         </div>
-        <button @click="emit('close')" class="cursor-pointer p-1.5 hover:bg-gray-50 rounded-lg text-gray-400 transition-colors">
+        <button @click="emit('close')" class="cursor-pointer p-1.5 hover:bg-gray-50 rounded-lg text-gris transition-colors" aria-label="Fermer">
           <X class="w-4 h-4" />
         </button>
       </div>
 
       <div class="px-4 pt-4 flex gap-1">
         <div v-for="s in [{n:1,l:'Client'}, {n:2,l:'Formule'}, {n:3,l:'Ajust.'}, {n:4,l:'Validation'}]" :key="s.n"
-          :class="[step === s.n ? 'bg-foret text-white border-foret font-bold' : step > s.n ? 'bg-emerald-50 text-foret border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200','flex-1 py-1.5 text-[10px] text-center border rounded-lg transition-all']">
+          :class="[step === s.n ? 'bg-foret text-white border-foret font-bold' : step > s.n ? 'bg-emerald-50 text-foret border-emerald-200' : 'bg-gray-50 text-gris border-gray-200','flex-1 py-1.5 text-[10px] text-center border rounded-lg transition-all']">
           <span v-if="step > s.n">✓ </span>{{ s.l }}
         </div>
       </div>
@@ -258,7 +282,7 @@ const submitOrder = async () => {
 
         <div v-if="step === 2" class="space-y-4">
           <div class="p-2.5 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-2">
-            <User class="w-3.5 h-3.5 text-gray-400" />
+            <User class="w-3.5 h-3.5 text-gris" />
             <span>Client : <strong class="text-noir">{{ cl?.username || commande?.clientName }}</strong></span>
           </div>
 
@@ -268,19 +292,19 @@ const submitOrder = async () => {
               @click="selectedPackSlug = pack as any" 
               :class="[selectedPackSlug === pack ? 'border-foret bg-emerald-50/50' : 'border-gray-200 bg-white', 'flex items-center justify-between p-3 rounded-xl border text-left cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed']">
               <span class="font-bold text-noir capitalize">Ahi-{{ pack }}</span>
-              <span v-if="selectedPackSlug === pack && isLoadingPack" class="text-[10px] text-gray-400">Chargement...</span>
+              <span v-if="selectedPackSlug === pack && isLoadingPack" class="text-[10px] text-gris">Chargement...</span>
             </button>
           </div>
 
           <div v-if="selectedPackSlug && packDetails" class="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-2xs">
-            <div class="px-3 py-2 bg-gray-100/70 font-semibold text-gray-500 flex justify-between items-center border-b">
+            <div class="px-3 py-2 bg-gray-100/70 font-semibold text-gris flex justify-between items-center border-b">
               <span class="flex items-center gap-1"><Layers class="w-3.5 h-3.5" /> Dotation auto ({{ packDetails.itemCount }} produits)</span>
-              <strong class="font-mono text-noir font-bold">{{ packDetails.formule.prixActuel.toLocaleString() }} F</strong>
+              <strong class="font-mono text-noir font-bold">{{ packDetails.prixCalcule?.toLocaleString() }} F</strong>
             </div>
             <div class="max-h-36 overflow-y-auto divide-y divide-gray-100 bg-white">
               <div v-for="item in packDetails.items" :key="item.productId" class="flex justify-between px-3 py-1.5 text-[11px]">
                 <span class="text-gray-700 font-medium">{{ item.name }}</span>
-                <span class="text-gray-400 font-mono">{{ item.quantity }} {{ item.unit }} · {{ item.totalPrice.toLocaleString() }} F</span>
+                <span class="text-gris font-mono">{{ item.quantity }} {{ item.unit }}<template v-if="item.isExtra"> · {{ item.totalPrice === null ? 'prix à renseigner' : `${item.totalPrice.toLocaleString('fr-FR')} F` }}</template></span>
               </div>
             </div>
           </div>
@@ -298,8 +322,8 @@ const submitOrder = async () => {
             <div class="flex gap-2">
               <select v-model="selectedExtraProductId" class="flex-1 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-noir focus:outline-none focus:border-foret">
                 <option value="">— Choisir un produit du catalogue —</option>
-                <option v-for="p in availableExtras" :key="p._id" :value="p._id">
-                  {{ p.name }} ({{ p.priceUnit }} F / {{ p.unit || 'u' }})
+                <option v-for="p in availableExtras" :key="p._id" :value="p._id" :disabled="p.priceUnit === null || p.statut === 'indisponible'">
+                  {{ p.name }} ({{ p.priceUnit === null ? 'prix à renseigner' : `${p.priceUnit} F` }} / {{ p.unit || 'u' }}){{ p.statut === 'indisponible' ? ' · indisponible' : '' }}
                 </option>
               </select>
               <button type="button" @click="addExtraProduct" :disabled="!selectedExtraProductId" class="cursor-pointer px-3 bg-foret text-white rounded-lg disabled:opacity-40 flex items-center justify-center">
@@ -311,7 +335,7 @@ const submitOrder = async () => {
           <div class="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-2xs">
             <div class="px-3 py-2 bg-gray-50 border-b font-bold text-noir flex justify-between items-center text-[10px] uppercase tracking-wider">
               <span>Panier de livraison</span>
-              <span class="text-foret font-mono text-xs font-bold">{{ finalPackPrice.toLocaleString() }} F</span>
+              <span class="text-foret font-mono text-xs font-bold">{{ formateFcfa(finalPackPrice) }}</span>
             </div>
             
             <div class="divide-y divide-gray-100 max-h-40 overflow-y-auto">
@@ -321,16 +345,16 @@ const submitOrder = async () => {
                     <span class="text-noir font-bold truncate text-[11px]">{{ item.name }}</span>
                     <span v-if="item.isExtra" class="px-1 text-[8px] bg-amber-100 text-amber-700 rounded-sm font-extrabold uppercase tracking-wide">Hors-Pack</span>
                   </div>
-                  <span class="text-[10px] text-gray-400 font-mono">{{ item.unitPrice.toLocaleString() }} F / {{ item.unit }}</span>
+                  <span class="text-[10px] text-gris font-mono">{{ item.unitPrice === null ? 'prix à renseigner' : `${item.unitPrice.toLocaleString('fr-FR')} F` }} / {{ item.unit }}</span>
                 </div>
                 
                 <div class="flex items-center gap-2 shrink-0">
                   <div class="flex items-center border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
-                    <button type="button" :disabled="isReadOnly" @click="decrementQty(idx)" class="p-1 hover:bg-gray-200 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed"><Minus class="w-3 h-3" /></button>
+                    <button type="button" :disabled="isReadOnly" @click="decrementQty(idx)" class="p-1 hover:bg-gray-200 text-gris disabled:opacity-30 disabled:cursor-not-allowed" aria-label="Diminuer la quantité"><Minus class="w-3 h-3" /></button>
                     <span class="px-1.5 font-mono font-bold text-noir text-[11px] min-w-5 text-center">{{ item.quantity }}</span>
-                    <button type="button" :disabled="isReadOnly" @click="incrementQty(idx)" class="p-1 hover:bg-gray-200 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed"><Plus class="w-3 h-3" /></button>
+                    <button type="button" :disabled="isReadOnly" @click="incrementQty(idx)" class="p-1 hover:bg-gray-200 text-gris disabled:opacity-30 disabled:cursor-not-allowed" aria-label="Augmenter la quantité"><Plus class="w-3 h-3" /></button>
                   </div>
-                  <button v-if="!isReadOnly" type="button" @click="removeItem(idx)" class="cursor-pointer p-1 text-red-400 hover:text-red-600"><Trash2 class="w-3.5 h-3.5" /></button>
+                  <button v-if="!isReadOnly" type="button" @click="removeItem(idx)" class="cursor-pointer p-1 text-red-400 hover:text-red-600" aria-label="Supprimer"><Trash2 class="w-3.5 h-3.5" /></button>
                 </div>
               </div>
             </div>
@@ -339,13 +363,22 @@ const submitOrder = async () => {
           <div class="space-y-2">
             <label class="block font-bold text-noir text-[10px] uppercase tracking-wide">Canal de Règlement</label>
             <div class="flex gap-1">
-              <button v-for="m in ['Mobile Money', 'Espèces', 'Acompte']" :key="m" 
+              <button v-for="m in MODES_PAIEMENT" :key="m" 
                 :disabled="isReadOnly"
                 @click="paiement = m" 
-                :class="[paiement === m ? 'bg-foret text-white' : 'bg-white text-gray-500 border-gray-200', 'flex-1 py-1.5 rounded-lg border text-center transition-all cursor-pointer disabled:cursor-not-allowed']">
+                :class="[paiement === m ? 'bg-foret text-white' : 'bg-white text-gris border-gray-200', 'flex-1 py-1.5 rounded-lg border text-center transition-all cursor-pointer disabled:cursor-not-allowed']">
                 {{ m }}
               </button>
             </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="block font-bold text-noir text-[10px] uppercase tracking-wide">Remise (facultative)</label>
+            <div class="flex gap-2">
+              <input id="commande-remise-montant" v-model.number="remiseMontant" :disabled="isReadOnly" type="number" min="0" placeholder="Montant FCFA" class="w-28 px-2 py-1.5 bg-[#f9f9fb] border border-gray-200 rounded-lg text-[11px] disabled:opacity-70" />
+              <input id="commande-remise-motif" v-model="remiseMotif" :disabled="isReadOnly" type="text" maxlength="300" placeholder="Motif (obligatoire si remise)" class="flex-1 px-2 py-1.5 bg-[#f9f9fb] border border-gray-200 rounded-lg text-[11px] disabled:opacity-70" />
+            </div>
+            <p v-if="!isReadOnly && (remiseMontant ?? 0) > 0 && !estAdmin" class="text-[10px] text-amber-800">La remise sera appliquée après validation par l'admin.</p>
           </div>
 
           <textarea v-model="notes" :disabled="isReadOnly" rows="2" class="w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl focus:outline-none focus:border-foret text-[11px] disabled:opacity-70" placeholder="Directives logistiques particulières..."></textarea>
@@ -366,11 +399,15 @@ const submitOrder = async () => {
             <div class="flex justify-between"><span>Client :</span><strong class="text-noir">{{ cl?.username || commande?.clientName }}</strong></div>
             <div class="flex justify-between"><span>Base formule :</span><strong class="text-noir uppercase">Ahi-{{ selectedPackSlug }}</strong></div>
             <div class="flex justify-between"><span>Nombre d'articles :</span><strong class="text-noir font-mono">{{ adjustedItems.length }}</strong></div>
-            <div class="flex justify-between"><span>Prix total calculé :</span><strong class="text-foret font-mono text-sm font-bold">{{ finalPackPrice.toLocaleString() }} FCFA</strong></div>
+            <div class="flex justify-between"><span>Prix de la formule :</span><strong class="text-noir font-mono">{{ formateFcfa(prixFormule) }}</strong></div>
+            <div v-if="montantExtras" class="flex justify-between"><span>Extras :</span><strong class="text-noir font-mono">{{ formateFcfa(montantExtras) }}</strong></div>
+            <div v-if="(remiseMontant ?? 0) > 0" class="flex justify-between"><span>Remise ({{ remiseMotif || 'motif à saisir' }}) :</span><strong class="font-mono" :class="estAdmin ? 'text-noir' : 'text-amber-800'">− {{ formateFcfa(remiseMontant) }}{{ estAdmin ? '' : ' (à valider)' }}</strong></div>
+            <div class="flex justify-between"><span>Total :</span><strong class="text-foret font-mono text-sm font-bold">{{ formateFcfa(finalPackPrice) }}</strong></div>
             <div class="flex justify-between"><span>Mode paiement :</span><span class="px-1.5 py-0.5 bg-gray-200 text-noir rounded text-[9px] font-bold uppercase">{{ paiement }}</span></div>
             <div v-if="commande?.statut" class="flex justify-between"><span>Statut actuel :</span><span class="text-noir font-bold">{{ commande.statut }}</span></div>
           </div>
 
+          <p v-if="erreurEnvoi" role="alert" class="p-2 rounded-lg bg-red-50 text-red-800 border border-red-200 text-[11px] font-semibold">{{ erreurEnvoi }}</p>
           <div class="flex gap-2 pt-2">
             <button @click="step = 3" class="cursor-pointer flex-1 py-2.5 bg-gray-50 border border-gray-200 rounded-xl">← Ajuster</button>
             

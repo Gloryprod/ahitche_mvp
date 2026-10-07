@@ -1,22 +1,29 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/user');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../middlewares/auth');
 const authC  = require('../controllers/AuthController');
 const userC = require('../controllers/UserController');
 const formuleC = require('../controllers/FormuleController');
 const orderC = require('../controllers/OrderController');
+const nutritionC = require('../controllers/NutritionController');
+const { limiteTentatives } = require('../middlewares/limiteTentatives');
+
+// Force brute : 5 échecs de connexion par compte en 15 minutes, 30 par adresse IP ;
+// mot de passe oublié : 3 demandes par compte et 10 par IP en 1 heure ; inscription et réinitialisation : 10 par IP en 1 heure
+const limiteConnexion = limiteTentatives({ nom: 'connexion', minutes: 15, maxParCompte: 5, maxParIp: 30, echecsSeulement: true });
+const limiteOubli = limiteTentatives({ nom: 'oubli', minutes: 60, maxParCompte: 3, maxParIp: 10 });
+const limiteInscription = limiteTentatives({ nom: 'inscription', minutes: 60, maxParCompte: 0, maxParIp: 10 });
+const limiteReinitialisation = limiteTentatives({ nom: 'reinitialisation', minutes: 60, maxParCompte: 0, maxParIp: 10 });
 
 // Authentification
-router.post('/register', authC.register);
-router.post('/login', authC.login);
+router.post('/register', limiteInscription, authC.register);
+router.post('/login', limiteConnexion, authC.login);
 router.post('/logout', authC.logout);
-router.post('/forgot-password', authC.forgotPassword);
-router.post('/reset-password', authC.resetPassword);
+router.post('/forgot-password', limiteOubli, authC.forgotPassword);
+router.post('/reset-password', limiteReinitialisation, authC.resetPassword);
 
 // Profil
+router.get('/session', authC.session); // Toujours 200 (visiteur : user null)
 router.get('/me', verifyToken, authC.getUser);
 router.post('/user/delivery-info', verifyToken, userC.saveUserDetails);
 
@@ -28,6 +35,12 @@ router.put('/user/preference-formule', verifyToken, userC.updateFormulePreferenc
 router.post('/save/orders', verifyToken, orderC.saveOrder);
 router.get('/my-orders', verifyToken, orderC.index);
 router.delete('/delete/order/:id', verifyToken, orderC.deleteOrder);
+
+// Suivi alimentaire (questionnaire, recommandations, menus ; suppression à la demande)
+router.route('/nutrition')
+  .get(verifyToken, nutritionC.monSuivi)
+  .put(verifyToken, nutritionC.enregistrerProfil)
+  .delete(verifyToken, nutritionC.supprimerMonSuivi);
 
 module.exports = router;
         

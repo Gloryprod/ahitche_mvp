@@ -1,5 +1,11 @@
 const User = require("../../models/user")
 const Order = require("../../models/order")
+const { STATUTS } = require("../../models/order")
+const { echapperRegex } = require("../../utils/texte")
+const { livreurDuCompte, filtreCommandesLivreur, clientsDuLivreur } = require("../../services/perimetreService")
+
+// Champs d'un client renvoyés à l'équipe : jamais le mot de passe ni le jeton de réinitialisation
+const CHAMPS_CLIENT = 'username email telephone quartier adresse zone lienLocalisation formuleHabituelle role createdAt'
 
 async function index(req, res) {
     try {
@@ -12,12 +18,16 @@ async function index(req, res) {
         // On cible uniquement les clients normaux (role: 'user')
         const query = { role: 'user' };
 
+        // Gestionnaire livreur : seulement les clients de ses livraisons
+        const livreurId = await livreurDuCompte(req);
+        if (livreurId) query._id = { $in: await clientsDuLivreur(livreurId) };
+
         // Si une recherche est tapée, on applique un filtre textuel (Insensible à la casse 'i')
         if (search) {
             query.$or = [
-                { username: { $regex: search, $options: 'i' } },
-                { telephone: { $regex: search, $options: 'i' } },
-                { quartier: { $regex: search, $options: 'i' } }
+                { username: { $regex: echapperRegex(search), $options: 'i' } },
+                { telephone: { $regex: echapperRegex(search), $options: 'i' } },
+                { quartier: { $regex: echapperRegex(search), $options: 'i' } }
             ];
         }
 
@@ -27,6 +37,7 @@ async function index(req, res) {
         // 4. Exécution des requêtes en parallèle pour de meilleures performances
         const [users, totalUsers] = await Promise.all([
             User.find(query)
+                .select(CHAMPS_CLIENT)
                 .sort({ createdAt: -1 }) // Les plus récents en premier, c'est mieux pour un admin !
                 .skip(skip)
                 .limit(limit),
@@ -62,19 +73,22 @@ async function getOrders(req, res) {
     // 1. Filtre de base
     let query = {};
 
-    if (statutFiltre === 'Annulé') {
-      // Une commande est annulée si 'deletedAt' contient une date (n'est pas égal à null)
+    if (statutFiltre === 'Annulée' || statutFiltre === 'Annulé') {
+      // Une commande est annulée (ou archivée) si 'deletedAt' contient une date
       query.deletedAt = { $ne: null };
     } else {
-      // Pour tous les autres onglets (Toutes, En attente, Livré), 
-      // on ne veut STRICTEMENT QUE les commandes actives !
+      // Pour tous les autres onglets, on ne veut STRICTEMENT QUE les commandes actives !
       query.deletedAt = null;
 
-      // Si on est sur un onglet spécifique ('En attente' ou 'Livré')
-      if (statutFiltre !== 'Toutes') {
+      // Si on est sur un onglet de statut précis
+      if (statutFiltre !== 'Toutes' && STATUTS.includes(statutFiltre)) {
         query.statut = statutFiltre;
       }
     }
+
+    // Gestionnaire livreur : ses commandes et celles qui restent à planifier
+    const livreurId = await livreurDuCompte(req);
+    if (livreurId) Object.assign(query, filtreCommandesLivreur(livreurId));
 
     let orders = await Order.find(query)
     .populate(
@@ -117,6 +131,9 @@ async function getOrders(req, res) {
         whatsapp: order.userId ? order.userId.telephone : 'N/A',
         formule: order.formule,
         total: order.total,
+        prixFormule: order.prixFormule,
+        montantExtras: order.montantExtras,
+        remise: order.remise,
         date: dateFormatee,
         formuleSlug: order.formuleSlug,
         modePaiement: order.modePaiement,
@@ -124,7 +141,12 @@ async function getOrders(req, res) {
         statut: order.statut,
         productsSnapshot: order.productsSnapshot || [],
         deletedAt: order.deletedAt,
-        dateLivraison: order.dateLivraison
+        dateLivraison: order.dateLivraison,
+        reference: order.reference,
+        zone: order.zone,
+        creneau: order.creneau,
+        livreurId: order.livreurId,
+        paiement: order.paiement
       };
     });
 

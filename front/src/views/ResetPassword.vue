@@ -1,23 +1,17 @@
 <template>
   <div class="min-h-screen flex md:flex-row">
     <!-- Partie gauche : Visuel (Identique pour garder la charte) -->
-    <div class="hidden md:block md:w-1/2 relative bg-foret min-h-112.5">
-      <img 
-        src="/beautiful-couple-looking-their-laptop.jpg" 
-        alt="Plat Ahitché" 
-        class="w-full h-full object-cover"
-      />
-      <div class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-8 text-white">
-        <h3 class="font-display text-2xl font-bold mb-2">Ahitché</h3>
-        <p class="text-white/80 text-sm">Votre partenaire de confiance dans la réalisation de vos courses</p>
-      </div>
-    </div>
+    <PanneauMarque titre="Le marché, organisé pour vous" texte="Votre partenaire de confiance pour les courses de votre foyer." />
 
     <!-- Partie droite : Formulaire de nouveau mot de passe -->
     <div class="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
+      <div class="mb-4">
+        <LienAccueil />
+      </div>
+
       <div class="mb-6 text-center">
-        <h2 class="text-2xl font-bold text-foret font-display">Nouveau mot de passe</h2>
-        <p class="text-sm text-gray-500 mt-1">Choisissez un mot de passe sécurisé pour votre compte.</p>
+        <h1 class="text-2xl font-bold text-foret font-display">Nouveau mot de passe</h1>
+        <p class="text-sm text-gris mt-1">Choisissez un mot de passe sécurisé pour votre compte.</p>
       </div>
 
       <form @submit.prevent="handleResetPassword" class="flex flex-col gap-4">
@@ -58,10 +52,12 @@
 </template>
 
 <script setup lang="ts">
+import PanneauMarque from '@/components/ui/PanneauMarque.vue'
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
+import LienAccueil from '@/components/ui/LienAccueil.vue';
 
 const password = ref('');
 const confirmPassword = ref('');

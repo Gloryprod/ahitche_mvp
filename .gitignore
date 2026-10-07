@@ -8,3 +8,6 @@
 # Bloquer les dossiers de dépendances lourds
 node_modules/
 dist/
+# Données internes confidentielles (budget, bilans, fournisseurs) : jamais versionnées
+docs-internes/
+Ahitche_Donnees_Admin_v1.zip

@@ -1,164 +1,3 @@
-<!-- <script setup lang="ts">
-import { ref } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
-import api from '@/stores/api'
-import { Layers, ShoppingBag, CheckCircle, ShieldAlert } from 'lucide-vue-next'
-import type { Formule } from '@/type'
-import type { ProductItem } from '@/type'
-
-interface PackDetailsResponse {
-  formule: Formule;
-  itemCount: number;
-  items: ProductItem[];
-}
-
-// État pour l'onglet de formule sélectionné
-const activePack = ref<'essentiel' | 'equilibre' | 'confort'>('essentiel')
-
-// --- TANSTACK QUERY ---
-const fetchPackDetails = async ({ queryKey }: { queryKey: any }) : Promise<PackDetailsResponse> => {
-  const [_, packType] = queryKey
-  const response = await api.get(`/api/admin/formulas/${packType}`)
-  return response.data
-}
-
-const { data, isLoading, isError, error } = useQuery({
-  queryKey: ['packDetails', activePack],
-  queryFn: fetchPackDetails,
-})
-
-// Définir les classes de couleurs dynamiques selon le pack pour le design
-const getPackColorClass = (pack: string) => {
-  if (pack === 'essentiel') return 'border-gray-500 bg-gray-50 text-gray-700'
-  if (pack === 'equilibre') return 'border-foret bg-emerald-50 text-foret'
-  return 'border-savane bg-amber-50 text-savane'
-}
-</script>
-
-<template>
-  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gray-600">
-    
-    <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
-      <div>
-        <h1 class="font-display font-bold text-xl text-noir">Formules & Packs</h1>
-        <p class="text-gray-400 text-[11px] mt-0.5">Vue d'ensemble et simulation des dots hebdomadaires</p>
-      </div>
-      
-      <div class="flex bg-[#f9f9fb] p-1 rounded-xl border border-gray-200 self-start sm:self-center">
-        <button 
-          @click="activePack = 'essentiel'"
-          :class="[activePack === 'essentiel' ? 'bg-white text-noir shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-4 py-2 rounded-lg transition-all cursor-pointer']"
-        >
-          Essentiel
-        </button>
-        <button 
-          @click="activePack = 'equilibre'"
-          :class="[activePack === 'equilibre' ? 'bg-foret text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-4 py-2 rounded-lg transition-all cursor-pointer']"
-        >
-          Équilibré
-        </button>
-        <button 
-          @click="activePack = 'confort'"
-          :class="[activePack === 'confort' ? 'bg-savane text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-4 py-2 rounded-lg transition-all cursor-pointer']"
-        >
-          Confort
-        </button>
-      </div>
-    </div>
-
-    <div v-if="isLoading" class="text-sm font-medium text-gray-500 p-12 text-center bg-white rounded-2xl border">
-      Génération de la formule {{ activePack }} en cours...
-    </div>
-    
-    <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl border flex items-center gap-2">
-      <ShieldAlert class="w-4 h-4 text-red-500" />
-      <span>Erreur lors du chargement de la formule : {{ error?.message }}</span>
-    </div>
-
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-      
-      <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden p-4">
-        <h3 class="font-bold text-noir text-sm mb-3 flex items-center gap-2">
-          <Layers class="w-4 h-4 text-gray-400" /> Composition de la dotation commerciale
-        </h3>
-        
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse min-w-137.5">
-            <thead>
-              <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                <th class="py-3 px-4">Produit</th>
-                <th class="py-3 px-4">Catégorie</th>
-                <th class="py-3 px-4 text-center">Coefficient</th>
-                <th class="py-3 px-4 text-right">Quantité Pack</th>
-                <th class="py-3 px-4 text-right">Sous-total Prix</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-50 text-noir">
-              <tr v-for="item in data?.items" :key="item.productId" :class="[item.quantity === 0 ? 'opacity-40 bg-gray-50/50' : '', 'hover:bg-gray-50/30 transition-colors']">
-                <td class="py-3 px-4 font-bold">
-                  {{ item.name }}
-                  <span v-if="item.quantity === 0" class="text-[9px] font-semibold text-red-500 px-1.5 py-0.2 bg-red-50 rounded border border-red-100 ml-1">Absent</span>
-                </td>
-                <td class="py-3 px-4">
-                  <span class="px-2 py-0.5 bg-gray-100 rounded-md text-[10px] text-gray-500">{{ item.category }}</span>
-                </td>
-                <td class="py-3 px-4 text-center font-mono text-gray-500">
-                  ×{{ item.appliedMultiplier }}
-                </td>
-                <td class="py-3 px-4 text-right font-bold text-noir">
-                  {{ item.quantity }} {{ item.unit }}
-                </td>
-                <td class="py-3 px-4 text-right font-mono text-gray-700 font-semibold">
-                  {{ item.totalPrice.toLocaleString() }} F
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="space-y-6">
-        
-        <div :class="[getPackColorClass(activePack), 'p-5 rounded-2xl border shadow-sm space-y-4 transition-all']">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] font-bold uppercase tracking-widest opacity-80">Synthèse Formule</span>
-            <ShoppingBag class="w-4 h-4 opacity-70" />
-          </div>
-          
-          <div>
-            <span class="text-[10px] block opacity-70">VALEUR FINANCIÈRE DU PACK</span>
-            <h2 class="text-2xl font-black tracking-tight font-mono">
-              {{ data?.formule.prixActuel.toLocaleString() }} <span class="text-sm font-bold">FCFA</span>
-            </h2>
-          </div>
-
-          <div class="border-t border-black/10 pt-3 space-y-2 text-[11px]">
-            <div class="flex justify-between">
-              <span>Produits actifs inclus :</span>
-              <strong class="font-bold">{{ data?.itemCount }} / 16</strong>
-            </div>
-            <div class="flex justify-between">
-              <span>Période couverte :</span>
-              <span>1 Personne / 1 Semaine</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
-          <h4 class="font-bold text-noir text-xs flex items-center gap-1.5">
-            <CheckCircle class="w-3.5 h-3.5 text-foret" /> Note de conformité technique (V2)
-          </h4>
-          <p class="text-gray-400 text-[11px] leading-relaxed">
-            Ce pack applique automatiquement les règles de l'écosystème Ahitché du référentiel officiel du <span class="font-semibold text-gray-500">28/05/2026</span>. Les plafonnements sur les féculents (Coquillettes limitées à 12 kg au lieu de 15 kg au niveau Confort) sont audités et calculés dynamiquement par le moteur d'API.
-          </p>
-        </div>
-
-      </div>
-
-    </div>
-  </div>
-</template> -->
-
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
@@ -170,6 +9,8 @@ interface PackDetailsResponse {
   formule: Formule;
   itemCount: number;
   items: ProductItem[];
+  prixCalcule: number; // Coût des matières aux prix du catalogue (le prix de vente reste formule.prixActuel)
+  prixManquants: number; // Produits dont le prix est à renseigner : coût incomplet
 }
 
 const queryClient = useQueryClient()
@@ -197,7 +38,7 @@ const { data, isLoading, isError, error } = useQuery({
 watch(data, (newData) => {
   if (newData?.formule) {
     // Si la formule a un prix fixé personnalisé, on l'utilise, sinon le prix généré
-    customPrice.value = newData.formule.prixCommercial ? newData.formule.prixCommercial : newData.formule.prixActuel
+    customPrice.value = newData.formule.prixCommercial ?? newData.formule.prixActuel ?? null
   }
 }, { immediate: true })
 
@@ -240,63 +81,65 @@ const getPackColorClass = (pack: string) => {
 }
 
 // 3. Texte dynamique pour la période couverte
+// Logique de commande et cycle : lus dans la formule (référentiel packs v4)
 const getPeriodText = computed(() => {
-  if (activePack.value === 'reserve') return 'Commande Volumétrique (Mensuelle / Bi-mensuelle)'
-  if (activePack.value === 'fraicheur') return 'Base de départ minimale (Modulable par le client)'
-  return '1 Personne / 1 Semaine'
+  const f = data.value?.formule
+  if (!f) return ''
+  const cycle = f.cycleJours === 7 ? 'chaque semaine' : `tous les ${f.cycleJours} jours`
+  return `${f.logiqueCommande || 'à renseigner'} · cycle : ${cycle}`
 })
 </script>
 
 <template>
-  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gray-600">
+  <div class="space-y-6 animate-fadeIn text-xs font-medium text-gris">
     
     <div class="bg-white p-4 rounded-2xl flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <div>
         <h1 class="font-display font-bold text-xl text-noir">Formules & Packs</h1>
-        <p class="text-gray-400 text-[11px] mt-0.5">Vue d'ensemble et simulation des dots hebdomadaires et commandes libres</p>
+        <p class="text-gris text-[11px] mt-0.5">Vue d'ensemble et simulation des dots hebdomadaires et commandes libres</p>
       </div>
       
       <!-- Sélecteur d'onglets -->
       <div class="flex flex-wrap bg-[#f9f9fb] rounded-xl border border-gray-200 self-start xl:self-center">
         <button 
           @click="activePack = 'essentiel'"
-          :class="[activePack === 'essentiel' ? 'bg-white text-noir shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'essentiel' ? 'bg-white text-noir shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Essentiel
         </button>
         <button 
           @click="activePack = 'equilibre'"
-          :class="[activePack === 'equilibre' ? 'bg-foret text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'equilibre' ? 'bg-foret text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Équilibré
         </button>
         <button 
           @click="activePack = 'confort'"
-          :class="[activePack === 'confort' ? 'bg-savane text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'confort' ? 'bg-savane text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Confort
         </button>
         <button 
           @click="activePack = 'reserve'"
-          :class="[activePack === 'reserve' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'reserve' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Réserve
         </button>
         <button 
           @click="activePack = 'fraicheur'"
-          :class="[activePack === 'fraicheur' ? 'bg-rose-500 text-white shadow-xs font-bold' : 'text-gray-400 hover:text-gray-600', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+          :class="[activePack === 'fraicheur' ? 'bg-rose-500 text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
         >
           Fraîcheur
         </button>
       </div>
     </div>
 
-    <div v-if="isLoading" class="text-sm font-medium text-gray-500 p-12 text-center bg-white rounded-2xl border">
+    <div v-if="isLoading" class="text-sm font-medium text-gris p-12 text-center bg-white rounded-2xl border">
       Génération de la formule {{ activePack }} en cours...
     </div>
     
     <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl border flex items-center gap-2">
-      <ShieldAlert class="w-4 h-4 text-red-500" />
+      <ShieldAlert class="w-4 h-4 text-red-700" />
       <span>Erreur lors du chargement de la formule : {{ error?.message }}</span>
     </div>
 
@@ -305,38 +148,37 @@ const getPeriodText = computed(() => {
       <!-- Table de composition -->
       <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden p-4">
         <h3 class="font-bold text-noir text-sm mb-3 flex items-center gap-2">
-          <Layers class="w-4 h-4 text-gray-400" /> Composition de la dotation commerciale
+          <Layers class="w-4 h-4 text-gris" /> Composition de la dotation commerciale
         </h3>
         
-        <div class="overflow-x-auto">
+        <div v-defilable="'Composition du pack'" class="overflow-x-auto">
           <table class="w-full text-left border-collapse min-w-137.5">
             <thead>
-              <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
                 <th class="py-3 px-4">Produit</th>
                 <th class="py-3 px-4">Catégorie</th>
-                <th class="py-3 px-4 text-center">Coefficient (virtuel)</th>
+                <th class="py-3 px-4">Règle (libellé)</th>
                 <th class="py-3 px-4 text-right">Quantité Pack</th>
                 <th class="py-3 px-4 text-right">Sous-total Prix</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50 text-noir">
-              <tr v-for="item in data?.items" :key="item.productId" :class="[item.quantity === 0 ? 'opacity-40 bg-gray-50/50' : '', 'hover:bg-gray-50/30 transition-colors']">
+              <tr v-for="item in data?.items" :key="item.productId" class="hover:bg-gray-50/30 transition-colors">
                 <td class="py-3 px-4 font-bold">
-                  {{ item.name }}
-                  <span v-if="item.quantity === 0" class="text-[9px] font-semibold text-red-500 px-1.5 py-0.2 bg-red-50 rounded border border-red-100 ml-1">Absent</span>
+                  <span v-if="item.reference" class="font-mono text-gris mr-1">{{ item.reference }}</span>{{ item.name }}
+                  <span v-if="item.indisponible" class="text-[9px] font-semibold text-red-700 px-1.5 bg-red-50 rounded border border-red-100 ml-1">Indisponible</span>
+                  <span v-if="item.commentaire" class="block text-[10px] font-normal text-gris">{{ item.commentaire }}</span>
                 </td>
                 <td class="py-3 px-4">
-                  <span class="px-2 py-0.5 bg-gray-100 rounded-md text-[10px] text-gray-500">{{ item.category }}</span>
+                  <span class="px-2 py-0.5 bg-gray-100 rounded-md text-[10px] text-gris">{{ item.category }}</span>
                 </td>
-                <td class="py-3 px-4 text-center font-mono text-gray-500">
-                  <span v-if="['reserve', 'fraicheur'].includes(activePack)">—</span>
-                  <span v-else>×{{ item.appliedMultiplier }}</span>
-                </td>
+                <td class="py-3 px-4 text-gris italic">{{ item.regle || '—' }}</td>
                 <td class="py-3 px-4 text-right font-bold text-noir">
                   {{ item.quantity }} {{ item.unit }}
                 </td>
                 <td class="py-3 px-4 text-right font-mono text-gray-700 font-semibold">
-                  {{ item.totalPrice.toLocaleString() }} F
+                  <span v-if="item.totalPrice === null" class="text-amber-800">prix à renseigner</span>
+                  <span v-else>{{ item.totalPrice.toLocaleString('fr-FR') }} F</span>
                 </td>
               </tr>
             </tbody>
@@ -355,11 +197,12 @@ const getPeriodText = computed(() => {
           
           <!-- Prix système généré -->
           <div>
-            <span class="text-[10px] block opacity-70">VALEUR FINANCIÈRE DU PACK (GÉNÉRÉE)</span>
+            <span class="text-[10px] block font-bold">COÛT DES MATIÈRES (PRIX DU CATALOGUE)</span>
             <h2 class="text-2xl font-black tracking-tight font-mono">
-              <span v-if="activePack === 'fraicheur' && data?.formule.prixActuel === 0" class="text-lg">À définir après pilote</span>
-              <span v-else>{{ data?.formule.prixActuel.toLocaleString() }} <span class="text-sm font-bold">FCFA</span></span>
+              {{ data?.prixCalcule?.toLocaleString('fr-FR') }} <span class="text-sm font-bold">FCFA</span>
             </h2>
+            <p v-if="data?.prixManquants" class="text-[10px] font-bold text-amber-800">Coût incomplet : {{ data.prixManquants }} produit(s) sans prix</p>
+            <p class="text-[10px] mt-1">Prix de vente : <strong>{{ data?.formule?.prixCommercial ?? data?.formule?.prixActuel ?? 'à définir' }}</strong><span v-if="(data?.formule?.prixCommercial ?? data?.formule?.prixActuel) !== null && (data?.formule?.prixCommercial ?? data?.formule?.prixActuel) !== undefined"> FCFA</span></p>
           </div>
 
           <!-- NOUVEAU : Champ d'édition du Prix Général par l'Admin -->
@@ -376,7 +219,7 @@ const getPeriodText = computed(() => {
                   placeholder="Ex: 22500"
                   class="w-full bg-white border border-gray-300 focus:border-noir text-noir font-mono font-bold text-sm rounded-xl px-3 py-2 pr-12 outline-none transition-all shadow-2xs"
                 />
-                <span class="absolute right-3 top-2.5 text-[10px] font-bold text-gray-400">FCFA</span>
+                <span class="absolute right-3 top-2.5 text-[10px] font-bold text-gris">FCFA</span>
               </div>
               
               <button 
@@ -402,7 +245,7 @@ const getPeriodText = computed(() => {
           <div class="border-t border-black/10 pt-3 space-y-2 text-[11px]">
             <div class="flex justify-between">
               <span>Produits actifs inclus :</span>
-              <strong class="font-bold">{{ data?.itemCount }} / {{ activePack === 'reserve' || activePack === 'fraicheur' ? '11' : '16' }}</strong>
+              <strong class="font-bold">{{ data?.itemCount }}</strong>
             </div>
             <div class="flex justify-between">
               <span>Période / Logistique :</span>
@@ -413,19 +256,17 @@ const getPeriodText = computed(() => {
 
         <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-2">
           <h4 class="font-bold text-noir text-xs flex items-center gap-1.5">
-            <CheckCircle class="w-3.5 h-3.5 text-foret" /> Note de conformité technique (V4)
+            <CheckCircle class="w-3.5 h-3.5 text-foret" /> Référentiel packs v4 (30/06/2026)
           </h4>
-          <p class="text-gray-400 text-[11px] leading-relaxed">
-            <span v-if="activePack === 'reserve'">
-              Ce pack applique la règle de stockage de volume à cycle libre. L'oignon y est comptabilisé au panier (3 000 FCFA brute) au lieu de lots hebdomadaires.
-            </span>
-            <span v-else-if="activePack === 'fraicheur'">
-              Ce pack affiche la configuration minimale d'aromates et produits frais[cite: 2]. Les quantités définitives de vente seront validées au cours du pilote à Calavi Kpota[cite: 2].
-            </span>
-            <span v-else>
-              Ce pack applique automatiquement les règles de l'écosystème Ahitché du référentiel officiel du <span class="font-semibold text-gray-500">30/06/2026</span>[cite: 2]. Les plafonnements sur les féculents sont audités et calculés dynamiquement[cite: 2].
-            </span>
+          <p class="text-gris text-[11px] leading-relaxed">
+            Les quantités de chaque produit dans ce pack sont celles du catalogue (écran Produits) ; un produit sans quantité est absent du pack.
           </p>
+          <dl v-if="data?.formule" class="text-[11px] space-y-1">
+            <div v-if="data.formule.promesse"><dt class="inline font-bold text-noir">Promesse : </dt><dd class="inline">{{ data.formule.promesse }}</dd></div>
+            <div v-if="data.formule.foyersCibles"><dt class="inline font-bold text-noir">Foyers cibles : </dt><dd class="inline">{{ data.formule.foyersCibles }}</dd></div>
+            <div><dt class="inline font-bold text-noir">Personnalisation : </dt><dd class="inline">{{ data.formule.changementsMax ?? 'à renseigner' }} changement(s), ±{{ data.formule.variationQuantitePct ?? '…' }} % sur les quantités</dd></div>
+            <div v-if="data.formule.bientotDisponible"><dd class="inline font-bold text-amber-800">Bientôt disponible : non commandable</dd></div>
+          </dl>
         </div>
 
       </div>

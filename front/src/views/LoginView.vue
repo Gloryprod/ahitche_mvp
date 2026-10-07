@@ -1,23 +1,27 @@
 <template>
     <div class="min-h-screen flex md:flex-row">
-        <div class="hidden md:block md:w-1/2 relative bg-foret min-h-112.5">
-            <img 
-              src="/beautiful-couple-looking-their-laptop.jpg" 
-              alt="Plat Ahitché" 
-              class="w-full h-full object-cover"
-            />
-            <div class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-8 text-white">
-              <h3 class="font-display text-2xl font-bold mb-2">Ahitché</h3>
-              <p class="text-white/80 text-sm">Votre partenaire de confiance dans la réalisation de vos courses</p>
-            </div>
-        </div>
+        <PanneauMarque titre="Le marché, organisé pour vous" texte="Votre partenaire de confiance pour les courses de votre foyer." />
 
         <div class="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center bg-white">
-            
+            <div class="mb-4">
+                <LienAccueil />
+            </div>
+
+            <!-- Pourquoi l'utilisateur arrive ici : inactivité, session expirée ou page protégée demandée -->
+            <p v-if="sessionInactivite" role="status" class="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                Par sécurité, vous avez été déconnecté après une période d'inactivité. Reconnectez-vous pour reprendre là où vous en étiez.
+            </p>
+            <p v-else-if="sessionExpiree" role="status" class="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                Votre session a expiré. Reconnectez-vous pour reprendre là où vous en étiez.
+            </p>
+            <p v-else-if="pageDemandee" role="status" class="mb-5 p-3 rounded-xl bg-creme border border-creme2 text-noir text-sm">
+                Connectez-vous pour accéder à cette page.
+            </p>
+
             <div v-if="isForgotPassword">
                 <div class="mb-6 text-center">
-                    <h2 class="text-2xl font-bold text-foret font-display">Mot de passe oublié</h2>
-                    <p class="text-sm text-gray-500 mt-1">Saisissez votre e-mail pour recevoir un lien de réinitialisation.</p>
+                    <h1 class="text-2xl font-bold text-foret font-display">Mot de passe oublié</h1>
+                    <p class="text-sm text-gris mt-1">Saisissez votre e-mail pour recevoir un lien de réinitialisation.</p>
                 </div>
 
                 <form @submit.prevent="handleForgotPassword" class="flex flex-col gap-4">
@@ -42,7 +46,7 @@
                 </form>
 
                 <div class="flex items-center justify-center gap-1 mt-4">
-                    <button @click="isForgotPassword = false" class="cursor-pointer text-sm text-gray-500 hover:text-foret font-medium transition-all">
+                    <button @click="isForgotPassword = false" class="cursor-pointer text-sm text-gris hover:text-foret font-medium transition-all">
                         ← Retour à la connexion
                     </button>
                 </div>
@@ -50,8 +54,8 @@
 
             <div v-else>
                 <div class="mb-6 text-center">
-                    <h2 class="text-2xl font-bold text-foret font-display">Connexion</h2>
-                    <p class="text-sm text-gray-500 mt-1">Connectez-vous à votre compte pour accéder à vos commandes et préférences.</p>
+                    <h1 class="text-2xl font-bold text-foret font-display">Connexion</h1>
+                    <p class="text-sm text-gris mt-1">Connectez-vous à votre compte pour accéder à vos commandes et préférences.</p>
                 </div>
 
                 <form @submit.prevent="handleLogin" class="flex flex-col gap-4">
@@ -96,7 +100,7 @@
                 </form>
 
                 <div class="flex items-center justify-center gap-1 mt-4">
-                    <span class="text-sm text-gray-500">
+                    <span class="text-sm text-gris">
                         Pas de compte ? <button @click="register" class="cursor-pointer text-foret hover:text-foret/90 font-bold">S'inscrire</button>
                     </span>
                 </div>
@@ -107,18 +111,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import PanneauMarque from '@/components/ui/PanneauMarque.vue'
+import { ref, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
-// import { useHead } from '@unhead/vue'
-
-// useHead({
-//   title: 'Connexion | Ahitché',
-//   meta: [
-//     { name: 'description', content: 'Connectez-vous à votre compte Ahitché pour accéder à votre espace personnel et gérer vos commandes.' }
-//   ]
-// })
+import { espaceParDefaut } from '@/config/roles';
+import LienAccueil from '@/components/ui/LienAccueil.vue';
 
 const formLogin = ref({ email: '', password: '' })
 const forgotEmail = ref('')
@@ -126,8 +125,17 @@ const isForgotPassword = ref(false)
 const isLoading = ref(false)
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const toast = useToast()
+
+// Page demandée avant la connexion (lien partagé, session expirée) : uniquement un chemin interne au site
+const pageDemandee = computed(() => {
+  const cible = route.query.redirect
+  return typeof cible === 'string' && /^\/(?![\/\\])/.test(cible) && !cible.includes('://') ? cible : null
+})
+const sessionExpiree = computed(() => route.query.session === 'expiree')
+const sessionInactivite = computed(() => route.query.session === 'inactivite')
 
 const handleLogin = async () => {
   isLoading.value = true
@@ -137,11 +145,10 @@ const handleLogin = async () => {
 
     toast.success(data.message);
 
-    if(userRole === "admin"){
-      router.push('/dashboard/admin')
-    } else {
-      router.push('/dashboard/user')
-    }
+    // Retour à la page demandée, sinon : client -> son espace ; équipe -> la première section de son rôle
+    // (le routeur vérifie ensuite que le rôle donne bien accès à la page demandée).
+    // « replace » : le bouton retour ne ramène pas sur le formulaire de connexion.
+    router.replace(pageDemandee.value ?? espaceParDefaut(userRole))
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
   } finally {
