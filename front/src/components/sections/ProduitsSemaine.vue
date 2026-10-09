@@ -1,14 +1,23 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import api from '@/stores/api'
 import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
+import CarteComplement from '@/components/complements/CarteComplement.vue'
 
-// Compléments disponibles cette semaine, à ajouter à une formule (prix en FCFA)
-const produits = [
-  { nom: 'Carottes fraîches', prix: '500 FCFA', emoji: '🥕' },
-  { nom: 'Poisson fumé', prix: '2 500 FCFA', emoji: '🐟' },
-  { nom: 'Fruits de saison', prix: '2 500 FCFA', emoji: '🍊' },
-  { nom: 'Jus santé gingembre', prix: '2 000 FCFA', emoji: '🫚' },
-  { nom: 'Œufs supplémentaires (×6)', prix: '510 FCFA', emoji: '🥚' },
-]
+// Compléments disponibles cette semaine, à ajouter à une formule : gérés dans le back-office (Compléments de la semaine)
+interface Complement { id: string; nom: string; prix: number; unite: string; description: string; photo: string }
+
+const produits = ref<Complement[]>([])
+const etat = ref<'chargement' | 'pret' | 'vide'>('chargement')
+
+onMounted(async () => {
+  try {
+    produits.value = (await api.get('/api/public/complements')).data
+    etat.value = produits.value.length ? 'pret' : 'vide'
+  } catch {
+    etat.value = 'vide'
+  }
+})
 </script>
 
 <template>
@@ -21,18 +30,35 @@ const produits = [
       <h2 class="font-display text-3xl sm:text-4xl font-bold mb-3 text-noir">Disponible cette semaine</h2>
       <p class="text-gris mb-8">À ajouter à votre formule, livré avec elle.</p>
 
-      <!-- Mobile : rangée à faire glisser ; ordinateur : grille -->
-      <ul tabindex="0" aria-label="Produits de la semaine" class="flex lg:grid lg:grid-cols-5 gap-3 lg:gap-4 -mx-6 px-6 lg:max-w-[960px] lg:mx-auto lg:px-0 mb-10 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-px-6 pb-2 [scrollbar-width:none]">
-        <li
-          v-for="prod in produits"
-          :key="prod.nom"
-          class="snap-start shrink-0 w-36 lg:w-auto bg-white border border-foret/6 rounded-2xl p-5 flex flex-col items-center justify-center text-center transition-all duration-250 hover:-translate-y-1 hover:shadow-md"
-        >
-          <div class="text-4xl mb-3 select-none" aria-hidden="true">{{ prod.emoji }}</div>
-          <h3 class="text-sm font-bold text-noir mb-1.5 leading-snug">{{ prod.nom }}</h3>
-          <div class="text-xs font-extrabold text-foret bg-savane/10 px-2.5 py-1 rounded-full whitespace-nowrap">{{ prod.prix }}</div>
-        </li>
+      <!-- Mobile : rangée à faire glisser ; ordinateur : cartes centrées sur plusieurs lignes -->
+      <ul
+        v-if="etat !== 'vide'"
+        tabindex="0"
+        aria-label="Produits de la semaine"
+        :aria-busy="etat === 'chargement'"
+        class="flex lg:flex-wrap lg:justify-center gap-3 lg:gap-4 -mx-6 px-6 lg:mx-0 lg:px-0 mb-10 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-px-6 pb-2 [scrollbar-width:none]"
+      >
+        <template v-if="etat === 'chargement'">
+          <!-- Emplacements de même taille que les cartes : la page ne saute pas à l'arrivée des produits -->
+          <li v-for="n in 4" :key="n" class="snap-start shrink-0 w-44 lg:w-52 h-64 rounded-2xl bg-white/70 animate-pulse" aria-hidden="true"></li>
+        </template>
+        <template v-else>
+          <li
+            v-for="prod in produits"
+            :key="prod.id"
+            class="snap-start shrink-0 w-44 lg:w-52 transition-all duration-250 hover:-translate-y-1 hover:shadow-md rounded-2xl"
+          >
+            <CarteComplement
+              :nom="prod.nom"
+              :prix="prod.prix"
+              :unite="prod.unite"
+              :description="prod.description"
+              :photo="prod.photo"
+            />
+          </li>
+        </template>
       </ul>
+      <p v-else class="text-sm text-gris mb-10">Les compléments de la semaine arrivent bientôt : demandez-nous ce qui est disponible sur WhatsApp.</p>
 
       <a
         :href="lienWhatsApp(MESSAGES_WHATSAPP.complements)"

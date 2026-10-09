@@ -74,6 +74,12 @@ const router = createRouter({
           meta: { roles: ACCES.commandes.lecture },
           component: () => import('@/components/admin/CommandeComponent.vue')
         },
+        {
+          path: 'complements',
+          name: 'complements-page',
+          meta: { roles: ACCES.complements.lecture },
+          component: () => import('@/components/admin/complements/ComplementsManagement.vue')
+        },
         // Données de base
         {
           path: 'categories', 
@@ -193,7 +199,7 @@ const TITRES: Record<string, string> = {
   'regles-page': 'Règles de composition', 'products-page': 'Produits', 'formulas-page': 'Formules', 'saveStock-page': 'Entrées de stock',
   'inventaire-page': 'Inventaire', 'mouvement-stock-page': 'Mouvements de stock', 'bon-commande-page': 'Bons de commande', 'prevision-achats-page': 'Prévision d\'achats',
   'prestataires-page': 'Prestataires', 'logistique-page': 'Logistique', 'finances-page': 'Finances', 'simulateurs-page': 'Simulateurs',
-  'idees-repas-page': 'Idées de repas', 'nutrition-page': 'Nutrition', 'posts-page': 'Contenus et médias',
+  'idees-repas-page': 'Idées de repas', 'nutrition-page': 'Nutrition', 'posts-page': 'Contenus et médias', 'complements-page': 'Compléments de la semaine',
 }
 router.afterEach((to) => {
   const titre = TITRES[String(to.name)]

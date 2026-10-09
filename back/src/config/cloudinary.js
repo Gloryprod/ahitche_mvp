@@ -57,6 +57,21 @@ const uploadJustificatif = multer({
   fileFilter: (req, file, cb) => cb(null, FORMATS_JUSTIFICATIF.includes(file.mimetype))
 });
 
+// Photos des compléments (vitrine publique) : image seulement, 5 Mo maximum, ramenée à 1000 px au plus.
+// Le navigateur réduit déjà la photo avant l'envoi (connexions lentes) ; l'affichage passe par f_auto,q_auto.
+const FORMATS_PHOTO = ['image/jpeg', 'image/png', 'image/webp'];
+const uploadPhotoProduit = multer({
+  storage: stockageCloudinary(async () => ({
+    folder: 'complements',
+    resource_type: 'image',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
+  })),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, FORMATS_PHOTO.includes(file.mimetype))
+});
+
 module.exports = upload;
 module.exports.uploadJustificatif = uploadJustificatif;
+module.exports.uploadPhotoProduit = uploadPhotoProduit;
 module.exports.cloudinary = cloudinary;
