@@ -43,5 +43,16 @@ export const PRODUITS_INCLUS = [
 // Produits absents de la formule AHI Essentiel
 export const EXCLUS_ESSENTIEL = ['Huile de palme']
 
+// Animation de la liste des produits de base (section Formules) : les produits défilent par groupes, en boucle.
+// Ajouter un produit à PRODUITS_INCLUS suffit : les groupes se recalculent. Sans animation (réglage du téléphone
+// « réduire les animations »), la liste complète s'affiche.
+export type EffetProduits = 'fondu' | 'glissement' | 'cascade'
+export const ANIMATION_PRODUITS = {
+  effet: 'cascade' as EffetProduits, // fondu : apparition douce ; glissement : arrive par le bas ; cascade : produit par produit
+  produitsParGroupe: 6,
+  affichageMs: 3500, // Temps pendant lequel un groupe reste à l'écran
+  transitionMs: 500, // Durée de l'apparition et de la disparition
+}
+
 // Montant en FCFA avec espaces de milliers (« 10 800 »)
 export const formaterPrix = (montant: number) => montant.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
