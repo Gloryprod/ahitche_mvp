@@ -1,0 +1,59 @@
+# Sauvegarde hebdomadaire de la base de production (la formule gratuite d'Atlas n'en fait aucune).
+# La sauvegarde est chiffrée (AES-256) avant d'être conservée 35 jours dans les « Artifacts » de GitHub.
+# À configurer une fois dans GitHub (Settings > Secrets and variables > Actions) :
+#   SAUVEGARDE_MONGO_URI : adresse d'un utilisateur Atlas en LECTURE SEULE sur la base de production
+#   SAUVEGARDE_PHRASE    : phrase secrète de chiffrement, à garder aussi hors de GitHub (sans elle, rien n'est lisible)
+# Sans ces secrets, le travail s'arrête sans rien faire. Restauration : voir back/src/scripts/restaurerBase.js
+#   gpg --batch --decrypt --passphrase "<phrase>" sauvegarde.tar.gz.gpg | tar xz
+name: Sauvegarde hebdomadaire
+
+on:
+  schedule:
+    - cron: '0 2 * * 0' # Chaque dimanche à 2 h (UTC), soit 3 h à Cotonou
+  workflow_dispatch: # Lancement à la main depuis l'onglet Actions
+
+permissions:
+  contents: read
+
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-latest
+    env:
+      MONGO_URI: ${{ secrets.SAUVEGARDE_MONGO_URI }}
+      SAUVEGARDE_PHRASE: ${{ secrets.SAUVEGARDE_PHRASE }}
+    steps:
+      - name: Secrets présents ?
+        id: secrets
+        run: |
+          if [ -z "$MONGO_URI" ] || [ -z "$SAUVEGARDE_PHRASE" ]; then
+            echo "Secrets SAUVEGARDE_MONGO_URI et SAUVEGARDE_PHRASE absents : aucune sauvegarde." >> "$GITHUB_STEP_SUMMARY"
+            echo "pret=non" >> "$GITHUB_OUTPUT"
+          else
+            echo "pret=oui" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.pret == 'oui'
+
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.pret == 'oui'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: back/package-lock.json
+
+      - name: Sauvegarde et chiffrement
+        if: steps.secrets.outputs.pret == 'oui'
+        working-directory: back
+        run: |
+          npm ci --omit=dev
+          node src/scripts/sauvegarderBase.js "$RUNNER_TEMP/sauvegarde"
+          tar czf - -C "$RUNNER_TEMP" sauvegarde | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$SAUVEGARDE_PHRASE" -o "$RUNNER_TEMP/sauvegarde.tar.gz.gpg"
+          rm -rf "$RUNNER_TEMP/sauvegarde"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.secrets.outputs.pret == 'oui'
+        with:
+          name: sauvegarde-${{ github.run_number }}
+          path: ${{ runner.temp }}/sauvegarde.tar.gz.gpg
+          retention-days: 35

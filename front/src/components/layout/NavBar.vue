@@ -239,7 +239,7 @@ onUnmounted(() => {
                     <div>
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Adresse Email</label>
                         <input 
-                          type="email" 
+                          type="email" autocapitalize="none" autocomplete="email" spellcheck="false" 
                           v-model="forgotEmail" 
                           required 
                           placeholder="exemple@domaine.com"
@@ -273,7 +273,7 @@ onUnmounted(() => {
                     <div>
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Adresse Email</label>
                         <input 
-                          type="email" 
+                          type="email" autocapitalize="none" autocomplete="email" spellcheck="false" 
                           v-model="formLogin.email" 
                           required 
                           placeholder="exemple@domaine.com"
@@ -293,7 +293,7 @@ onUnmounted(() => {
                             </button>
                         </div>
                         <input 
-                          type="password" 
+                          type="password" autocomplete="current-password"
                           v-model="formLogin.password" 
                           required 
                           placeholder="••••••••"

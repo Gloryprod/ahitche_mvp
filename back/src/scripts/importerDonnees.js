@@ -21,6 +21,7 @@ const Expense = require('../models/expense');
 const { LotStockFifo, MouvementStock, FOURNISSEUR_INTERNE } = require('../models/stock');
 const Parametres = require('../models/parametres');
 const User = require('../models/user');
+const AuditLog = require('../models/auditLog');
 const { EQUIPE } = require('../config/roles');
 const { SOURCES_FINANCEMENT, MODES_PAIEMENT_DEPENSE } = require('../config/convention');
 const { lireCsv, lireNombre } = require('../utils/csv');
@@ -517,10 +518,14 @@ async function importer() {
     stock: f('09_stock_depart.csv'), parametres: f('10_parametres.csv'), equipe: f('11_equipe.csv')
   };
 
-  // autoIndex désactivé : aucune écriture hors de la transaction (simulation sans trace)
-  await mongoose.connect(process.env.MONGO_URI, { autoIndex: false });
+  // autoIndex et autoCreate désactivés : aucune écriture hors de la transaction (simulation sans trace), sauf les
+  // collections encore absentes, créées vides avant la transaction (sinon conflit « namespace already in use »)
+  await mongoose.connect(process.env.MONGO_URI, { autoIndex: false, autoCreate: false });
+  for (const M of [Category, CompositionRule, Product, Formule, Zone, Partner, BudgetLine, Expense, LotStockFifo, MouvementStock, Parametres, User, AuditLog]) {
+    await M.createCollection();
+  }
   const session = await mongoose.startSession();
-  let controles = null;
+  let controles = null, reussi = false;
   try {
     const admin = await User.findOne({ role: 'admin' }).sort({ adminPrincipal: -1, createdAt: 1 });
     if (!admin) throw new Error("Aucun compte admin : lancer createAdmin.js d'abord.");
@@ -542,6 +547,7 @@ async function importer() {
 
     controles = await controlerDonnees(session);
     if (appliquer) { await session.commitTransaction(); } else { await session.abortTransaction(); }
+    reussi = true; // Seulement après la validation réelle : un échec à l'enregistrement ne s'affiche plus comme appliqué
   } catch (error) {
     if (session.inTransaction()) await session.abortTransaction();
     console.error('❌ Import interrompu, rien n\'a été enregistré :', error.message);
@@ -550,7 +556,7 @@ async function importer() {
     session.endSession();
     await mongoose.disconnect();
   }
-  if (!controles) return;
+  if (!reussi || !controles) return;
 
   console.log(appliquer ? '✅ IMPORT APPLIQUÉ' : '🔎 SIMULATION (rien n\'a été enregistré)');
   for (const b of bilan) console.log('  ' + b);

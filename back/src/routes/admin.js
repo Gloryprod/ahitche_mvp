@@ -16,6 +16,7 @@ const financeC = require('../controllers/admin/FinanceController');
 const simulateurC = require('../controllers/admin/SimulateurController');
 const parametresC = require('../controllers/admin/ParametresController');
 const nutritionC = require('../controllers/NutritionController');
+const complementC = require('../controllers/admin/ComplementController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -30,6 +31,7 @@ router.use('/users', acces(ACCES.clients));
 router.use(['/commandes', '/orders'], acces(ACCES.commandes));
 router.use(['/categories', '/composition-rules', '/products', '/formulas'], acces(ACCES.donneesBase));
 router.use(['/posts', '/upload'], acces(ACCES.contenus));
+router.use('/complements', acces(ACCES.complements));
 router.use(['/stock', '/inventory', '/mouvements', '/bons-commande'], acces(ACCES.stock));
 router.use('/prestataires', acces(ACCES.prestataires));
 router.use(['/zones', '/logistique'], acces(ACCES.logistique));
@@ -76,6 +78,15 @@ router.route('/products')
 router.route('/products/:id')
   .put(productC.updateProduct)
   .delete(productC.deleteProduct);
+
+// Compléments de la semaine (extras du catalogue affichés sur l'accueil)
+router.route('/complements')
+  .get(complementC.listerComplements)
+  .post(complementC.creerComplement);
+router.post('/complements/photo', upload.uploadPhotoProduit.single('photo'), complementC.televerserPhoto);
+router.route('/complements/:id')
+  .put(complementC.modifierComplement)
+  .patch(complementC.modifierComplement);
 
 // --- Formules / Packs ---
 router.get('/formulas/:packType', formulaC.getPackDetails);

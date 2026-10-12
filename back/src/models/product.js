@@ -27,6 +27,10 @@ const ProductSchema = new mongoose.Schema({
   priceUnit: { type: Number, min: 0, default: null }, // P.U. FCFA du référentiel ; vide = à renseigner
   seuilAlerte: { type: Number, min: 0, default: null }, // Dans l'unité du produit ; vide = pas d'alerte (à renseigner)
   commentaire: { type: String, trim: true, default: '' },
+  // Vitrine des compléments (extras) : section « Disponible cette semaine » de l'accueil
+  photo: { type: String, trim: true, default: '' }, // Adresse Cloudinary ; vide = pas encore de photo
+  description: { type: String, trim: true, default: '', maxlength: 200 },
+  cetteSemaine: { type: Boolean, default: false }, // Affiché sur le site cette semaine (retirer ne supprime pas)
   deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 

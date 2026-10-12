@@ -3,7 +3,7 @@ const { ROLES } = require('../config/roles');
 
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true, trim: true, lowercase: true }, // Toujours en minuscules (migrerDonnees pour l'existant)
     password: { type: String, required: true },
     role: { type: String, enum: ROLES, required: true, default: 'user' }, // client ('user') ou membre de l'équipe, voir config/roles.js
     telephone: { type: String, required: false }, // unique seulement s'il est renseigné (index plus bas)
