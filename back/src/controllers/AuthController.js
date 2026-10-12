@@ -4,6 +4,17 @@ const jwt = require('jsonwebtoken');
 const emailService = require('../services/emailServices');
 const crypto = require('crypto');
 const { OPTIONS_COOKIE, ouvrirSession, actualiserSession } = require('../services/sessionService');
+const { echapperRegex, normaliserEmail, EMAIL_VALIDE } = require('../utils/texte');
+
+// Longueur minimale d'un mot de passe (inscription et réinitialisation), même valeur dans le front
+const MOT_DE_PASSE_MIN = 5;
+
+// Compte par adresse e-mail (déjà en minuscules). Les anciens comptes enregistrés avec des majuscules, avant la
+// migration des adresses (migrerDonnees), restent trouvables.
+async function trouverParEmail(email) {
+    return await User.findOne({ email })
+        || await User.findOne({ email: { $regex: `^${echapperRegex(email)}$`, $options: 'i' } });
+}
 
 // Les jetons de réinitialisation sont stockés hachés : une fuite de la base ne permet pas de les réutiliser
 function hacherJeton(jeton) {
@@ -18,15 +29,22 @@ function sontDesChaines(...valeurs) {
 
 async function register(req, res) {
     try {
-        const { username, email, password, telephone } = req.body;
+        const { password, telephone } = req.body;
 
-        if (!sontDesChaines(username, email, password) || (telephone !== undefined && typeof telephone !== 'string')) {
+        if (!sontDesChaines(req.body.username, req.body.email, password) || (telephone !== undefined && typeof telephone !== 'string')) {
             return res.status(400).json({ message: "Données d'inscription invalides." });
         }
+        const username = req.body.username.trim();
+        const email = normaliserEmail(req.body.email);
+        if (!username) return res.status(400).json({ message: "Indiquez votre nom." });
+        if (!EMAIL_VALIDE.test(email)) return res.status(400).json({ message: "Adresse e-mail invalide." });
+        if (password.length < MOT_DE_PASSE_MIN) {
+            return res.status(400).json({ message: `Le mot de passe doit contenir au moins ${MOT_DE_PASSE_MIN} caractères.` });
+        }
 
-        // Vérifier si l'utilisateur existe déjà
-        const userExists = await User.findOne({ email });
-        if (userExists) return res.status(400).json({ message: "Cet email est déjà utilisé." });
+        // Vérifier si l'utilisateur existe déjà (adresse ou nom, tous deux uniques)
+        if (await trouverParEmail(email)) return res.status(400).json({ message: "Cet email est déjà utilisé." });
+        if (await User.exists({ username })) return res.status(400).json({ message: "Ce nom est déjà utilisé : ajoutez par exemple votre prénom." });
 
         // Hacher le mot de passe
         const salt = await bcrypt.genSalt(10);
@@ -47,13 +65,14 @@ async function register(req, res) {
 
 async function login(req, res) {
     try {
-        const { email, password } = req.body;
+        const { password } = req.body;
 
-        if (!sontDesChaines(email, password)) {
+        if (!sontDesChaines(req.body.email, password)) {
             return res.status(400).json({ message: "Identifiants incorrects." });
         }
 
-        const user = await User.findOne({ email });
+        // Pas de longueur minimale ici : les mots de passe créés avant la règle des 5 caractères restent valables
+        const user = await trouverParEmail(normaliserEmail(req.body.email));
         if (!user) return res.status(400).json({ message: "Identifiants incorrects." });
 
         const isMatch = await bcrypt.compare(password, user.password);
@@ -135,14 +154,12 @@ async function getUser(req, res) {
 
 async function forgotPassword(req, res) {
     try {
-    const { email } = req.body;
-
-    if (!sontDesChaines(email)) {
+    if (!sontDesChaines(req.body.email)) {
       return res.status(400).json({ message: "Adresse e-mail invalide." });
     }
 
     // 1. Vérifier si l'utilisateur existe
-    const user = await User.findOne({ email });
+    const user = await trouverParEmail(normaliserEmail(req.body.email));
     if (!user) {
       // Sécurité : on renvoie un message générique pour éviter le "User Enumeration"
       return res.status(200).json({ 
@@ -182,6 +199,9 @@ async function resetPassword(req, res) {
             return res.status(400).json({
                 message: "Le lien de réinitialisation est invalide ou a expiré."
             });
+        }
+        if (password.length < MOT_DE_PASSE_MIN) {
+            return res.status(400).json({ message: `Le mot de passe doit contenir au moins ${MOT_DE_PASSE_MIN} caractères.` });
         }
 
         // 1. Chercher l'utilisateur avec le jeton valide ET non expiré

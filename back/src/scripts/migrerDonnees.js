@@ -13,7 +13,7 @@ const Zone = require('../models/zone');
 const Order = require('../models/order');
 const ExchangeRate = require('../models/exchangeRate');
 const { TAUX_CONVENTION } = require('../services/journalService');
-const { normaliser } = require('../utils/texte');
+const { normaliser, normaliserEmail } = require('../utils/texte');
 
 dotenv.config();
 
@@ -207,6 +207,30 @@ async function migrerPrixCommercial() {
   for (const f of fixes) console.log(`  ⚠ ${f.slug} : prix fixé par l'admin ${f.prixCommercial} FCFA (référentiel ${f.prixActuel ?? 'vide'}) : c'est lui qui s'applique`);
 }
 
+// Étape 11 : adresses e-mail en minuscules (le clavier des téléphones met une majuscule au début : « Awa@… » et
+// « awa@… » faisaient deux comptes). Deux comptes qui tomberaient sur la même adresse ne sont jamais fusionnés ici :
+// ils sont signalés et laissés tels quels, à régler à la main.
+async function migrerEmails() {
+  const comptes = await User.collection.find({}, { projection: { email: 1, role: 1 } }).toArray();
+  const parAdresse = new Map();
+  for (const c of comptes) {
+    const cle = normaliserEmail(c.email);
+    parAdresse.set(cle, [...(parAdresse.get(cle) || []), c]);
+  }
+  let corriges = 0;
+  for (const [adresse, liste] of parAdresse) {
+    if (liste.length > 1) {
+      console.log(`  ⚠ ${liste.length} comptes pour la même adresse (${liste.map(c => `${c.role} ${c._id}`).join(', ')}) : laissés tels quels, à fusionner ou supprimer à la main`);
+      continue;
+    }
+    if (liste[0].email !== adresse) {
+      await User.collection.updateOne({ _id: liste[0]._id }, { $set: { email: adresse } });
+      corriges++;
+    }
+  }
+  console.log(corriges ? `  ✔ ${corriges} adresse(s) e-mail mise(s) en minuscules` : '  ✔ Toutes les adresses e-mail sont déjà en minuscules');
+}
+
 const ETAPES = [
   ['Index du téléphone', migrerIndexTelephone],
   ['Fournisseurs vers Prestataires', migrerFournisseurs],
@@ -218,6 +242,7 @@ const ETAPES = [
   ['Numéros de lot uniques', migrerIndexLots],
   ['Idées de repas', migrerIdeesRepas],
   ["Prix fixés par l'admin", migrerPrixCommercial],
+  ['Adresses e-mail en minuscules', migrerEmails],
 ];
 
 async function migrer() {

@@ -11,4 +11,11 @@ function normaliser(texte) {
     .toLowerCase().replace(/[-_']/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-module.exports = { echapperRegex, normaliser };
+// Adresse e-mail comparable : sans espaces autour, en minuscules. Sur téléphone, le clavier met souvent une majuscule
+// au début : « Awa@… » et « awa@… » doivent désigner le même compte.
+function normaliserEmail(email) {
+  return String(email ?? '').trim().toLowerCase();
+}
+const EMAIL_VALIDE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+module.exports = { echapperRegex, normaliser, normaliserEmail, EMAIL_VALIDE };

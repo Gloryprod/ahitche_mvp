@@ -34,7 +34,7 @@
             <div>
             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Adresse Email</label>
             <input 
-                type="email" 
+                type="email" autocapitalize="none" autocomplete="email" spellcheck="false" 
                 v-model="formRegister.email" 
                 required 
                 placeholder="exemple@domaine.com"
@@ -59,11 +59,15 @@
             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Mot de passe</label>
             <input 
                 type="password" 
-                v-model="formRegister.password" 
-                required 
+                v-model="formRegister.password"
+                required
+                minlength="5"
+                autocomplete="new-password"
+                aria-describedby="aide-mot-de-passe"
                 placeholder="••••••••"
                 class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all"
             />
+            <p id="aide-mot-de-passe" class="text-xs text-gris mt-1">5 caractères minimum.</p>
             </div>
 
             <button 

@@ -20,8 +20,10 @@
           <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nouveau mot de passe</label>
           <input 
             type="password" 
-            v-model="password" 
-            required 
+            v-model="password"
+            required
+            minlength="5"
+            autocomplete="new-password"
             placeholder="••••••••"
             class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all"
           />
@@ -32,8 +34,10 @@
           <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Confirmer le mot de passe</label>
           <input 
             type="password" 
-            v-model="confirmPassword" 
-            required 
+            v-model="confirmPassword"
+            required
+            minlength="5"
+            autocomplete="new-password"
             placeholder="••••••••"
             class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-foret focus:ring-1 focus:ring-foret transition-all"
           />
@@ -82,8 +86,8 @@ onMounted(() => {
 
 const handleResetPassword = async () => {
   // 1. Validation locale
-  if (password.value.length < 6) {
-    toast.error("Le mot de passe doit contenir au moins 6 caractères.");
+  if (password.value.length < 5) {
+    toast.error("Le mot de passe doit contenir au moins 5 caractères.");
     return;
   }
 

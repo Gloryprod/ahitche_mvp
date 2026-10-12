@@ -10,11 +10,13 @@ const dotenv = require('dotenv');
 const User = require('../models/user');
 const Partner = require('../models/partner');
 const { EQUIPE } = require('../config/roles');
+const { normaliserEmail } = require('../utils/texte');
 
 dotenv.config();
 
 async function createStaff() {
-  const [email, username, role, option, nomLivreur] = process.argv.slice(2);
+  const [emailSaisi, username, role, option, nomLivreur] = process.argv.slice(2);
+  const email = normaliserEmail(emailSaisi); // Toujours en minuscules, comme à l'inscription
   const motDePasse = process.env.STAFF_PASSWORD;
 
   if (!email || !username || !EQUIPE.includes(role)) {
