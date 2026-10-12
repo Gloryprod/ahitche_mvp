@@ -1,3 +1,5 @@
+// Suivi des erreurs : à charger en premier (inactif sans SENTRY_DSN)
+const Sentry = require('./instrument');
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -48,9 +50,19 @@ app.use(express.json());
 
 app.use(cookieParser());
 // Route exemple
+// Adresse de contrôle pour la surveillance (UptimeRobot…) : 200 si l'API répond et que la base est joignable, 503 sinon.
+// Aucun détail technique dans la réponse.
+app.get('/api/sante', (req, res) => {
+    const base = mongoose.connection.readyState === 1;
+    res.set('Cache-Control', 'no-store');
+    res.status(base ? 200 : 503).json({ statut: base ? 'ok' : 'indisponible', base: base ? 'connectée' : 'injoignable' });
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
+
+// Erreurs non gérées : transmises au suivi des erreurs, puis réponse ci-dessous
+if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 
 // Erreurs non gérées par les routes (téléversement, CORS…) : message en français, jamais de page HTML ni de détail technique
 app.use((err, req, res, next) => {

@@ -31,11 +31,13 @@ const emailDe = (req) => String(req.body?.email ?? '').trim().toLowerCase();
  * @param {number} o.maxParCompte - Tentatives par e-mail dans la fenêtre (0 : pas de limite par compte)
  * @param {number} o.maxParIp - Tentatives par adresse IP dans la fenêtre
  * @param {boolean} [o.echecsSeulement] - Ne compter que les réponses en erreur ; un succès remet le compte à zéro
+ * @param {function} [o.compteDe] - Identifiant du compte à partir de la requête (par défaut : l'e-mail saisi)
+ * @param {string} [o.message] - Message en cas de dépassement (« Réessayez dans … » est ajouté)
  */
-function limiteTentatives({ nom, minutes, maxParCompte, maxParIp, echecsSeulement = false }) {
+function limiteTentatives({ nom, minutes, maxParCompte, maxParIp, echecsSeulement = false, compteDe = emailDe, message = 'Trop de tentatives.' }) {
   const fenetreMs = minutes * 60 * 1000;
   return (req, res, next) => {
-    const email = emailDe(req);
+    const email = compteDe(req);
     const cles = [
       ...(maxParCompte && email ? [[`${nom}:compte:${email}`, maxParCompte]] : []),
       [`${nom}:ip:${req.ip}`, maxParIp]
@@ -44,7 +46,7 @@ function limiteTentatives({ nom, minutes, maxParCompte, maxParIp, echecsSeulemen
     if (bloque) {
       const attente = Math.max(1, Math.ceil((bloque.finLe - Date.now()) / 60000));
       res.set('Retry-After', String(attente * 60));
-      return res.status(429).json({ message: `Trop de tentatives. Réessayez dans ${attente} minute${attente > 1 ? 's' : ''}.` });
+      return res.status(429).json({ message: `${message} Réessayez dans ${attente} minute${attente > 1 ? 's' : ''}.` });
     }
     if (!echecsSeulement) {
       for (const [cle] of cles) enregistrer(cle, fenetreMs);

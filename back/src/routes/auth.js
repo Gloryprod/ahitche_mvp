@@ -14,6 +14,12 @@ const limiteConnexion = limiteTentatives({ nom: 'connexion', minutes: 15, maxPar
 const limiteOubli = limiteTentatives({ nom: 'oubli', minutes: 60, maxParCompte: 3, maxParIp: 10 });
 const limiteInscription = limiteTentatives({ nom: 'inscription', minutes: 60, maxParCompte: 0, maxParIp: 10 });
 const limiteReinitialisation = limiteTentatives({ nom: 'reinitialisation', minutes: 60, maxParCompte: 0, maxParIp: 10 });
+// Commandes de l'espace client : contre l'envoi en masse (compte piraté, script), 10 par heure et par compte
+const limiteCommandes = limiteTentatives({
+  nom: 'commande', minutes: 60, maxParCompte: 10, maxParIp: 30,
+  compteDe: (req) => (req.user?.id ? String(req.user.id) : ''),
+  message: 'Trop de commandes envoyées en peu de temps. Contactez-nous sur WhatsApp si besoin.'
+});
 
 // Authentification
 router.post('/register', limiteInscription, authC.register);
@@ -32,7 +38,7 @@ router.get('/formules', verifyToken, formuleC.index);
 router.put('/user/preference-formule', verifyToken, userC.updateFormulePreference);
 
 // Commandes 
-router.post('/save/orders', verifyToken, orderC.saveOrder);
+router.post('/save/orders', verifyToken, limiteCommandes, orderC.saveOrder);
 router.get('/my-orders', verifyToken, orderC.index);
 router.delete('/delete/order/:id', verifyToken, orderC.deleteOrder);
 

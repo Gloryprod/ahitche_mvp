@@ -35,10 +35,13 @@ STAFF_PASSWORD=… node src/scripts/importerDonnees.js ../docs-internes/imports 
 node src/scripts/decisionsMiseEnService.js ../docs-internes/imports [--appliquer]  # décisions du porteur après l'import (prix admin, anciens lots et règles, commandes d'essai, compte admin générique)
 node src/scripts/controlerDonnees.js [--attendu <json>]  # contrôles B.4, lecture seule
 MONGO_URI=<lecture seule> node src/scripts/inventaireBase.js  # inventaire d'une base (nombres seulement, aucune donnée personnelle)
+MONGO_URI=<lecture seule> node src/scripts/sauvegarderBase.js [dossier]  # sauvegarde complète (défaut : ../docs-internes/sauvegardes)
+MONGO_URI=<base vide> node src/scripts/restaurerBase.js <dossier>       # restauration, refusée si la base n'est pas vide
 ```
+Sauvegarde automatique : `.github/workflows/sauvegarde-hebdomadaire.yml` (dimanche, chiffrée, 35 jours), active dès que les secrets GitHub `SAUVEGARDE_MONGO_URI` et `SAUVEGARDE_PHRASE` existent. Surveillance : `GET /api/sante` (200 si l'API et la base répondent, 503 sinon).
 L'import ne touche jamais la production sans `--appliquer` : la simulation s'exécute dans une transaction annulée et affiche les écarts. Ordre de mise en service : sauvegarde, migrerDonnees, createFormules, import, decisionsMiseEnService, controlerDonnees ; à répéter d'abord sur la base de recette `ahitche_recette` (la production est la base `test` du cluster Atlas). Atlas annule toute transaction de plus de 60 s : les scripts chargent chaque liste une fois par étape au lieu d'une requête par ligne. Les fichiers CSV et les valeurs attendues des contrôles restent dans `docs-internes/` (exclu de Git).
 Les transactions MongoDB (livraison + sortie de stock FIFO) exigent un replica set : c'est le cas sur Atlas ; en local, utiliser `MongoMemoryReplSet` ou un replica set à un nœud.
-Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL`, `CLOUDINARY_*`, `ADMIN_PASSWORD`, `NODE_ENV`, `PORT`, et `INACTIVITE_MINUTES` (facultative, 60 par défaut : déconnexion de l'équipe après inactivité).
+Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL`, `CLOUDINARY_*`, `ADMIN_PASSWORD`, `NODE_ENV`, `PORT`, `INACTIVITE_MINUTES` (facultative, 60 par défaut : déconnexion de l'équipe après inactivité), `TRUST_PROXY` (1 derrière l'hébergeur : vraie adresse IP pour les limites) et `SENTRY_DSN` (facultative : suivi des erreurs, `back/instrument.js`, sans donnée personnelle).
 
 ## Structure
 - `front/src/views/` : pages (accueil, login, register, reset, blog, dashboards user et admin).
