@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
+import { copyFileSync } from 'node:fs'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -13,7 +14,15 @@ export default defineConfig({
     vueJsx(),
     vueDevTools(),
     tailwindcss(),
-
+    // Vercel sert dist/404.html, avec le statut 404, pour toute adresse inconnue (voir vercel.json) : c'est la même
+    // application, qui affiche la page « introuvable »
+    {
+      name: 'page-404',
+      apply: 'build',
+      closeBundle() {
+        copyFileSync(fileURLToPath(new URL('./dist/index.html', import.meta.url)), fileURLToPath(new URL('./dist/404.html', import.meta.url)))
+      },
+    },
   ],
   resolve: {
     alias: {
