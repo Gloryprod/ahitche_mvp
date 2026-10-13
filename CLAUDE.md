@@ -44,7 +44,8 @@ Les transactions MongoDB (livraison + sortie de stock FIFO) exigent un replica s
 Variables d'environnement du back : `MONGO_URI`, `JWT_SECRET`, `RESEND_API_KEY`, `FRONTEND_URL`, `CLOUDINARY_*`, `ADMIN_PASSWORD`, `NODE_ENV`, `PORT`, `INACTIVITE_MINUTES` (facultative, 60 par défaut : déconnexion de l'équipe après inactivité), `TRUST_PROXY` (1 derrière l'hébergeur : vraie adresse IP pour les limites) et `SENTRY_DSN` (facultative : suivi des erreurs, `back/instrument.js`, sans donnée personnelle).
 
 ## Structure
-- `front/src/views/` : pages (accueil, login, register, reset, blog, dashboards user et admin).
+- `front/src/views/` : pages (accueil, login, register, reset, blog et page d'un contenu `/blog/:slug`, dashboards user et admin). Liste des pages : `router/routes.ts` (partagée par le routeur et le rendu au build).
+- Référencement : `services/referencement.ts` (canonique et noindex par page, aperçu de partage d'un article, données structurées GroceryStore, FAQPage, Article). L'accueil est rendu en HTML au build (`npm run build` lance `postbuild` : `vite.prerendu.config.ts`, `src/entry-prerendu.ts`, `scripts/prerendre.mjs`) ; `dist/index.html` = accueil rendu, `dist/app.html` = coquille des autres pages, `dist/404.html` = adresses inconnues (statut 404), voir `vercel.json`. Plan du site : `GET /api/public/sitemap.xml`, servi sur `/sitemap.xml`. L'API publique ne renvoie jamais les brouillons.
 - `front/src/components/sections/` : sections de la page d'accueil (Hero, Formules, Comment ça marche…).
 - `front/src/components/admin/` : back-office (commandes, stock, produits, formules, posts) et les sections Gestion : `prestataires/`, `logistique/`, `finances/`, `simulateurs/`, `nutrition/` (chargées à la demande).
 - `front/src/components/client/` : blocs de l'espace client (suivi alimentaire).

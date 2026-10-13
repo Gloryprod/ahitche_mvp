@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Search, Play, FileText, Newspaper, Calendar, ArrowRight, User } from 'lucide-vue-next'
 import api from '@/stores/api'
 import LienAccueil from '@/components/ui/LienAccueil.vue'
@@ -24,7 +25,6 @@ const page = ref(1)
 const selectedType = ref<string>('') // '' = Tous, 'article', 'blog', 'video'
 const search = ref('')
 const debouncedSearch = ref('')
-const selectedPost = ref<Post | null>(null)
 
 // Debounce pour la recherche
 let timeoutId: ReturnType<typeof setTimeout>
@@ -48,7 +48,6 @@ const fetchPublicPosts = async ({ queryKey }: { queryKey: any }) => {
     params: {
       page: currentPage,
       limit: 9,
-      published: 'true',
       type: currentType || undefined,
       search: currentSearch || undefined
     }
@@ -62,14 +61,6 @@ const { data, isLoading, isError, isPlaceholderData } = useQuery({
   placeholderData: keepPreviousData
 })
 
-// Convertisseur pour intégrer les vidéos YouTube
-const embedVideoUrl = computed(() => {
-  if (!selectedPost.value?.videoUrl) return ''
-  const url = selectedPost.value.videoUrl
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
-  const match = url.match(regExp)
-  return (match && match[2]?.length === 11) ? `https://www.youtube.com/embed/${match[2]}` : url
-})
 </script>
 
 <template>
@@ -128,10 +119,10 @@ const embedVideoUrl = computed(() => {
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <article 
-        v-for="post in data.posts" 
-        :key="post._id" 
-        @click="selectedPost = post"
+      <RouterLink
+        v-for="post in data.posts"
+        :key="post._id"
+        :to="`/blog/${post.slug}`"
         class="group bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col justify-between">
         
         <div>
@@ -182,7 +173,7 @@ const embedVideoUrl = computed(() => {
           <span>{{ post.type === 'video' ? 'Regarder la vidéo' : 'Lire la suite' }}</span>
           <ArrowRight class="w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </div>
-      </article>
+      </RouterLink>
     </div>
 
     <!-- Pagination -->
@@ -200,43 +191,6 @@ const embedVideoUrl = computed(() => {
         class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold hover:bg-gray-50 disabled:opacity-40 transition-all cursor-pointer">
         Page suivante →
       </button>
-    </div>
-
-    <!-- MODAL DE LECTURE COMPLÈTE -->
-    <div v-if="selectedPost" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-      <div class="bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl overflow-y-auto p-6 space-y-6 relative">
-        
-        <button @click="selectedPost = null" class="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 text-gris rounded-full transition-colors cursor-pointer">
-          ✕
-        </button>
-
-        <div class="space-y-2">
-          <span class="px-3 py-1 bg-emerald-50 text-emerald-800 text-[10px] font-bold rounded-lg uppercase tracking-wider">{{ selectedPost.category }}</span>
-          <h2 class="text-2xl font-extrabold text-gray-900">{{ selectedPost.title }}</h2>
-          <p class="text-xs text-gris">Publié le {{ new Date(selectedPost.createdAt).toLocaleDateString() }}</p>
-        </div>
-
-        <!-- Integration lecteur Vidéo si c'est un format vidéo -->
-        <div v-if="selectedPost.type === 'video' && selectedPost.videoUrl" class="aspect-video w-full rounded-xl overflow-hidden bg-black">
-          <iframe :src="embedVideoUrl" class="w-full h-full" frameborder="0" allowfullscreen></iframe>
-        </div>
-
-        <!-- Image si disponible et non vidéo -->
-        <div v-else-if="selectedPost.coverImage" class="w-full h-64 rounded-xl overflow-hidden bg-gray-100">
-          <img :src="selectedPost.coverImage" :alt="selectedPost.title" class="w-full h-full object-cover" />
-        </div>
-
-        <!-- Résumé -->
-        <div v-if="selectedPost.summary" class="p-4 bg-emerald-50/50 border-l-4 border-emerald-800 text-xs italic text-gray-700 rounded-r-xl">
-          {{ selectedPost.summary }}
-        </div>
-
-        <!-- Contenu complet de l'article -->
-        <div v-if="selectedPost.content" class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-sans">
-          {{ selectedPost.content }}
-        </div>
-
-      </div>
     </div>
 
   </div>

@@ -1,20 +1,12 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import { FAQ } from '@/config/faq'
-import { ajouterDonneesStructurees } from '@/services/referencement'
+import { ajouterDonneesStructurees, donneesFaq } from '@/services/referencement'
 
 // Données structurées FAQPage (référencement local) : ajoutées au <head> le temps de l'affichage de l'accueil
 let retirer: (() => void) | undefined
 onMounted(() => {
-  retirer = ajouterDonneesStructurees('donnees-faq', {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: FAQ.map(q => ({
-      '@type': 'Question',
-      name: q.question,
-      acceptedAnswer: { '@type': 'Answer', text: q.reponse },
-    })),
-  })
+  retirer = ajouterDonneesStructurees('donnees-faq', donneesFaq())
 })
 onUnmounted(() => retirer?.())
 </script>
