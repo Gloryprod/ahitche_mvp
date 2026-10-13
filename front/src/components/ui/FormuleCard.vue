@@ -65,6 +65,7 @@ const enAvant = computed(() => props.conseillee || (props.formule.recommandee &&
       </div>
       <BaseButton
         :href="lienWhatsApp"
+        :data-mesure="`formule-${formule.slug}`"
         :variant="enAvant ? 'primary' : 'secondary'"
         external
         class="w-full"

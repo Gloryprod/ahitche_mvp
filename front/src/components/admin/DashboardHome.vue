@@ -165,6 +165,25 @@ const { data: parametres } = useQuery({
 })
 // Chiffre d'affaires et marges : pas pour les gestionnaires (D-17), mêmes droits que les simulateurs
 const voirMarges = computed(() => peutLire(authStore.role.value, 'simulateurs'))
+
+// Fréquentation du site (mesure d'audience sans cookie) : 30 derniers jours
+interface Frequentation {
+  visites: number
+  clicsWhatsApp: number
+  tauxClic: number | null
+  origines: { detail: string; nombre: number }[]
+  pages: { detail: string; nombre: number }[]
+}
+const { data: frequentation } = useQuery({
+  queryKey: ['frequentation', 30],
+  queryFn: async () => (await api.get('/api/admin/mesures', { params: { jours: 30 } })).data as Frequentation,
+  enabled: computed(() => peutLire(authStore.role.value, 'mesures')),
+})
+// « accueil:formule-ahi-essentiel » -> « Accueil · formule ahi essentiel »
+const libelleOrigine = (detail: string) => {
+  const [page, origine] = detail.split(':')
+  return `${page === 'accueil' ? 'Accueil' : page} · ${(origine || '').replace(/-/g, ' ')}`
+}
 const targetClients = computed(() => parametres.value?.objectifClients ?? null)
 
 const estimatedRevenue = computed(() => {
@@ -422,6 +441,29 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                     <span class="w-16 text-right font-semibold text-gris">{{ form.count }} client(s)</span>
                 </div>
                 </div>
+            </div>
+
+            <!-- FRÉQUENTATION DU SITE -->
+            <div v-if="frequentation" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-4">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-2">
+                <h2 class="font-bold text-noir text-sm">Fréquentation du site</h2>
+                <span class="px-2 py-0.5 bg-gray-100 text-gris rounded-md text-[10px]">30 derniers jours, sans cookie</span>
+                </div>
+                <div class="grid grid-cols-3 gap-3 text-center">
+                <div><p class="text-xl font-bold text-noir tabular-nums">{{ frequentation.visites.toLocaleString('fr-FR') }}</p><p class="text-[10px] text-gris">pages vues</p></div>
+                <div><p class="text-xl font-bold text-foret tabular-nums">{{ frequentation.clicsWhatsApp.toLocaleString('fr-FR') }}</p><p class="text-[10px] text-gris">clics WhatsApp</p></div>
+                <div><p class="text-xl font-bold text-noir tabular-nums">{{ frequentation.tauxClic === null ? '—' : `${frequentation.tauxClic} %` }}</p><p class="text-[10px] text-gris">clics / pages vues</p></div>
+                </div>
+                <div v-if="frequentation.origines.length">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-gris mb-1.5">D'où viennent les clics WhatsApp</p>
+                <ul class="space-y-1">
+                    <li v-for="o in frequentation.origines" :key="o.detail" class="flex justify-between gap-3 text-xs">
+                    <span class="text-noir truncate">{{ libelleOrigine(o.detail) }}</span>
+                    <span class="font-semibold text-gris tabular-nums">{{ o.nombre }}</span>
+                    </li>
+                </ul>
+                </div>
+                <p v-else class="text-xs text-gris">Aucun clic vers WhatsApp mesuré sur la période.</p>
             </div>
 
             <!-- MARGE BRUTE -->

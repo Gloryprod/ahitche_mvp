@@ -17,6 +17,7 @@ const simulateurC = require('../controllers/admin/SimulateurController');
 const parametresC = require('../controllers/admin/ParametresController');
 const nutritionC = require('../controllers/NutritionController');
 const complementC = require('../controllers/admin/ComplementController');
+const mesureC = require('../controllers/admin/MesureController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -32,6 +33,7 @@ router.use(['/commandes', '/orders'], acces(ACCES.commandes));
 router.use(['/categories', '/composition-rules', '/products', '/formulas'], acces(ACCES.donneesBase));
 router.use(['/posts', '/upload'], acces(ACCES.contenus));
 router.use('/complements', acces(ACCES.complements));
+router.use('/mesures', acces(ACCES.mesures));
 router.use(['/stock', '/inventory', '/mouvements', '/bons-commande'], acces(ACCES.stock));
 router.use('/prestataires', acces(ACCES.prestataires));
 router.use(['/zones', '/logistique'], acces(ACCES.logistique));
@@ -78,6 +80,9 @@ router.route('/products')
 router.route('/products/:id')
   .put(productC.updateProduct)
   .delete(productC.deleteProduct);
+
+// Fréquentation du site (mesure d'audience sans cookie)
+router.get('/mesures', mesureC.resumeFrequentation);
 
 // Compléments de la semaine (extras du catalogue affichés sur l'accueil)
 router.route('/complements')

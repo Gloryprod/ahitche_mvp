@@ -19,9 +19,11 @@ const ACCES = {
   commandes:     { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
   donneesBase:   { lecture: EQUIPE,                                                  ecriture: ['admin'] },
   contenus:      { lecture: ['admin'],                                               ecriture: ['admin'] },
+  // Fréquentation du site (mesure d'audience sans cookie), affichée au tableau de bord
+  mesures:       { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: [] },
   // Compléments de la semaine (extras du catalogue : photo, description, prix de vente, affichage sur le site)
   complements:   { lecture: ['admin', 'gestionnaire', 'coordinateur'],              ecriture: ['admin', 'gestionnaire'] },
-  stock:        { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur', 'auditeur'], ecriture: ['admin', 'gestionnaire'] },
+  stock:         { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur', 'auditeur'], ecriture: ['admin', 'gestionnaire'] },
   prestataires:  { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
   logistique:    { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
   finances:      { lecture: ['admin', 'comptable', 'coordinateur', 'auditeur'],     ecriture: ['admin', 'comptable', 'coordinateur'] },

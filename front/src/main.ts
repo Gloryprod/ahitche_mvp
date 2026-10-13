@@ -10,6 +10,7 @@ import axios from 'axios';
 import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
 import { VueQueryPlugin } from '@tanstack/vue-query'
+import { mesurerVisite, suivreClicsWhatsApp } from './services/mesure'
 
 
 axios.defaults.withCredentials = true;
@@ -27,5 +28,9 @@ app.use(Toast, {
 })
 
 app.use(VueQueryPlugin)
+
+// Mesure d'audience sans cookie : pages publiques vues et clics vers WhatsApp (totaux par jour)
+router.afterEach(mesurerVisite)
+suivreClicsWhatsApp()
 
 app.mount('#app')

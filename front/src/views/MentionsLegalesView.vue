@@ -52,6 +52,11 @@ import { lienWhatsApp, WHATSAPP_AFFICHAGE, RESEAUX_SOCIAUX } from '@/config/cont
           Le site n'utilise qu'un cookie technique, déposé lorsque vous vous connectez à votre espace : il maintient votre
           session et disparaît à la déconnexion ou à son expiration. Aucun cookie publicitaire ni de mesure d'audience n'est utilisé.
         </p>
+        <p class="mt-2">
+          Mesure d'audience : pour améliorer le site, nous comptons chaque jour le nombre de pages vues et de clics vers
+          WhatsApp, avec la section d'où vient le clic. Ces totaux ne contiennent ni cookie, ni identifiant, ni adresse IP :
+          ils ne permettent pas de reconnaître un visiteur.
+        </p>
       </section>
 
       <section class="mb-8">

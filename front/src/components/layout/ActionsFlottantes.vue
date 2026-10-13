@@ -53,6 +53,7 @@ function retourEnHaut() {
       <!-- Mobile : commande WhatsApp toujours à portée -->
       <a
         :href="lienWhatsApp(MESSAGES_WHATSAPP.commande)"
+        data-mesure="bouton-flottant"
         target="_blank"
         rel="noopener noreferrer"
         :tabindex="barreVisible ? 0 : -1"
