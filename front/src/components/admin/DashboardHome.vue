@@ -5,6 +5,7 @@ import api from '@/stores/api'
 import { classeStatut } from '@/config/commandes'
 import { useAuthStore } from '@/stores/auth'
 import { peutLire, peutEcrire } from '@/config/roles'
+import { FORMULES } from '@/config/formules'
 import { useTauxChange } from '@/composables/useTauxChange'
 import { useToast } from 'vue-toastification'
 import type { Commande } from '@/type'
@@ -179,10 +180,11 @@ const { data: frequentation } = useQuery({
   queryFn: async () => (await api.get('/api/admin/mesures', { params: { jours: 30 } })).data as Frequentation,
   enabled: computed(() => peutLire(authStore.role.value, 'mesures')),
 })
-// « accueil:formule-ahi-essentiel » -> « Accueil · formule ahi essentiel »
+// « accueil:formule-ahi-equilibre » -> « Accueil · carte AHI ÉQUILIBRÉ » ; « accueil:hero » -> « Accueil · hero »
 const libelleOrigine = (detail: string) => {
-  const [page, origine] = detail.split(':')
-  return `${page === 'accueil' ? 'Accueil' : page} · ${(origine || '').replace(/-/g, ' ')}`
+  const [page, origine = ''] = detail.split(':')
+  const formule = FORMULES.find(f => origine === `formule-${f.slug}`)
+  return `${page === 'accueil' ? 'Accueil' : page} · ${formule ? `carte ${formule.nom}` : origine.replace(/-/g, ' ')}`
 }
 const targetClients = computed(() => parametres.value?.objectifClients ?? null)
 
