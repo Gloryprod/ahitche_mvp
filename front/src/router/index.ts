@@ -5,6 +5,7 @@ import HomeView from '../views/HomeView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 import { useAuthStore } from '../stores/auth';
 import { ACCES, EQUIPE, espaceParDefaut, type Role } from '@/config/roles';
+import { mettreAJourReferencement } from '@/services/referencement';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -205,6 +206,7 @@ router.afterEach((to) => {
   const titre = TITRES[String(to.name)]
   const espace = to.path.startsWith('/dashboard/admin') ? 'Back-office Ahitché' : 'Ahitché'
   document.title = titre ? `${titre} · ${espace}` : TITRE_ACCUEIL
+  mettreAJourReferencement(to) // Adresse canonique propre à la page ; noindex hors des pages publiques
 })
 
 

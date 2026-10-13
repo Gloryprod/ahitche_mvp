@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import { FAQ } from '@/config/faq'
+import { ajouterDonneesStructurees } from '@/services/referencement'
 
 // Données structurées FAQPage (référencement local) : ajoutées au <head> le temps de l'affichage de l'accueil
-let script: HTMLScriptElement | null = null
+let retirer: (() => void) | undefined
 onMounted(() => {
-  script = document.createElement('script')
-  script.type = 'application/ld+json'
-  script.textContent = JSON.stringify({
+  retirer = ajouterDonneesStructurees('donnees-faq', {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
     mainEntity: FAQ.map(q => ({
@@ -16,9 +15,8 @@ onMounted(() => {
       acceptedAnswer: { '@type': 'Answer', text: q.reponse },
     })),
   })
-  document.head.appendChild(script)
 })
-onUnmounted(() => script?.remove())
+onUnmounted(() => retirer?.())
 </script>
 
 <template>
