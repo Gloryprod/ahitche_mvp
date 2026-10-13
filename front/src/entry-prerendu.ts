@@ -1,17 +1,29 @@
-// Rendu de l'accueil au build : le HTML de la page est prêt avant le JavaScript (titre affiché tout de suite sur
-// mobile, aperçus WhatsApp et Facebook, moteurs de recherche). Utilisé par scripts/prerendre.mjs, jamais par le site.
-// Le navigateur remplace ensuite ce HTML par l'application (main.ts), identique à l'écran.
-import { createSSRApp } from 'vue'
+// Rendu du haut de l'accueil au build (menu et titre principal) : affiché dès l'arrivée du HTML, avant le
+// JavaScript, sur les téléphones lents. Utilisé par scripts/prerendre.mjs, jamais par le site.
+// Seul le haut de page est rendu : le navigateur remplace ensuite ce HTML par l'application complète (main.ts),
+// et remplacer une petite partie coûte peu sur un téléphone d'entrée de gamme (la page entière coûtait plus qu'elle
+// ne rapportait). Les moteurs de recherche lisent le reste de la page avec le JavaScript, et les données
+// structurées sont, elles, écrites en entier dans le HTML.
+import { createSSRApp, defineComponent, h } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import Toast from 'vue-toastification'
 import { VueQueryPlugin } from '@tanstack/vue-query'
-import App from './App.vue'
+import NavBar from './components/layout/NavBar.vue'
+import HeroSection from './components/sections/HeroSection.vue'
 import { routes } from './router/routes'
 import { donneesCommerce, donneesFaq } from './services/referencement'
 
+// Même structure que App.vue et HomeView.vue autour du titre : rien ne bouge quand l'application prend le relais
+const HautDeLAccueil = defineComponent({
+  render: () => h('div', { class: 'min-h-screen flex flex-col' }, [
+    h(NavBar),
+    h('main', { id: 'contenu', class: 'grow' }, [h('div', [h(HeroSection)])]),
+  ]),
+})
+
 export async function rendreAccueil(): Promise<string> {
-  const app = createSSRApp(App)
+  const app = createSSRApp(HautDeLAccueil)
   const router = createRouter({ history: createMemoryHistory(), routes })
   app.use(router)
   app.use(Toast)

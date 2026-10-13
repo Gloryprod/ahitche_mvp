@@ -15,7 +15,8 @@ fs.writeFileSync(dist('404.html'), coquille)
 const { rendreAccueil, donneesStructurees } = await import(pathToFileURL(rendu).href)
 const html = await rendreAccueil()
 if (!html.includes('<h1')) throw new Error("Rendu de l'accueil sans titre h1 : abandon, la coquille reste en place")
-const blocs = donneesStructurees()
+const donnees = donneesStructurees()
+const blocs = donnees
   .map(({ id, donnees }) => `<script id="${id}" type="application/ld+json">${JSON.stringify(donnees).replace(/</g, '\\u003c')}</script>`)
   .join('\n    ')
 const page = coquille
@@ -23,4 +24,4 @@ const page = coquille
   .replace('</head>', `    ${blocs}\n  </head>`)
 fs.writeFileSync(dist('index.html'), page)
 fs.rmSync(fileURLToPath(new URL('../dist-prerendu', import.meta.url)), { recursive: true, force: true })
-console.log(`✔ Accueil rendu au build : ${Math.round(html.length / 1024)} Ko de HTML, ${blocs.length ? 'données structurées incluses' : ''}`)
+console.log(`✔ Haut de l'accueil rendu au build : ${Math.round(html.length / 1024)} Ko de HTML, ${donnees.length} blocs de données structurées`)
