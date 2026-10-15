@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useMutation, useQueryClient, type QueryFunctionContext } from '@tanstack/vue-query'
 import api from '@/stores/api'
+import { useAuthStore } from '@/stores/auth'
+import { peutEcrire } from '@/config/roles'
 import { Layers, ShoppingBag, CheckCircle, ShieldAlert, Save, Loader2 } from 'lucide-vue-next'
 import type { Formule, ProductItem } from '@/type'
 
@@ -23,8 +25,8 @@ const customPrice = ref<number | null>(null)
 const saveSuccess = ref(false)
 
 // --- TANSTACK QUERY (GET) ---
-const fetchPackDetails = async ({ queryKey }: { queryKey: any }): Promise<PackDetailsResponse> => {
-  const [_, packType] = queryKey
+const fetchPackDetails = async ({ queryKey }: QueryFunctionContext): Promise<PackDetailsResponse> => {
+  const packType = String(queryKey[1]) // queryKey : ['packDetails', type de pack]
   const response = await api.get(`/api/admin/formulas/${packType}`)
   return response.data
 }
@@ -45,7 +47,56 @@ watch(data, (newData) => {
 // Reset le message de succès au changement d'onglet
 watch(activePack, () => {
   saveSuccess.value = false
+  cycleEnregistre.value = false
 })
+
+// --- CYCLE DE RELANCE (admin seulement, comme côté serveur) ---
+// Jours entre la livraison et la relance du client (alerte à J-5 au tableau de bord)
+const authStore = useAuthStore()
+const peutModifierCycle = computed(() => peutEcrire(authStore.role.value, 'donneesBase'))
+const CYCLES_COURANTS = [
+  { jours: 7, libelle: 'Semaine (7 j)' },
+  { jours: 14, libelle: '2 semaines (14 j)' },
+  { jours: 30, libelle: 'Mois (30 j)' },
+]
+const cycleSaisi = ref<number | null>(null)
+const cycleEnregistre = ref(false)
+const cycleValide = computed(() => Number.isInteger(cycleSaisi.value) && (cycleSaisi.value as number) >= 1 && (cycleSaisi.value as number) <= 365)
+
+watch(data, (newData) => {
+  if (newData?.formule) cycleSaisi.value = newData.formule.cycleJours ?? null
+}, { immediate: true })
+
+const updateCycleMutation = useMutation({
+  mutationFn: async (jours: number) => {
+    const response = await api.patch(`/api/admin/formulas/${activePack.value}/cycle`, { cycleJours: jours })
+    return response.data
+  },
+  onSuccess: () => {
+    // Cet onglet et le tableau de bord (relances) lisent le cycle dans le même cache
+    queryClient.invalidateQueries({ queryKey: ['packDetails'] })
+    cycleEnregistre.value = true
+    setTimeout(() => {
+      cycleEnregistre.value = false
+    }, 3000)
+  }
+})
+const erreurCycle = computed(() => {
+  const erreur = updateCycleMutation.error.value as { response?: { data?: { message?: string } } } | null
+  return erreur ? (erreur.response?.data?.message || "Erreur lors de l'enregistrement du cycle.") : ''
+})
+
+const enregistrerCycle = () => {
+  if (cycleValide.value) updateCycleMutation.mutate(cycleSaisi.value as number)
+}
+
+const libelleCycle = (jours?: number | null) => {
+  if (!jours) return 'à renseigner'
+  if (jours === 30) return 'chaque mois'
+  if (jours === 7) return 'chaque semaine'
+  if (jours === 14) return 'toutes les 2 semaines'
+  return `tous les ${jours} jours`
+}
 
 // --- TANSTACK MUTATION (UPDATE PRIX) ---
 const updatePriceMutation = useMutation({
@@ -85,8 +136,7 @@ const getPackColorClass = (pack: string) => {
 const getPeriodText = computed(() => {
   const f = data.value?.formule
   if (!f) return ''
-  const cycle = f.cycleJours === 7 ? 'chaque semaine' : `tous les ${f.cycleJours} jours`
-  return `${f.logiqueCommande || 'à renseigner'} · cycle : ${cycle}`
+  return `${f.logiqueCommande || 'à renseigner'} · cycle : ${libelleCycle(f.cycleJours)}`
 })
 </script>
 
@@ -96,7 +146,7 @@ const getPeriodText = computed(() => {
     <div class="bg-white p-4 rounded-2xl flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <div>
         <h1 class="font-display font-bold text-xl text-noir">Formules & Packs</h1>
-        <p class="text-gris text-[11px] mt-0.5">Vue d'ensemble et simulation des dots hebdomadaires et commandes libres</p>
+        <p class="text-gris text-[11px] mt-0.5">Vue d'ensemble et simulation des dots mensuelles et commandes libres</p>
       </div>
       
       <!-- Sélecteur d'onglets -->
@@ -240,6 +290,71 @@ const getPeriodText = computed(() => {
             <p v-if="updatePriceMutation.isError.value" class="text-[10px] font-bold text-red-600 mt-1">
               Erreur lors de l'enregistrement.
             </p>
+          </div>
+
+          <!-- Cycle de relance : réglé par l'admin, lu par le tableau de bord pour les relances -->
+          <div class="border-t border-black/10 pt-3 space-y-2">
+            <template v-if="peutModifierCycle">
+              <label for="cycle-relance" class="text-[10px] font-bold uppercase block opacity-80">
+                Cycle de relance
+              </label>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <input
+                    id="cycle-relance"
+                    v-model.number="cycleSaisi"
+                    type="number"
+                    min="1"
+                    max="365"
+                    step="1"
+                    inputmode="numeric"
+                    aria-describedby="cycle-aide"
+                    class="w-full bg-white border border-gris-lt focus:border-noir text-noir font-mono font-bold text-sm rounded-xl px-3 py-2 pr-14 outline-none transition-all shadow-2xs"
+                  />
+                  <span class="absolute right-3 top-2.5 text-[10px] font-bold text-gris">jours</span>
+                </div>
+                <button
+                  type="button"
+                  @click="enregistrerCycle"
+                  :disabled="!cycleValide || updateCycleMutation.isPending.value"
+                  class="bg-noir hover:bg-noir/85 text-white font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Loader2 v-if="updateCycleMutation.isPending.value" class="w-3.5 h-3.5 animate-spin" />
+                  <Save v-else class="w-3.5 h-3.5" />
+                  <span>Enregistrer</span>
+                </button>
+              </div>
+
+              <div class="flex flex-wrap gap-1.5" role="group" aria-label="Cycles courants">
+                <button
+                  v-for="c in CYCLES_COURANTS"
+                  :key="c.jours"
+                  type="button"
+                  @click="cycleSaisi = c.jours"
+                  :aria-pressed="cycleSaisi === c.jours"
+                  :class="[cycleSaisi === c.jours ? 'bg-noir text-white border-noir' : 'bg-white text-noir border-gris-lt hover:border-noir', 'px-2.5 py-1 rounded-lg border text-[10px] font-bold transition-all cursor-pointer']"
+                >
+                  {{ c.libelle }}
+                </button>
+              </div>
+
+              <p id="cycle-aide" class="text-[10px] opacity-80 leading-relaxed">
+                Délai entre la livraison et la relance du client, avec une alerte 5 jours avant au tableau de bord.
+                Les textes du site (« par mois ») ne changent pas.
+              </p>
+              <p v-if="!cycleValide && cycleSaisi !== null" class="text-[10px] font-bold text-red-600">
+                Un nombre entier de jours, entre 1 et 365.
+              </p>
+              <p v-if="cycleEnregistre" class="text-[10px] font-bold text-foret flex items-center gap-1">
+                <CheckCircle class="w-3 h-3" /> Cycle enregistré : relance {{ libelleCycle(data?.formule?.cycleJours) }}.
+              </p>
+              <p v-if="erreurCycle" class="text-[10px] font-bold text-red-600">{{ erreurCycle }}</p>
+            </template>
+
+            <template v-else>
+              <span class="text-[10px] font-bold uppercase block opacity-80">Cycle de relance</span>
+              <p class="text-[11px]">Relance {{ libelleCycle(data?.formule?.cycleJours) }}</p>
+            </template>
           </div>
 
           <div class="border-t border-black/10 pt-3 space-y-2 text-[11px]">

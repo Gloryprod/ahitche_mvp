@@ -72,7 +72,54 @@ async function updateFormulaPrice(req, res) {
   }
 }
 
+// Cycle de relance : jours entre la livraison et la relance du client (alerte à J-5 au tableau de bord).
+// Réglé par l'admin ; il ne change pas les textes du site (« par mois »), qui restent dans front/src/config/formules.ts.
+const CYCLE_MIN = 1;
+const CYCLE_MAX = 365;
+
+async function updateFormulaCycle(req, res) {
+  try {
+    const type = String(req.params.packType).toLowerCase();
+    if (!TYPES_PACK.includes(type)) {
+      return res.status(400).json({ success: false, message: 'Type de pack invalide.' });
+    }
+
+    const { cycleJours } = req.body;
+    if (!Number.isInteger(cycleJours) || cycleJours < CYCLE_MIN || cycleJours > CYCLE_MAX) {
+      return res.status(400).json({
+        success: false,
+        message: `Le cycle doit être un nombre entier de jours, entre ${CYCLE_MIN} et ${CYCLE_MAX}.`
+      });
+    }
+
+    const formule = await Formule.findOne({ slug: `ahi-${type}`, statut: 'actif' });
+    if (!formule) {
+      return res.status(404).json({ success: false, message: 'Formule introuvable' });
+    }
+
+    const avant = formule.cycleJours;
+    if (avant === cycleJours) {
+      return res.status(200).json({ success: true, message: 'Cycle de relance inchangé', data: formule });
+    }
+    formule.cycleJours = cycleJours;
+    await formule.save();
+
+    // Journal des modifications : qui a changé le cycle, et quand
+    await journaliser(req, {
+      action: 'Modification', entite: 'Formule', entiteId: formule._id,
+      resume: `Cycle de relance de ${formule.nom} : ${avant} -> ${cycleJours} jours`,
+      avant: { cycleJours: avant }, apres: { cycleJours }
+    });
+
+    return res.status(200).json({ success: true, message: 'Cycle de relance mis à jour', data: formule });
+  } catch (error) {
+    console.error('Erreur updateFormulaCycle:', error);
+    return res.status(500).json({ success: false, message: 'Erreur serveur lors de la mise à jour du cycle.' });
+  }
+}
+
 module.exports = {
   getPackDetails,
-  updateFormulaPrice
+  updateFormulaPrice,
+  updateFormulaCycle
 };

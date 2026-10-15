@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { Search, Eye, X, Layers, AlertTriangle, CheckCircle2, Plus } from 'lucide-vue-next'
+import { Search, Eye, X, AlertTriangle, CheckCircle2, Plus } from 'lucide-vue-next'
 import api from '@/stores/api'
 import { useQuery, keepPreviousData } from '@tanstack/vue-query'
 
@@ -22,7 +22,6 @@ interface InventoryItem {
 // --- ÉTATS ---
 const search = ref('')
 const debouncedSearch = ref('')
-const notification = ref({ text: '', type: '' })
 
 // Gestion de l'affichage du volet de détails latéral
 const showDetailPanel = ref(false)

@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { Search, Plus, Edit2, Trash2, X, Phone, MessageCircle } from 'lucide-vue-next'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import type { Prestataire, TypePrestataire } from '@/type'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import { useAuthStore } from '@/stores/auth'
@@ -99,8 +100,8 @@ const handleSubmit = async () => {
     }
     queryClient.invalidateQueries({ queryKey: ['prestataires'] })
     closePanel()
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || 'Une erreur est survenue', 'error')
+  } catch (err) {
+    showNotification(messageErreur(err, 'Une erreur est survenue'), 'error')
   } finally {
     isSubmitting.value = false
   }
@@ -124,8 +125,8 @@ const supprimerPrestataire = async (prestataire: Prestataire) => {
     await api.delete(`/api/admin/prestataires/${prestataire._id}`)
     showNotification('Prestataire supprimé.', 'success')
     queryClient.invalidateQueries({ queryKey: ['prestataires'] })
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || 'Suppression impossible', 'error')
+  } catch (err) {
+    showNotification(messageErreur(err, 'Suppression impossible'), 'error')
   }
 }
 

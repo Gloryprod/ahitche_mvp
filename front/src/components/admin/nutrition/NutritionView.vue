@@ -3,6 +3,7 @@ import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { Scale, Search, MessageCircle, X, ShieldCheck } from 'lucide-vue-next'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
 
@@ -75,8 +76,8 @@ async function ajouterSuivi() {
     notifier(data.message, 'success')
     suivi.contenu = ''
     queryClient.invalidateQueries({ queryKey: ['nutrition'] })
-  } catch (err: any) {
-    notifier(err.response?.data?.message || 'Enregistrement impossible', 'error')
+  } catch (err) {
+    notifier(messageErreur(err, 'Enregistrement impossible'), 'error')
   } finally {
     envoi.value = false
   }

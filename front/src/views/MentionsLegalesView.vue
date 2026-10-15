@@ -37,11 +37,13 @@ import { lienWhatsApp, WHATSAPP_AFFICHAGE, RESEAUX_SOCIAUX } from '@/config/cont
           Ahitché collecte les seules données nécessaires à votre service : nom, adresse e-mail, téléphone, quartier et
           adresse de livraison, ainsi que l'historique de vos commandes. Elles servent à préparer et livrer vos commandes,
           à vous recontacter pour leur renouvellement et à assurer votre suivi alimentaire. Elles ne sont ni vendues ni cédées.
+          Si vous donnez votre avis depuis votre espace client, le prénom et le quartier que vous indiquez, votre note et votre
+          texte sont publiés sur le site avec votre accord, après validation par notre équipe.
         </p>
         <p class="mt-2">
           Conformément à la loi n° 2017-20 du 20 avril 2018 portant Code du numérique en République du Bénin, vous pouvez
           demander l'accès à vos données, leur rectification ou leur suppression en nous écrivant sur WhatsApp.
-          Les informations de votre suivi alimentaire se suppriment aussi directement depuis votre espace client.
+          Les informations de votre suivi alimentaire et votre avis se suppriment aussi directement depuis votre espace client.
           Vous pouvez saisir l'Autorité de Protection des Données à caractère Personnel (APDP) en cas de difficulté.
         </p>
       </section>
@@ -51,6 +53,11 @@ import { lienWhatsApp, WHATSAPP_AFFICHAGE, RESEAUX_SOCIAUX } from '@/config/cont
         <p>
           Le site n'utilise qu'un cookie technique, déposé lorsque vous vous connectez à votre espace : il maintient votre
           session et disparaît à la déconnexion ou à son expiration. Aucun cookie publicitaire ni de mesure d'audience n'est utilisé.
+        </p>
+        <p class="mt-2">
+          Mesure d'audience : pour améliorer le site, nous comptons chaque jour le nombre de pages vues et de clics vers
+          WhatsApp, avec la section d'où vient le clic. Ces totaux ne contiennent ni cookie, ni identifiant, ni adresse IP :
+          ils ne permettent pas de reconnaître un visiteur.
         </p>
       </section>
 

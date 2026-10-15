@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useQuery, keepPreviousData, useQueries } from '@tanstack/vue-query'
+import axios from 'axios'
 import api from '@/stores/api'
 import { classeStatut } from '@/config/commandes'
 import { useAuthStore } from '@/stores/auth'
 import { peutLire, peutEcrire } from '@/config/roles'
+import { FORMULES } from '@/config/formules'
 import { useTauxChange } from '@/composables/useTauxChange'
 import { useToast } from 'vue-toastification'
-import type { Commande } from '@/type'
+import type { Commande, ProductItem } from '@/type'
 import { 
   AlertTriangle, 
   Bell, 
@@ -46,7 +48,7 @@ const fetchDashboardOrders = async (): Promise<PaginatedCommandesResponse> => {
   }
 }
 
-const { data: ordersData, isLoading: isLoadingOrders, isError: isErrorOrders, refetch: refetchOrders } = useQuery<PaginatedCommandesResponse>({
+const { data: ordersData, isLoading: isLoadingOrders, refetch: refetchOrders } = useQuery<PaginatedCommandesResponse>({
   queryKey: ['dashboard-orders'],
   queryFn: fetchDashboardOrders,
   placeholderData: keepPreviousData,
@@ -100,15 +102,16 @@ const changerTaux = async () => {
   try {
     const message = await modifierTaux(tauxData.value.courant, tauxData.value.convention)
     if (message) toast.success(message)
-  } catch (err: any) {
-    toast.error(err.response?.data?.message || 'Modification du taux impossible')
+  } catch (err) {
+    const message = axios.isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined
+    toast.error(message || 'Modification du taux impossible')
   }
 }
 
 // --- 4. GESTION DES RENOUVELLEMENTS ---
-// Relance si le client ne se manifeste pas : 14 jours après la livraison (Essentiel, Fraîcheur) ou 30 jours
-// (autres packs), selon le cycle enregistré sur la formule ; alerte à J-5.
-const CYCLES_PAR_DEFAUT: Record<string, number> = { 'ahi-essentiel': 14, 'ahi-fraicheur': 14 }
+// Relance si le client ne se manifeste pas : à la fin du cycle enregistré sur la formule (réglable dans l'écran
+// Formules) ; alerte à J-5. Sans valeur chargée : 30 jours (packs mensuels), 7 pour Fraîcheur.
+const CYCLES_PAR_DEFAUT: Record<string, number> = { 'ahi-fraicheur': 7 }
 const cycleJours = (formuleSlug: string): number => {
   const index = PACKS_CONFIG.findIndex(pack => `ahi-${pack.key}` === formuleSlug)
   return formulaQueries.value[index]?.data?.formule?.cycleJours ?? CYCLES_PAR_DEFAUT[formuleSlug] ?? 30
@@ -165,6 +168,26 @@ const { data: parametres } = useQuery({
 })
 // Chiffre d'affaires et marges : pas pour les gestionnaires (D-17), mêmes droits que les simulateurs
 const voirMarges = computed(() => peutLire(authStore.role.value, 'simulateurs'))
+
+// Fréquentation du site (mesure d'audience sans cookie) : 30 derniers jours
+interface Frequentation {
+  visites: number
+  clicsWhatsApp: number
+  tauxClic: number | null
+  origines: { detail: string; nombre: number }[]
+  pages: { detail: string; nombre: number }[]
+}
+const { data: frequentation } = useQuery({
+  queryKey: ['frequentation', 30],
+  queryFn: async () => (await api.get('/api/admin/mesures', { params: { jours: 30 } })).data as Frequentation,
+  enabled: computed(() => peutLire(authStore.role.value, 'mesures')),
+})
+// « accueil:formule-ahi-equilibre » -> « Accueil · carte AHI ÉQUILIBRÉ » ; « accueil:hero » -> « Accueil · hero »
+const libelleOrigine = (detail: string) => {
+  const [page, origine = ''] = detail.split(':')
+  const formule = FORMULES.find(f => origine === `formule-${f.slug}`)
+  return `${page === 'accueil' ? 'Accueil' : page} · ${formule ? `carte ${formule.nom}` : origine.replace(/-/g, ' ')}`
+}
 const targetClients = computed(() => parametres.value?.objectifClients ?? null)
 
 const estimatedRevenue = computed(() => {
@@ -254,7 +277,7 @@ const grossMargins = computed(() => {
 
     // Calcul du coût réel de la dotation (somme des sous-totaux des produits)
     const realCost = data?.items
-      ? data.items.reduce((sum: number, item: any) => sum + (Number(item.totalPrice) || 0), 0)
+      ? data.items.reduce((sum: number, item: ProductItem) => sum + (Number(item.totalPrice) || 0), 0)
       : 0
 
     // Marge brute = Prix de vente - Coût réel
@@ -422,6 +445,29 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                     <span class="w-16 text-right font-semibold text-gris">{{ form.count }} client(s)</span>
                 </div>
                 </div>
+            </div>
+
+            <!-- FRÉQUENTATION DU SITE -->
+            <div v-if="frequentation" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-4">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-2">
+                <h2 class="font-bold text-noir text-sm">Fréquentation du site</h2>
+                <span class="px-2 py-0.5 bg-gray-100 text-gris rounded-md text-[10px]">30 derniers jours, sans cookie</span>
+                </div>
+                <div class="grid grid-cols-3 gap-3 text-center">
+                <div><p class="text-xl font-bold text-noir tabular-nums">{{ frequentation.visites.toLocaleString('fr-FR') }}</p><p class="text-[10px] text-gris">pages vues</p></div>
+                <div><p class="text-xl font-bold text-foret tabular-nums">{{ frequentation.clicsWhatsApp.toLocaleString('fr-FR') }}</p><p class="text-[10px] text-gris">clics WhatsApp</p></div>
+                <div><p class="text-xl font-bold text-noir tabular-nums">{{ frequentation.tauxClic === null ? '—' : `${frequentation.tauxClic} %` }}</p><p class="text-[10px] text-gris">clics / pages vues</p></div>
+                </div>
+                <div v-if="frequentation.origines.length">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-gris mb-1.5">D'où viennent les clics WhatsApp</p>
+                <ul class="space-y-1">
+                    <li v-for="o in frequentation.origines" :key="o.detail" class="flex justify-between gap-3 text-xs">
+                    <span class="text-noir truncate">{{ libelleOrigine(o.detail) }}</span>
+                    <span class="font-semibold text-gris tabular-nums">{{ o.nombre }}</span>
+                    </li>
+                </ul>
+                </div>
+                <p v-else class="text-xs text-gris">Aucun clic vers WhatsApp mesuré sur la période.</p>
             </div>
 
             <!-- MARGE BRUTE -->

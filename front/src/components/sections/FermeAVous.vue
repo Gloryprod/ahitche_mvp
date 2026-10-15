@@ -10,7 +10,7 @@ const etapes = [
   { icone: 'recolte', titre: 'Récolte et tri', texte: 'Les produits frais sont choisis et triés pour ne garder que ce que nous servirions chez nous.', photo: PHOTOS.fermeRecolte },
   { icone: 'preparation', titre: 'Préparation', texte: 'Votre pack est composé selon la taille de votre foyer, vérifié puis emballé.', photo: PHOTOS.fermePreparation },
   { icone: 'livraison', titre: 'Livraison', texte: `${LIVRAISON_ANNONCE}, chez vous à Cotonou et Abomey-Calavi ; le livreur vous appelle avant d'arriver.`, photo: PHOTOS.fermeLivraison },
-  { icone: 'reception', titre: 'Réception', texte: 'Vous payez à la livraison, et nous suivons votre alimentation semaine après semaine.', photo: PHOTOS.fermeReception },
+  { icone: 'reception', titre: 'Réception', texte: 'Vous payez à la livraison, et nous suivons votre alimentation mois après mois.', photo: PHOTOS.fermeReception },
 ] as const
 </script>
 

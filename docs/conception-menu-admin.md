@@ -14,7 +14,7 @@ Ce document réunit les réponses du 2026-10-04 aux 41 questions de conception, 
 | AHI Fraîcheur | 14 jours après la livraison | J-5 |
 | AHI Équilibré, AHI Confort, AHI Réserve | 30 jours après la livraison | J-5, soit 25 jours après la livraison |
 
-Les cartes de formules affichent « par mois » (Essentiel, Équilibré, Confort). Le cycle de relance ci-dessus reste celui de 14 ou 30 jours. La relance sert à recontacter le client s'il ne se manifeste pas de lui-même. Elle remplace le calcul unique à +30 jours du tableau de bord actuel. Le cycle est porté par la formule (nouveau champ `cycleJours`), et non codé en dur.
+Les cartes de formules affichent « par mois » (Essentiel, Équilibré, Confort). La relance sert à recontacter le client s'il ne se manifeste pas de lui-même. Elle remplace le calcul unique à +30 jours du tableau de bord actuel. Le cycle est porté par la formule (champ `cycleJours`), et non codé en dur : 30 jours pour les packs mensuels, 7 pour Fraîcheur. **Depuis le 15/10/2026, l'admin le règle dans l'écran Formules** (1 à 365 jours, raccourcis 7, 14 et 30, modification journalisée) ; `createFormules.js` ne l'écrase plus.
 
 ### Paiement
 
@@ -162,10 +162,7 @@ Sources :
 
 ### 4.3 Cohérences à régler côté site
 
-- **Fait (commit dc1bcbf) :** les cartes d'Essentiel, Équilibré et Confort affichent « par mois ». Restent à trancher :
-  - l'Essentiel est relancé à 14 jours mais affiché « par mois » : est-ce voulu (un pack couvrant environ deux semaines, deux livraisons par mois) ?
-  - les chiffres « repas possibles » et « heures économisées » (par exemple 20–30 repas et 2–4 h pour l'Essentiel) étaient pensés pour une semaine : faut-il les recalculer pour un mois ?
-  - Fraîcheur affiche encore « Par semaine » et Réserve « Mensuel / Bi-mensuel ».
+- **Décidé le 15/10/2026 :** un pack Essentiel, Équilibré ou Confort couvre **un mois**. Les prix (10 800, 22 500 et 50 300 FCFA), les repas possibles et les heures économisées sont annoncés par mois, et la relance suit un cycle de 30 jours (`createFormules.js`). Les packs étaient déjà composés pour un mois : seuls les libellés « par semaine » du référentiel v4 (cible, accroche de l'Essentiel, logique de commande, cycle 7) étaient une erreur, corrigée dans le code et dans `04_formules.csv`. Les quantités par pack du catalogue ne changent pas. Reste à appliquer le référentiel en base (`createFormules.js`, recette puis production) et à régler le cycle à 30 jours dans l'écran Formules, le script ne touchant plus au cycle d'une formule existante. Fraîcheur reste « chaque semaine » (cycle 7) et Réserve « volume mensuel ou bimensuel ».
 - **Décidé :** les modes « Espèces » et « Acompte » sont conservés pour les cas particuliers (voir la section Paiement).
 - Le délai de la garantie est maintenant fixé (24 h après le créneau confirmé). Le texte du site (« livrée avec plus de 24h de retard ») peut le préciser.
 
@@ -181,7 +178,7 @@ Sources :
    - convertit « Livré » en « Livrée » et les commandes supprimées en « Annulée » ;
    - enregistre le taux USD/FCFA 571 ;
    - désigne l'admin principal (le plus ancien compte admin) s'il n'y en a pas : c'est le seul compte de l'équipe qui n'est pas déconnecté après 1 h d'inactivité. Pour en changer, passer `adminPrincipal` à `true` sur le nouveau compte et à `false` sur l'ancien, en base.
-3. **Référentiel des formules** : `node src/scripts/createFormules.js`. Il restaure les prix officiels, l'état « Bientôt » de Réserve et Fraîcheur, le cycle de relance (14 ou 30 jours) et l'affichage « par mois ».
+3. **Référentiel des formules** : `node src/scripts/createFormules.js`. Il restaure les prix officiels, l'état « Bientôt » de Réserve et Fraîcheur, l'affichage « par mois » ; il ne fixe le cycle de relance qu'à la création d'une formule (ensuite, écran Formules).
 4. **Comptes de l'équipe** : `STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <gestionnaire|comptable|nutritionniste|admin>`.
 5. **Front** : déployer après le back (le front envoie désormais `fournisseurId`, `zone`, etc.).
 6. **Saisies de départ** dans le back-office :

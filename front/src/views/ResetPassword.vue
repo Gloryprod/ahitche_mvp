@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { messageErreur } from '@/services/erreurs'
 import PanneauMarque from '@/components/ui/PanneauMarque.vue'
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -106,8 +107,8 @@ const handleResetPassword = async () => {
 
     toast.success(data.message || "Votre mot de passe a été modifié ! Connectez-vous.");
     router.push('/login');
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Lien expiré ou invalide.");
+  } catch (error) {
+    toast.error(messageErreur(error, "Lien expiré ou invalide."));
   } finally {
     isLoading.value = false;
   }

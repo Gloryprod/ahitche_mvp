@@ -111,6 +111,7 @@
 </template>
 
 <script setup lang="ts">
+import { messageErreur } from '@/services/erreurs'
 import PanneauMarque from '@/components/ui/PanneauMarque.vue'
 import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -132,7 +133,7 @@ const toast = useToast()
 // Page demandée avant la connexion (lien partagé, session expirée) : uniquement un chemin interne au site
 const pageDemandee = computed(() => {
   const cible = route.query.redirect
-  return typeof cible === 'string' && /^\/(?![\/\\])/.test(cible) && !cible.includes('://') ? cible : null
+  return typeof cible === 'string' && /^\/(?![/\\])/.test(cible) && !cible.includes('://') ? cible : null
 })
 const sessionExpiree = computed(() => route.query.session === 'expiree')
 const sessionInactivite = computed(() => route.query.session === 'inactivite')
@@ -149,8 +150,8 @@ const handleLogin = async () => {
     // (le routeur vérifie ensuite que le rôle donne bien accès à la page demandée).
     // « replace » : le bouton retour ne ramène pas sur le formulaire de connexion.
     router.replace(pageDemandee.value ?? espaceParDefaut(userRole))
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
+  } catch (error) {
+    toast.error(messageErreur(error, "Une erreur est survenue lors de la connexion."))
   } finally {
     isLoading.value = false
   }
@@ -164,8 +165,8 @@ const handleForgotPassword = async () => {
     toast.success(response.message);
     isForgotPassword.value = false;
     forgotEmail.value = '';
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Impossible de traiter la demande.")
+  } catch (error) {
+    toast.error(messageErreur(error, "Impossible de traiter la demande."))
   } finally {
     isLoading.value = false
   }

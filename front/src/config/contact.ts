@@ -23,6 +23,12 @@ export const RESEAUX_SOCIAUX = [
 ] as const
 
 export const HORAIRES = 'Lundi – Samedi, 9h00 – 18h00'
+// Les mêmes horaires pour Google (données structurées de l'accueil) : à changer avec HORAIRES
+export const HORAIRES_GOOGLE = {
+  jours: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  ouverture: '09:00',
+  fermeture: '18:00',
+}
 // Livraison à jour fixe (D-07) : les jours de tournée se fixent avec le livreur ; vide tant qu'ils ne sont pas confirmés
 export const JOURS_LIVRAISON = '' // Ex : « le mardi et le samedi »
 export const LIVRAISON_ANNONCE = JOURS_LIVRAISON ? `Livraison ${JOURS_LIVRAISON}` : 'Livraison à jour fixe'

@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { finDernierTableau } from './pdfTableau'
 
 // Export PDF des simulations (pas d'enregistrement des scénarios en v1 : le PDF en garde la trace)
 
@@ -50,7 +51,7 @@ export function genererSimulationPDF(titre: string, hypotheses: string[], sectio
       footStyles: { fillColor: [240, 235, 225], textColor: [26, 26, 26] },
       styles: { fontSize: 8 },
     })
-    y = (doc as any).lastAutoTable.finalY + 6
+    y = (finDernierTableau(doc) ?? 0) + 6
   }
 
   const nomFichier = titre.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-')

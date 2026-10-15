@@ -91,6 +91,7 @@
 </template>
 
 <script setup lang="ts">
+import { messageErreur } from '@/services/erreurs'
 import PanneauMarque from '@/components/ui/PanneauMarque.vue'
 import { ref, h, defineAsyncComponent } from 'vue';
 import axios from 'axios';
@@ -120,8 +121,8 @@ const handleRegister = async () => {
     toast.success(response.data.message || "Inscription réussie !")
     formRegister.value = { username: '', email: '', password: '', telephone:'' } // Reset
     router.push('/login') // Redirige vers la page de connexion
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Une erreur est survenue lors de l'inscription.")
+  } catch (error) {
+    toast.error(messageErreur(error, "Une erreur est survenue lors de l'inscription."))
   } finally {
     isLoading.value = false
   }

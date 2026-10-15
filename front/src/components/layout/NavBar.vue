@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { messageErreur } from '@/services/erreurs'
 import PanneauMarque from '@/components/ui/PanneauMarque.vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -76,8 +77,8 @@ const handleLogin = async () => {
     // Client -> son espace ; équipe -> la première section accessible avec son rôle
     closeLoginModal() // Rétablit le défilement avant de quitter la page
     router.push(espaceParDefaut(userRole))
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Une erreur est survenue lors de la connexion.")
+  } catch (error) {
+    toast.error(messageErreur(error, "Une erreur est survenue lors de la connexion."))
   } finally {
     isLoading.value = false
   }
@@ -91,8 +92,8 @@ const handleForgotPassword = async () => {
     toast.success(response.message);
     isForgotPassword.value = false;
     forgotEmail.value = '';
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Impossible de traiter la demande.")
+  } catch (error) {
+    toast.error(messageErreur(error, "Impossible de traiter la demande."))
   } finally {
     isLoading.value = false
   }

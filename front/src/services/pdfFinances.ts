@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { finDernierTableau } from './pdfTableau'
 import type { LigneBudget, SyntheseFinances } from '@/type'
 
 // Synthèse PDF pour l'audit Next Impact : exécution du budget par ligne et résultat d'exploitation
@@ -43,11 +44,11 @@ export function genererSynthesePDF(lignes: LigneBudget[], synthese: SyntheseFina
   doc.setFont('Helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(120, 120, 120)
-  doc.text("Engagé : dépenses payées et prévues. Justifié : dépenses payées dont toutes les pièces exigées sont jointes.", 14, (doc as any).lastAutoTable.finalY + 5)
+  doc.text("Engagé : dépenses payées et prévues. Justifié : dépenses payées dont toutes les pièces exigées sont jointes.", 14, (finDernierTableau(doc) ?? 0) + 5)
 
   // 2. Exploitation sur la période
   const e = synthese.exploitation
-  const y = (doc as any).lastAutoTable.finalY + 14
+  const y = (finDernierTableau(doc) ?? 0) + 14
   doc.setFont('Helvetica', 'bold')
   doc.setFontSize(11)
   doc.setTextColor(26, 26, 26)

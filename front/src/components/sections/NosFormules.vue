@@ -3,6 +3,7 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import api from '@/stores/api'
 import FormuleCard from '../ui/FormuleCard.vue'
 import ProduitsDeBase from './ProduitsDeBase.vue'
+import { vApparition } from '@/directives/apparition'
 import {
   FORMULES as formules, PRODUITS_INCLUS as produitsInclus,
   TAILLES_FOYER, formaterPrix, type TailleFoyer,
@@ -51,7 +52,7 @@ async function choisirFoyer(valeur: TailleFoyer) {
         </h2>
       </div>
 
-      <!-- Comparateur : taille du foyer → formule conseillée et prix par semaine -->
+      <!-- Comparateur : taille du foyer → formule conseillée et prix par mois -->
       <fieldset class="max-w-2xl mx-auto mb-10 text-center">
         <legend class="w-full text-base font-bold text-noir mb-4">Combien êtes-vous à la maison ?</legend>
         <div class="flex flex-wrap justify-center gap-2">
@@ -73,15 +74,17 @@ async function choisirFoyer(valeur: TailleFoyer) {
           <Transition name="fondu" mode="out-in">
             <span v-if="conseillee" :key="conseillee.nom">
               Pour {{ libelleFoyer }}, nous conseillons <strong class="text-foret">{{ conseillee.nom }}</strong> :
-              <strong class="text-foret whitespace-nowrap">{{ formaterPrix(conseillee.prix) }} FCFA par semaine</strong>.
+              <strong class="text-foret whitespace-nowrap">{{ formaterPrix(conseillee.prix) }} FCFA par mois</strong>.
             </span>
             <span v-else key="invite">Choisissez la taille de votre foyer : nous vous indiquons la formule adaptée.</span>
           </Transition>
         </p>
       </fieldset>
 
-      <!-- Mobile : cartes côte à côte, à faire glisser ; ordinateur : grille de trois colonnes -->
+      <!-- Mobile : cartes côte à côte, à faire glisser ; ordinateur : grille de trois colonnes.
+           La rangée apparaît d'un bloc (une carte à moitié visible sur mobile reste lisible), puis les jauges se remplissent. -->
       <div
+        v-apparition
         class="flex md:grid md:grid-cols-3 gap-4 md:gap-8 items-stretch overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-4 px-4 pt-6 pb-4 md:pb-0 mb-12 [scrollbar-width:none]"
         role="list"
         aria-label="Formules Ahitché"

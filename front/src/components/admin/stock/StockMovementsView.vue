@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch} from 'vue'
-import { ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, Layers } from 'lucide-vue-next'
+import { ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw } from 'lucide-vue-next'
 import api from '@/stores/api'
-import { useQuery, keepPreviousData } from '@tanstack/vue-query'
+import { useQuery, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import type { Product } from '@/type'
 
 // --- INTERFACES TYPES ---
@@ -46,8 +46,8 @@ const page = ref(1)
 const typeFiltre = ref('') // '', 'entree', 'sortie', 'correction_negative'
 
 // --- CHARGEMENT DES DONNÉES (TanStack Query v5) ---
-const fetchMouvements = async ({ queryKey }: { queryKey: any }): Promise<PaginatedMouvementsResponse> => {
-  const [_, currentPage, currentType] = queryKey
+const fetchMouvements = async ({ queryKey }: QueryFunctionContext): Promise<PaginatedMouvementsResponse> => {
+  const [, currentPage, currentType] = queryKey
   
   const response = await api.get('/api/admin/mouvements', {
     params: {

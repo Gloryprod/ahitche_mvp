@@ -43,7 +43,7 @@ const problemes = [
       <div class="bg-foret rounded-3xl p-6 md:p-8 text-white flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
         <p class="flex-1 text-base md:text-lg leading-relaxed">
           <strong class="font-bold">La réponse Ahitché :</strong>
-          nous sélectionnons les produits locaux et ajustons votre ravitaillement à votre foyer, semaine après semaine.
+          nous sélectionnons les produits locaux et ajustons votre ravitaillement à votre foyer, mois après mois.
         </p>
         <a href="#formules" class="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-full bg-or text-noir font-bold text-sm hover:bg-or-deep transition-colors shrink-0">
           Voir les formules

@@ -1,6 +1,7 @@
 // Témoignages affichés sur l'accueil. Uniquement des avis réels, dont le texte a été validé par la
 // personne (accord donné le 2026-10-04 pour David, Nadine et Boniface). Pas de photo : avatar à initiale.
 // `note` : nombre d'étoiles (sur 5) donné par le client.
+// Les avis publiés depuis les espaces clients (validés par l'admin, GET /api/public/avis) s'affichent avant ceux-ci.
 
 export interface Temoignage {
   prenom: string

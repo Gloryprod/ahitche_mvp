@@ -2,9 +2,10 @@
 import { ref, watch } from 'vue'
 import { Search, Plus, Edit2, Trash2, Eye, X, Video, FileText, Newspaper } from 'lucide-vue-next'
 import api from '@/stores/api'
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
+import { messageErreur } from '@/services/erreurs'
+import { useQuery, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
-import { UploadCloud, Loader2 } from 'lucide-vue-next'
+import { Loader2 } from 'lucide-vue-next'
 
 // --- INTERFACES ---
 export interface Post {
@@ -64,8 +65,8 @@ const isUploadingImage = ref(false)
 const isUploadingVideo = ref(false)
 
 // --- TANSTACK QUERY ---
-const fetchPosts = async ({ queryKey }: { queryKey: any }) => {
-  const [_, currentPage, currentSearch] = queryKey
+const fetchPosts = async ({ queryKey }: QueryFunctionContext) => {
+  const [, currentPage, currentSearch] = queryKey
   const response = await api.get('/api/admin/posts', {
     params: { page: currentPage, search: currentSearch, limit: 10 }
   })
@@ -141,7 +142,7 @@ const generateSlug = () => {
 }
 
 // Fonction d'upload générique ou dédiée
-const uploadFile = async (file: File, type: 'image' | 'video') => {
+const uploadFile = async (file: File) => {
   const formData = new FormData()
   formData.append('image', file)
 
@@ -159,10 +160,10 @@ const handleCoverImageUpload = async (event: Event) => {
 
   try {
     isUploadingImage.value = true
-    const uploadedUrl = await uploadFile(file, 'image')
+    const uploadedUrl = await uploadFile(file)
     form.value.coverImage = uploadedUrl
     showNotification("Image téléversée avec succès", "success")
-  } catch (err) {
+  } catch {
     showNotification("Échec du téléversement de l'image", "error")
   } finally {
     isUploadingImage.value = false
@@ -177,10 +178,10 @@ const handleVideoUpload = async (event: Event) => {
 
   try {
     isUploadingVideo.value = true
-    const uploadedUrl = await uploadFile(file, 'video')
+    const uploadedUrl = await uploadFile(file)
     form.value.videoUrl = uploadedUrl
     showNotification("Vidéo téléversée avec succès", "success")
-  } catch (err) {
+  } catch {
     showNotification("Échec du téléversement de la vidéo", "error")
   } finally {
     isUploadingVideo.value = false
@@ -196,14 +197,15 @@ const handleSubmit = async () => {
       showNotification("Contenu modifié avec succès !", "success")
     } else {
       // Exclure l'id vide pour la création
-      const { _id, ...createPayload } = form.value
+      const createPayload: Partial<typeof form.value> = { ...form.value }
+      delete createPayload._id
       await api.post('/api/admin/posts', createPayload)
       showNotification("Nouveau contenu créé !", "success")
     }
     queryClient.invalidateQueries({ queryKey: ['adminPosts'] })
     closePanels()
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || "Une erreur est survenue", "error")
+  } catch (err) {
+    showNotification(messageErreur(err, "Une erreur est survenue"), "error")
   } finally {
     isSubmitting.value = false
   }
@@ -228,7 +230,7 @@ const deletePost = async (id: string) => {
       showNotification("Contenu supprimé", "success")
       queryClient.invalidateQueries({ queryKey: ['adminPosts'] })
       if (selectedPost.value?._id === id) closePanels()
-    } catch (err) {
+    } catch {
       showNotification("Impossible de supprimer le contenu", "error")
     }
   }

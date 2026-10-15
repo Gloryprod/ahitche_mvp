@@ -1,14 +1,14 @@
 # Ahitché
 
-> Service d'approvisionnement et de livraison alimentaire à domicile à Cotonou et Abomey-Calavi (Bénin) : des packs de produits de base livrés chaque semaine, commandés par WhatsApp et payés à la livraison.
+> Service d'approvisionnement et de livraison alimentaire à domicile à Cotonou et Abomey-Calavi (Bénin) : des packs de produits de base pour le mois, commandés par WhatsApp et payés à la livraison.
 
 Informations publiques, reprises de l'accueil du site. Les prix et les conditions de l'accueil font foi.
 
-## Formules (prix par semaine)
+## Formules (prix par mois)
 
-- AHI Essentiel : 1 personne, 10 800 FCFA par semaine (sans huile de palme).
-- AHI Équilibré : couples et familles actives, 22 500 FCFA par semaine.
-- AHI Confort : familles établies, 50 300 FCFA par semaine.
+- AHI Essentiel : 1 personne, 10 800 FCFA par mois (sans huile de palme).
+- AHI Équilibré : couples et familles actives, 22 500 FCFA par mois.
+- AHI Confort : familles établies, 50 300 FCFA par mois.
 - AHI Réserve et AHI Fraîcheur : bientôt disponibles.
 
 Chaque pack contient 17 produits de base (riz local, haricots, pâtes, gari, huile, tomates, oignons…), en quantités adaptées à la formule.

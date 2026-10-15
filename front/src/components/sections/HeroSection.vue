@@ -35,7 +35,7 @@ const reassurances = [
 
         <p class="text-base sm:text-lg text-white/90 mb-8 md:max-w-xl">
           Pour une alimentation suivie et organisée sans stress&nbsp;: {{ PRODUITS_INCLUS.length }} produits de base
-          composés selon votre foyer, dès <strong class="text-or font-bold text-xl whitespace-nowrap">{{ formaterPrix(PRIX_D_APPEL) }} FCFA</strong> par semaine.
+          composés selon votre foyer, dès <strong class="text-or font-bold text-xl whitespace-nowrap">{{ formaterPrix(PRIX_D_APPEL) }} FCFA</strong> par mois.
         </p>
 
         <div class="flex flex-col sm:flex-row gap-3 justify-center md:justify-start mb-8">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { messageErreur } from '@/services/erreurs'
 import { ref, onMounted, computed, reactive } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useRouter } from 'vue-router';
@@ -12,6 +13,7 @@ import {
 import { genererRecuPDF } from '@/services/pdfRecuCommande';
 import { ANNULABLES_PAR_CLIENT, classeStatut, type StatutCommande } from '@/config/commandes';
 import SuiviAlimentaire from '@/components/client/SuiviAlimentaire.vue';
+import MonAvis from '@/components/client/MonAvis.vue';
 import { useDeconnexion } from '@/composables/useDeconnexion';
 import { lienWhatsApp } from '@/config/contact';
 
@@ -181,9 +183,9 @@ const sauvegarderInfos = async () => {
 
     estEnEdition.value = false; // On ferme le formulaire
     toast.success(response.data.message)
-  } catch (error: any) {
+  } catch (error) {
     console.error("Erreur lors de l'enregistrement des infos", error);
-    toast.error(error.response?.data?.message || "Impossible d'enregistrer vos informations de livraison.");
+    toast.error(messageErreur(error, "Impossible d'enregistrer vos informations de livraison."));
   } finally {
     enCoursDeSauvegarde.value = false;
   }
@@ -253,9 +255,9 @@ const lancerCommande = async () => {
     const { reference, total } = response.data.commande;
     toast.success(`Commande ${reference} enregistrée. Finalisez-la sur WhatsApp.`);
     lien = genererLienWhatsApp({ reference, total });
-  } catch (error: any) {
+  } catch (error) {
     // La commande reste possible sur WhatsApp, mais le client sait qu'elle n'est pas dans son historique
-    toast.error(error.response?.data?.message || "Votre commande n'a pas pu être enregistrée. Vous pouvez la finaliser directement sur WhatsApp.");
+    toast.error(messageErreur(error, "Votre commande n'a pas pu être enregistrée. Vous pouvez la finaliser directement sur WhatsApp."));
     lien = genererLienWhatsApp();
   } finally {
     commandeEnCours.value = false;
@@ -280,9 +282,9 @@ const annulerCommande = async (commande_id : string) => {
   try {
     const response = await api.delete(`/api/auth/delete/order/${commande_id}`);
     toast.success(response.data.message);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Impossible d'annuler la commande", error);
-    toast.error(error.response?.data?.message || "Impossible d'annuler la commande")
+    toast.error(messageErreur(error, "Impossible d'annuler la commande"))
   } finally {
     window.open(genererLienAnnulation(commande), '_blank');
     await fetchDashboardData();   
@@ -716,6 +718,9 @@ onMounted(async () => {
 
         </div>
       </div>
+
+      <!-- MON AVIS (publié sur l'accueil après validation de l'admin) -->
+      <MonAvis />
 
       <!-- SUIVI ALIMENTAIRE (questionnaire, conseils, menus) -->
       <SuiviAlimentaire />

@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { finDernierTableau } from './pdfTableau'
 
 interface PDFItem {
   productId?: { name: string; unit: string } | string
@@ -21,7 +22,7 @@ const formatPrixPDF = (valeur: number): string => {
   return valeur.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " FCFA"
 }
 
-export const générerBonCommandePDF = (bon: PurchaseOrderPDFData, catalogueProduits: any[] = []) => {
+export const générerBonCommandePDF = (bon: PurchaseOrderPDFData, catalogueProduits: { _id: string; name: string; unit?: string }[] = []) => {
   try {
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -143,7 +144,7 @@ export const générerBonCommandePDF = (bon: PurchaseOrderPDFData, catalogueProd
     })
 
     // --- TOTALISATION FINANCIÈRE ---
-    const finalY = (doc as any).lastAutoTable?.finalY || 110
+    const finalY = finDernierTableau(doc) || 110
     const finTableauY = finalY + 12
 
     doc.setFont('Helvetica', 'bold')
