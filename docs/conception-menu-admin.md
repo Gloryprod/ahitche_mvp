@@ -162,10 +162,10 @@ Sources :
 
 ### 4.3 Cohérences à régler côté site
 
-- **Fait (commit dc1bcbf) :** les cartes d'Essentiel, Équilibré et Confort affichent « par mois ». Restent à trancher :
-  - l'Essentiel est relancé à 14 jours mais affiché « par mois » : est-ce voulu (un pack couvrant environ deux semaines, deux livraisons par mois) ?
-  - les chiffres « repas possibles » et « heures économisées » (par exemple 20–30 repas et 2–4 h pour l'Essentiel) étaient pensés pour une semaine : faut-il les recalculer pour un mois ?
-  - Fraîcheur affiche encore « Par semaine » et Réserve « Mensuel / Bi-mensuel ».
+- **Décidé le 15/10/2026 :** un pack Essentiel, Équilibré ou Confort couvre **un mois**. Les prix (10 800, 22 500 et 50 300 FCFA), les repas possibles et les heures économisées sont annoncés par mois, et la relance suit un cycle de 30 jours (`createFormules.js`). Ce choix remplace les packs hebdomadaires du référentiel v4 et l'ancien affichage du commit dc1bcbf. Restent à faire côté données :
+  - les quantités par pack du catalogue (et donc la « valeur estimée » barrée, la composition et le stock) sont encore dimensionnées pour une semaine, comme la « logique de commande » des formules : elles sont à mettre à jour par l'admin pour un mois ;
+  - le fichier d'import `04_formules.csv` doit porter les mêmes valeurs (cible « par mois », cycle 30), sinon un nouvel import remettrait la semaine ;
+  - Fraîcheur reste « chaque semaine » (cycle 7) et Réserve « volume mensuel ou bimensuel ».
 - **Décidé :** les modes « Espèces » et « Acompte » sont conservés pour les cas particuliers (voir la section Paiement).
 - Le délai de la garantie est maintenant fixé (24 h après le créneau confirmé). Le texte du site (« livrée avec plus de 24h de retard ») peut le préciser.
 
@@ -181,7 +181,7 @@ Sources :
    - convertit « Livré » en « Livrée » et les commandes supprimées en « Annulée » ;
    - enregistre le taux USD/FCFA 571 ;
    - désigne l'admin principal (le plus ancien compte admin) s'il n'y en a pas : c'est le seul compte de l'équipe qui n'est pas déconnecté après 1 h d'inactivité. Pour en changer, passer `adminPrincipal` à `true` sur le nouveau compte et à `false` sur l'ancien, en base.
-3. **Référentiel des formules** : `node src/scripts/createFormules.js`. Il restaure les prix officiels, l'état « Bientôt » de Réserve et Fraîcheur, le cycle de relance (14 ou 30 jours) et l'affichage « par mois ».
+3. **Référentiel des formules** : `node src/scripts/createFormules.js`. Il restaure les prix officiels, l'état « Bientôt » de Réserve et Fraîcheur, le cycle de relance (30 jours pour les packs mensuels, 7 pour Fraîcheur) et l'affichage « par mois ».
 4. **Comptes de l'équipe** : `STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <gestionnaire|comptable|nutritionniste|admin>`.
 5. **Front** : déployer après le back (le front envoie désormais `fournisseurId`, `zone`, etc.).
 6. **Saisies de départ** dans le back-office :

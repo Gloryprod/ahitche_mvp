@@ -61,7 +61,7 @@ const enAvant = computed(() => props.conseillee || (props.formule.recommandee &&
       <div class="mb-6">
         <span v-if="prixBarre" class="block text-sm text-gris">valeur estimée <s class="whitespace-nowrap">{{ formaterPrix(prixBarre) }} FCFA</s></span>
         <span class="text-3xl font-bold text-foret font-body">{{ formaterPrix(formule.prix) }} <small class="text-sm font-semibold">FCFA</small></span>
-        <span class="block text-sm text-gris mt-1">par semaine</span>
+        <span class="block text-sm text-gris mt-1">par mois</span>
       </div>
       <BaseButton
         :href="lienWhatsApp"

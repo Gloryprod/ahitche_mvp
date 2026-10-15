@@ -69,7 +69,7 @@ export function ajouterDonneesStructurees(id: string, donnees: object): () => vo
   return () => script.remove()
 }
 
-// Commerce local (Cotonou et Abomey-Calavi) et formules hebdomadaires avec leur prix. Aucune adresse postale :
+// Commerce local (Cotonou et Abomey-Calavi) et formules mensuelles avec leur prix. Aucune adresse postale :
 // elle n'est pas publiée, rien n'est inventé.
 export function donneesCommerce() {
   return {
@@ -80,7 +80,7 @@ export function donneesCommerce() {
     url: `${SITE}/`,
     logo: `${SITE}/logo-ahitche-512.webp`,
     image: `${SITE}/og-image.jpeg`,
-    description: 'Ravitaillement alimentaire régulier livré à domicile à Cotonou et Abomey-Calavi : formules hebdomadaires de produits de base, paiement à la livraison.',
+    description: 'Ravitaillement alimentaire régulier livré à domicile à Cotonou et Abomey-Calavi : formules mensuelles de produits de base, paiement à la livraison.',
     telephone: `+${WHATSAPP_NUMERO}`,
     areaServed: [
       { '@type': 'City', name: 'Cotonou' },
@@ -97,7 +97,7 @@ export function donneesCommerce() {
     sameAs: RESEAUX_SOCIAUX.map(r => r.url),
     hasOfferCatalog: {
       '@type': 'OfferCatalog',
-      name: 'Formules hebdomadaires',
+      name: 'Formules mensuelles',
       itemListElement: FORMULES.map(f => ({
         '@type': 'Offer',
         name: f.nom,

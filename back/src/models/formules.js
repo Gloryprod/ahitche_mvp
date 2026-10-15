@@ -7,7 +7,7 @@ const formuleSchema = new mongoose.Schema({
   slug: { type: String, required: true, unique: true, trim: true },
   nom: { type: String, required: true, trim: true },
   emoji: { type: String, default: '🌾' },
-  cible: { type: String, required: true }, // Ex : "1 personne · par semaine"
+  cible: { type: String, required: true }, // Ex : "1 personne · par mois"
   phraseAccroche: { type: String, default: '' }, // Vide : à valider (D-05)
   promesse: { type: String, default: '' },
   foyersCibles: { type: String, default: '' },
@@ -15,7 +15,7 @@ const formuleSchema = new mongoose.Schema({
   // Limites de personnalisation par pack (Architecture des offres) ; vide = non fixé
   changementsMax: { type: Number, min: 0, default: null },
   variationQuantitePct: { type: Number, min: 0, default: null },
-  // Repas possibles et heures gagnées, par semaine (étude marketing) ; vide pour Réserve et Fraîcheur
+  // Repas possibles et heures gagnées, par mois (étude marketing) ; vide pour Réserve et Fraîcheur
   estimationRepas: {
     min: { type: Number, default: null },
     max: { type: Number, default: null }
@@ -29,7 +29,7 @@ const formuleSchema = new mongoose.Schema({
   prixCommercial: { type: Number, min: 0, required: false }, // Prix fixé par l'admin (journalisé)
   estRecommandee: { type: Boolean, default: false },
   statut: { type: String, enum: ['actif', 'inactif'], default: 'actif' },
-  // Cycle du pack en jours : 7 (hebdomadaire) ou 30 (Réserve) ; relance du client à l'échéance (alerte à J-5)
+  // Cycle du pack en jours : 30 (Essentiel, Équilibré, Confort, Réserve) ou 7 (Fraîcheur) ; relance du client à l'échéance (alerte à J-5)
   cycleJours: { type: Number, default: 7, min: 1 },
   // Formule annoncée mais pas encore ouverte : visible côté client, non commandable
   bientotDisponible: { type: Boolean, default: false },
