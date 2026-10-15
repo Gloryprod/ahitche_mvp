@@ -11,7 +11,7 @@ const formuleSchema = new mongoose.Schema({
   phraseAccroche: { type: String, default: '' }, // Vide : à valider (D-05)
   promesse: { type: String, default: '' },
   foyersCibles: { type: String, default: '' },
-  logiqueCommande: { type: String, default: '' }, // Ex : "Quantités pour 1 personne et 1 semaine"
+  logiqueCommande: { type: String, default: '' }, // Ex : "Quantités pour 1 personne et 1 mois"
   // Limites de personnalisation par pack (Architecture des offres) ; vide = non fixé
   changementsMax: { type: Number, min: 0, default: null },
   variationQuantitePct: { type: Number, min: 0, default: null },

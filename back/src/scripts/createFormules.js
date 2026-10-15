@@ -18,7 +18,7 @@ const formulesData = [
     phraseAccroche: 'Les bases de votre mois déjà organisées.',
     promesse: 'Assurez vos repas essentiels sans stress ni déplacements inutiles.',
     foyersCibles: 'Étudiants, jeunes couples, petits foyers urbains, jeunes actifs',
-    logiqueCommande: 'Quantités pour 1 personne et 1 semaine',
+    logiqueCommande: 'Quantités pour 1 personne et 1 mois',
     changementsMax: 2, variationQuantitePct: 50,
     estimationRepas: { min: 20, max: 30 }, heuresEconomisees: { min: 2, max: 4 },
     prixActuel: 10800, cycleJours: 30, estRecommandee: false, bientotDisponible: false
@@ -29,7 +29,7 @@ const formulesData = [
     phraseAccroche: 'Mieux manger sans compliquer votre quotidien.',
     promesse: 'Une alimentation plus variée et mieux organisée pour les foyers actifs.',
     foyersCibles: 'Couples actifs, familles urbaines, professionnels occupés',
-    logiqueCommande: "Quantités d'Essentiel × multiplicateurs, par semaine",
+    logiqueCommande: "Quantités d'Essentiel × multiplicateurs, par mois",
     changementsMax: 4, variationQuantitePct: 75,
     estimationRepas: { min: 35, max: 50 }, heuresEconomisees: { min: 4, max: 6 },
     prixActuel: 22500, cycleJours: 30, estRecommandee: true, bientotDisponible: false
@@ -40,7 +40,7 @@ const formulesData = [
     phraseAccroche: 'Votre cuisine organisée sans stress.',
     promesse: 'Une expérience de ravitaillement complète pensée pour votre confort.',
     foyersCibles: 'Familles établies, professionnels très occupés, clients premium',
-    logiqueCommande: "Quantités d'Essentiel × multiplicateurs, par semaine ; personnalisation élevée",
+    logiqueCommande: "Quantités d'Essentiel × multiplicateurs, par mois ; personnalisation élevée",
     changementsMax: null, variationQuantitePct: null,
     estimationRepas: { min: 60, max: 90 }, heuresEconomisees: { min: 6, max: 10 },
     prixActuel: 50300, cycleJours: 30, estRecommandee: false, bientotDisponible: false

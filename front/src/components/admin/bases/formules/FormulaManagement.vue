@@ -85,7 +85,7 @@ const getPackColorClass = (pack: string) => {
 const getPeriodText = computed(() => {
   const f = data.value?.formule
   if (!f) return ''
-  const cycle = f.cycleJours === 7 ? 'chaque semaine' : `tous les ${f.cycleJours} jours`
+  const cycle = f.cycleJours === 30 ? 'chaque mois' : f.cycleJours === 7 ? 'chaque semaine' : `tous les ${f.cycleJours} jours`
   return `${f.logiqueCommande || 'à renseigner'} · cycle : ${cycle}`
 })
 </script>
@@ -96,7 +96,7 @@ const getPeriodText = computed(() => {
     <div class="bg-white p-4 rounded-2xl flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <div>
         <h1 class="font-display font-bold text-xl text-noir">Formules & Packs</h1>
-        <p class="text-gris text-[11px] mt-0.5">Vue d'ensemble et simulation des dots hebdomadaires et commandes libres</p>
+        <p class="text-gris text-[11px] mt-0.5">Vue d'ensemble et simulation des dots mensuelles et commandes libres</p>
       </div>
       
       <!-- Sélecteur d'onglets -->

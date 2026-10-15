@@ -162,10 +162,7 @@ Sources :
 
 ### 4.3 Cohérences à régler côté site
 
-- **Décidé le 15/10/2026 :** un pack Essentiel, Équilibré ou Confort couvre **un mois**. Les prix (10 800, 22 500 et 50 300 FCFA), les repas possibles et les heures économisées sont annoncés par mois, et la relance suit un cycle de 30 jours (`createFormules.js`). Ce choix remplace les packs hebdomadaires du référentiel v4 et l'ancien affichage du commit dc1bcbf. Restent à faire côté données :
-  - les quantités par pack du catalogue (et donc la « valeur estimée » barrée, la composition et le stock) sont encore dimensionnées pour une semaine, comme la « logique de commande » des formules : elles sont à mettre à jour par l'admin pour un mois ;
-  - le fichier d'import `04_formules.csv` doit porter les mêmes valeurs (cible « par mois », cycle 30), sinon un nouvel import remettrait la semaine ;
-  - Fraîcheur reste « chaque semaine » (cycle 7) et Réserve « volume mensuel ou bimensuel ».
+- **Décidé le 15/10/2026 :** un pack Essentiel, Équilibré ou Confort couvre **un mois**. Les prix (10 800, 22 500 et 50 300 FCFA), les repas possibles et les heures économisées sont annoncés par mois, et la relance suit un cycle de 30 jours (`createFormules.js`). Les packs étaient déjà composés pour un mois : seuls les libellés « par semaine » du référentiel v4 (cible, accroche de l'Essentiel, logique de commande, cycle 7) étaient une erreur, corrigée dans le code et dans `04_formules.csv`. Les quantités par pack du catalogue ne changent pas. Reste à appliquer le référentiel en base (`createFormules.js`, recette puis production). Fraîcheur reste « chaque semaine » (cycle 7) et Réserve « volume mensuel ou bimensuel ».
 - **Décidé :** les modes « Espèces » et « Acompte » sont conservés pour les cas particuliers (voir la section Paiement).
 - Le délai de la garantie est maintenant fixé (24 h après le créneau confirmé). Le texte du site (« livrée avec plus de 24h de retard ») peut le préciser.
 
