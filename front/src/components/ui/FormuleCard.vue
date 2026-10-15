@@ -24,7 +24,7 @@ const prixBarre = computed(() => (props.valeurEstimee && props.valeurEstimee > p
 const enAvant = computed(() => props.conseillee || (props.formule.recommandee && !props.autreConseillee))
 
 // Couleurs de chaque pack (classes écrites en entier pour que Tailwind les génère).
-// Contrastes du texte ≥ 4,5 : 1 : savane sur fond clair, blanc sur forêt et sur terre cuite, terre cuite sur blanc.
+// Contrastes du texte ≥ 4,5 : 1 : savane sur fond clair, blanc sur forêt, or et blanc sur marine, marine sur blanc.
 const THEMES: Record<TeinteFormule, {
   bandeau: string; pastille: string; titre: string; cible: string
   accent: string; bordure: string; lisere: boolean
@@ -37,9 +37,9 @@ const THEMES: Record<TeinteFormule, {
     bandeau: 'bg-foret', pastille: 'bg-creme shadow-sm', titre: 'text-white', cible: 'text-white/80',
     accent: 'text-foret', bordure: 'border-foret/25', lisere: false,
   },
-  terre: {
-    bandeau: 'bg-terre', pastille: 'bg-white/15 ring-1 ring-or/60', titre: 'text-white', cible: 'text-white/85',
-    accent: 'text-terre', bordure: 'border-terre/30', lisere: true,
+  marine: {
+    bandeau: 'bg-marine', pastille: 'bg-white/10 ring-1 ring-or/60', titre: 'text-or', cible: 'text-white/80',
+    accent: 'text-marine', bordure: 'border-marine/30', lisere: true,
   },
 }
 const theme = computed(() => THEMES[props.formule.teinte])

@@ -7,7 +7,7 @@
 - Tout le site et tous les messages destinés aux utilisateurs sont en **français**.
 - Respecter la charte graphique (couleurs, typo, logo). Les tokens se trouvent dans `front/src/assets/main.css` (`@theme`) :
   - Couleurs : `foret #1A5C38`, `savane #2E7D4F`, `or #F2B705`, `or-deep #D4A003`, `creme #F8F5EF`, `creme2 #F0EBE1`, `noir #111111`, `gris #4A5568`, `gris-lt #9AA5B4`.
-  - Hors charte, choisies par le porteur pour les cartes des formules : `terre #8F3B1B` (en-tête d'AHI Confort) et `COULEURS_NIVEAU` (jauge « niveau de confort », `config/formules.ts`).
+  - Hors charte, choisies par le porteur pour les cartes des formules : `marine #1C2E4A` (en-tête d'AHI Confort) et `COULEURS_NIVEAU` (jauge « niveau de confort », `config/formules.ts`).
   - Polices : `font-display` = Fraunces (titres), `font-body` = Plus Jakarta Sans (texte).
   - Utiliser ces classes Tailwind (`bg-foret`, `text-or`…) plutôt que `gray-*`, `emerald-*` ou des hex en dur.
 
