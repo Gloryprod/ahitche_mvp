@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useQuery, keepPreviousData, useQueries } from '@tanstack/vue-query'
+import axios from 'axios'
 import api from '@/stores/api'
 import { classeStatut } from '@/config/commandes'
 import { useAuthStore } from '@/stores/auth'
@@ -8,7 +9,7 @@ import { peutLire, peutEcrire } from '@/config/roles'
 import { FORMULES } from '@/config/formules'
 import { useTauxChange } from '@/composables/useTauxChange'
 import { useToast } from 'vue-toastification'
-import type { Commande } from '@/type'
+import type { Commande, ProductItem } from '@/type'
 import { 
   AlertTriangle, 
   Bell, 
@@ -47,7 +48,7 @@ const fetchDashboardOrders = async (): Promise<PaginatedCommandesResponse> => {
   }
 }
 
-const { data: ordersData, isLoading: isLoadingOrders, isError: isErrorOrders, refetch: refetchOrders } = useQuery<PaginatedCommandesResponse>({
+const { data: ordersData, isLoading: isLoadingOrders, refetch: refetchOrders } = useQuery<PaginatedCommandesResponse>({
   queryKey: ['dashboard-orders'],
   queryFn: fetchDashboardOrders,
   placeholderData: keepPreviousData,
@@ -101,8 +102,9 @@ const changerTaux = async () => {
   try {
     const message = await modifierTaux(tauxData.value.courant, tauxData.value.convention)
     if (message) toast.success(message)
-  } catch (err: any) {
-    toast.error(err.response?.data?.message || 'Modification du taux impossible')
+  } catch (err) {
+    const message = axios.isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined
+    toast.error(message || 'Modification du taux impossible')
   }
 }
 
@@ -275,7 +277,7 @@ const grossMargins = computed(() => {
 
     // Calcul du coût réel de la dotation (somme des sous-totaux des produits)
     const realCost = data?.items
-      ? data.items.reduce((sum: number, item: any) => sum + (Number(item.totalPrice) || 0), 0)
+      ? data.items.reduce((sum: number, item: ProductItem) => sum + (Number(item.totalPrice) || 0), 0)
       : 0
 
     // Marge brute = Prix de vente - Coût réel

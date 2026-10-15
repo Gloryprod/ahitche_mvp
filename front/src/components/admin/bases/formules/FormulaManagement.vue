@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useMutation, useQueryClient, type QueryFunctionContext } from '@tanstack/vue-query'
 import api from '@/stores/api'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
@@ -25,8 +25,8 @@ const customPrice = ref<number | null>(null)
 const saveSuccess = ref(false)
 
 // --- TANSTACK QUERY (GET) ---
-const fetchPackDetails = async ({ queryKey }: { queryKey: any }): Promise<PackDetailsResponse> => {
-  const [_, packType] = queryKey
+const fetchPackDetails = async ({ queryKey }: QueryFunctionContext): Promise<PackDetailsResponse> => {
+  const packType = String(queryKey[1]) // queryKey : ['packDetails', type de pack]
   const response = await api.get(`/api/admin/formulas/${packType}`)
   return response.data
 }
