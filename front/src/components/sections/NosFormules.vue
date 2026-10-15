@@ -3,6 +3,7 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import api from '@/stores/api'
 import FormuleCard from '../ui/FormuleCard.vue'
 import ProduitsDeBase from './ProduitsDeBase.vue'
+import { vApparition } from '@/directives/apparition'
 import {
   FORMULES as formules, PRODUITS_INCLUS as produitsInclus,
   TAILLES_FOYER, formaterPrix, type TailleFoyer,
@@ -80,8 +81,10 @@ async function choisirFoyer(valeur: TailleFoyer) {
         </p>
       </fieldset>
 
-      <!-- Mobile : cartes côte à côte, à faire glisser ; ordinateur : grille de trois colonnes -->
+      <!-- Mobile : cartes côte à côte, à faire glisser ; ordinateur : grille de trois colonnes.
+           La rangée apparaît d'un bloc (une carte à moitié visible sur mobile reste lisible), puis les jauges se remplissent. -->
       <div
+        v-apparition
         class="flex md:grid md:grid-cols-3 gap-4 md:gap-8 items-stretch overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-4 px-4 pt-6 pb-4 md:pb-0 mb-12 [scrollbar-width:none]"
         role="list"
         aria-label="Formules Ahitché"
