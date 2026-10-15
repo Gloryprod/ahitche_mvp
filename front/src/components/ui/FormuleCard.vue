@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import BaseButton from './BaseButton.vue'
 import { lienWhatsApp as lienWa } from '@/config/contact'
-import { formaterPrix, type FormuleVitrine, type TeinteFormule } from '@/config/formules'
+import { formaterPrix, COULEURS_NIVEAU, type FormuleVitrine, type TeinteFormule } from '@/config/formules'
 
 const props = defineProps<{
   formule: FormuleVitrine
@@ -24,22 +24,22 @@ const prixBarre = computed(() => (props.valeurEstimee && props.valeurEstimee > p
 const enAvant = computed(() => props.conseillee || (props.formule.recommandee && !props.autreConseillee))
 
 // Couleurs de chaque pack (classes écrites en entier pour que Tailwind les génère).
-// Contrastes du texte ≥ 4,5 : 1 : savane sur fond clair, blanc sur forêt, or et blanc sur noir.
+// Contrastes du texte ≥ 4,5 : 1 : savane sur fond clair, blanc sur forêt et sur terre cuite, terre cuite sur blanc.
 const THEMES: Record<TeinteFormule, {
   bandeau: string; pastille: string; titre: string; cible: string
-  accent: string; bordure: string; niveauPlein: string; niveauVide: string; lisere: boolean
+  accent: string; bordure: string; lisere: boolean
 }> = {
   savane: {
     bandeau: 'bg-savane/10', pastille: 'bg-white shadow-sm', titre: 'text-savane', cible: 'text-gris',
-    accent: 'text-savane', bordure: 'border-savane/25', niveauPlein: 'bg-savane', niveauVide: 'bg-savane/20', lisere: false,
+    accent: 'text-savane', bordure: 'border-savane/25', lisere: false,
   },
   foret: {
     bandeau: 'bg-foret', pastille: 'bg-creme shadow-sm', titre: 'text-white', cible: 'text-white/80',
-    accent: 'text-foret', bordure: 'border-foret/25', niveauPlein: 'bg-or', niveauVide: 'bg-white/25', lisere: false,
+    accent: 'text-foret', bordure: 'border-foret/25', lisere: false,
   },
-  or: {
-    bandeau: 'bg-noir', pastille: 'bg-or/15 ring-1 ring-or/50', titre: 'text-or', cible: 'text-white/75',
-    accent: 'text-noir', bordure: 'border-or/40', niveauPlein: 'bg-or', niveauVide: 'bg-white/20', lisere: true,
+  terre: {
+    bandeau: 'bg-terre', pastille: 'bg-white/15 ring-1 ring-or/60', titre: 'text-white', cible: 'text-white/85',
+    accent: 'text-terre', bordure: 'border-terre/30', lisere: true,
   },
 }
 const theme = computed(() => THEMES[props.formule.teinte])
@@ -58,16 +58,23 @@ const theme = computed(() => THEMES[props.formule.teinte])
     </div>
 
     <!-- En-tête aux couleurs du pack, avec sa jauge de niveau de confort -->
-    <div :class="['bandeau relative overflow-hidden rounded-t-[22px] px-6 sm:px-8 pt-7 pb-5', theme.bandeau]">
+    <div :class="['bandeau relative overflow-hidden rounded-t-[22px] px-6 sm:px-8 pt-11 pb-5', theme.bandeau]">
       <span v-if="theme.lisere" class="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-or-deep via-or to-or-deep" aria-hidden="true"></span>
-      <!-- Jauge dans le coin : le nom du pack garde toute la largeur sur téléphone -->
-      <div :class="['absolute right-5 sm:right-7 flex gap-1', enAvant ? 'top-5' : 'top-3.5']" aria-hidden="true">
-        <span
-          v-for="n in 3"
-          :key="n"
-          :style="{ '--i': n, '--carte': formule.niveau }"
-          :class="['niveau-barre block h-1.5 w-4 rounded-full', n <= formule.niveau ? theme.niveauPlein : theme.niveauVide]"
-        ></span>
+      <!-- Jauge « niveau de confort » façon barres de réseau, sur une pastille blanche : même lecture sur les
+           trois en-têtes ; dans le coin, le nom du pack garde toute la largeur sur téléphone -->
+      <div
+        :class="['absolute right-4 sm:right-6 flex items-end gap-1.5 rounded-full bg-white/95 shadow-sm px-2.5 py-1', enAvant ? 'top-5' : 'top-3.5']"
+        aria-hidden="true"
+      >
+        <span class="text-[9px] font-extrabold uppercase tracking-wider text-gris leading-none pb-px">Niveau</span>
+        <span class="flex items-end gap-0.5">
+          <span
+            v-for="n in 3"
+            :key="n"
+            :style="{ '--i': n, '--carte': formule.niveau, height: `${4 + n * 3}px`, backgroundColor: n <= formule.niveau ? COULEURS_NIVEAU[n - 1] : undefined }"
+            :class="['niveau-barre block w-1.5 rounded-sm', n <= formule.niveau ? '' : 'bg-gris-lt/40']"
+          ></span>
+        </span>
       </div>
       <div class="flex items-center gap-3 min-w-0">
         <span :class="['flex items-center justify-center w-12 h-12 rounded-2xl text-2xl shrink-0', theme.pastille]" aria-hidden="true">{{ formule.emoji }}</span>
@@ -118,14 +125,14 @@ const theme = computed(() => THEMES[props.formule.teinte])
 
 <style scoped>
 .niveau-barre {
-  transform-origin: left center;
+  transform-origin: bottom center;
 }
 
 /* Animations seulement si l'utilisateur ne demande pas à les réduire ; sinon la carte est complète d'emblée */
 @media (prefers-reduced-motion: no-preference) {
   /* Jauge : les barres se remplissent l'une après l'autre quand la rangée de cartes apparaît (v-apparition) */
   .apparition:not(.apparition-visible) .niveau-barre {
-    transform: scaleX(0);
+    transform: scaleY(0);
   }
   .apparition-visible .niveau-barre {
     animation: remplir 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -165,8 +172,8 @@ const theme = computed(() => THEMES[props.formule.teinte])
 }
 
 @keyframes remplir {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
 }
 @keyframes onde {
   from { opacity: 0.9; transform: scale(1); }
