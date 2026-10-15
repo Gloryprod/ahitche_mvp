@@ -4,6 +4,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import { Plus, CheckCircle2, Trash2, Paperclip, X, Upload, AlertTriangle, Lock } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import type { Depense, Justificatif, LigneBudget, Prestataire } from '@/type'
 
 // Liste des dépenses d'une catégorie (Budget ou Exploitation) : ajout, paiement, pièces justificatives, audit
@@ -69,8 +70,8 @@ async function ajouter() {
     form.value = nouvelle()
     formOuvert.value = false
     rafraichir()
-  } catch (err: any) {
-    emit('notifier', err.response?.data?.message || "Impossible d'ajouter la dépense", 'error')
+  } catch (err) {
+    emit('notifier', messageErreur(err, "Impossible d'ajouter la dépense"), 'error')
   } finally {
     envoi.value = false
   }
@@ -110,8 +111,8 @@ async function joindre(evenement: Event) {
     const suivante = ouverte.value.pieces.manquantes.find(p => !typesPresents.value.has(p))
     typePiece.value = suivante ?? ''
     rafraichir()
-  } catch (err: any) {
-    emit('notifier', err.response?.data?.message || 'Téléversement impossible (PDF, JPG ou PNG).', 'error')
+  } catch (err) {
+    emit('notifier', messageErreur(err, 'Téléversement impossible (PDF, JPG ou PNG).'), 'error')
   } finally {
     televersement.value = false
   }
@@ -122,8 +123,8 @@ async function ouvrirPiece(depenseId: string, piece: Justificatif) {
   try {
     const { url } = (await api.get(`/api/admin/finances/depenses/${depenseId}/justificatifs/${piece._id}/lien`)).data
     window.open(url, '_blank', 'noopener')
-  } catch (err: any) {
-    emit('notifier', err.response?.data?.message || "Impossible d'ouvrir le justificatif", 'error')
+  } catch (err) {
+    emit('notifier', messageErreur(err, "Impossible d'ouvrir le justificatif"), 'error')
   }
 }
 
@@ -135,8 +136,8 @@ async function confirmerPaiement() {
     emit('notifier', message || `« ${ouverte.value.libelle} » marquée effectuée.`, 'success')
     ouverte.value = null
     rafraichir()
-  } catch (err: any) {
-    emit('notifier', err.response?.data?.message || 'Validation impossible', 'error')
+  } catch (err) {
+    emit('notifier', messageErreur(err, 'Validation impossible'), 'error')
   } finally {
     envoi.value = false
   }
@@ -145,8 +146,8 @@ async function confirmerPaiement() {
 async function basculerAudit(d: Depense) {
   try {
     await api.patch(`/api/admin/finances/depenses/${d._id}/audit`, { estValidePourAudit: !d.estValidePourAudit })
-  } catch (err: any) {
-    emit('notifier', err.response?.data?.message || 'Mise à jour impossible', 'error')
+  } catch (err) {
+    emit('notifier', messageErreur(err, 'Mise à jour impossible'), 'error')
   } finally {
     rafraichir()
   }
@@ -163,8 +164,8 @@ async function supprimer(d: Depense) {
     await api.delete(`/api/admin/finances/depenses/${d._id}`)
     emit('notifier', 'Dépense supprimée.', 'success')
     rafraichir()
-  } catch (err: any) {
-    emit('notifier', err.response?.data?.message || 'Suppression impossible', 'error')
+  } catch (err) {
+    emit('notifier', messageErreur(err, 'Suppression impossible'), 'error')
   }
 }
 

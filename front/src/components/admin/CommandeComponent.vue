@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 import api from '@/stores/api'
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
+import { messageErreur } from '@/services/erreurs'
+import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import CommandeForm from '@/components/admin/CommandeForm.vue'
 import type { Client, Commande, Product } from '@/type'
 import { Eye, Edit2, Trash2, Search, CheckCircle } from 'lucide-vue-next'
@@ -21,8 +22,8 @@ async function deciderRemise(cmd: Commande, decision: 'valider' | 'refuser') {
     const { message } = (await api.patch(`/api/admin/orders/${cmd.id}/remise`, { decision })).data
     queryClient.invalidateQueries({ queryKey: ['orders'] })
     showNotification(message, 'success')
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || 'Décision impossible', 'error')
+  } catch (err) {
+    showNotification(messageErreur(err, 'Décision impossible'), 'error')
   }
 }
 
@@ -58,7 +59,7 @@ onMounted(async () => {
     ])
     usersList.value = userRes.data.users || []
     prodList.value = productRes.data.products || []
-  } catch (err) {
+  } catch {
     showNotification("Erreur lors du chargement des options de formulaire", "error")
   }
 })
@@ -77,8 +78,8 @@ watch(statutActif, () => {
   page.value = 1
 })
 
-const fetchCommandes = async ({ queryKey }: { queryKey: any }): Promise<PaginatedCommandesResponse> => {
-  const [_, currentPage, currentSearch, currentStatut] = queryKey
+const fetchCommandes = async ({ queryKey }: QueryFunctionContext): Promise<PaginatedCommandesResponse> => {
+  const [, currentPage, currentSearch, currentStatut] = queryKey
   
   const response = await api.get('/api/admin/commandes', {
     params: {
@@ -142,8 +143,8 @@ const handleChangerStatut = async (cmd: Commande) => {
     if (!message) return
     queryClient.invalidateQueries({ queryKey: ['orders'] })
     showNotification(message, 'success')
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || 'Impossible de modifier le statut', 'error')
+  } catch (err) {
+    showNotification(messageErreur(err, 'Impossible de modifier le statut'), 'error')
   }
 }
 

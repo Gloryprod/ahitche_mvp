@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { Plus, X, Check, Clock, Trash2, Search, Eye, Edit3, Download } from 'lucide-vue-next'
 import api from '@/stores/api'
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import type { Product } from '@/type'
 import { générerBonCommandePDF } from '@/services/pdfService'
 import Swal from 'sweetalert2'
@@ -12,6 +12,12 @@ interface OrderItem {
   productId: string
   quantiteCommandee: number
   prixUnitairePrevu: number
+}
+
+// Données envoyées au serveur pour créer ou modifier un bon
+interface BonPayload {
+  fournisseurId: string
+  items: OrderItem[]
 }
 
 interface PurchaseOrder {
@@ -28,6 +34,7 @@ interface PurchaseOrder {
   createdAt?: string
   dateEmission?: string
 }
+type LigneBon = PurchaseOrder['items'][number]
 
 // --- ÉTATS & PAGINATION ---
 const page = ref(1)
@@ -59,8 +66,8 @@ watch(search, (newValue) => {
 })
 
 // --- QUERIES ---
-const fetchPurchaseOrders = async ({ queryKey }: { queryKey: any }) => {
-  const [_, currentPage, currentSearch] = queryKey
+const fetchPurchaseOrders = async ({ queryKey }: QueryFunctionContext) => {
+  const [, currentPage, currentSearch] = queryKey
   const res = await api.get('/api/admin/bons-commande', {
     params: { page: currentPage, search: currentSearch, limit: 10 }
   })
@@ -84,7 +91,7 @@ const { data: produitsCatalogue } = useQuery<Product[]>({
 // --- MUTATIONS ---
 // 1. Création
 const createMutation = useMutation({
-  mutationFn: async (payload: any) => {
+  mutationFn: async (payload: BonPayload) => {
     return await api.post('/api/admin/bons-commande', payload)
   },
   onSuccess: (response) => {
@@ -100,7 +107,7 @@ const createMutation = useMutation({
 
 // 2. Modification
 const updateMutation = useMutation({
-  mutationFn: async ({ id, payload }: { id: string; payload: any }) => {
+  mutationFn: async ({ id, payload }: { id: string; payload: BonPayload }) => {
     return await api.put(`/api/admin/bons-commande/${id}`, payload)
   },
   onSuccess: () => {
@@ -198,7 +205,7 @@ const telechargerPDF = (bon: PurchaseOrder) => {
 }
 
 // Utilitaires
-const calculerTotalBon = (items: any[]) => {
+const calculerTotalBon = (items: LigneBon[]) => {
   return items ? items.reduce((sum, item) => sum + (item.quantiteCommandee * item.prixUnitairePrevu), 0) : 0
 }
 
@@ -206,7 +213,7 @@ const formatPrixCFA = (valeur: number) => {
   return new Intl.NumberFormat('fr-BJ', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(valeur)
 }
 
-const getNomProduit = (item: any) => {
+const getNomProduit = (item: LigneBon) => {
   if (typeof item.productId === 'object' && item.productId?.name) {
     return item.productId.name
   }

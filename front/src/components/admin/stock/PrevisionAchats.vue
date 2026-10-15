@@ -2,6 +2,7 @@
 import { ref, reactive } from 'vue'
 import { ShoppingCart, FileText, Info } from 'lucide-vue-next'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import { genererSimulationPDF, fcfaPDF } from '@/services/pdfSimulateurs'
 
 // Prévision d'achats pour N commandes (section Stock, gestionnaires compris) : besoins par produit,
@@ -35,9 +36,9 @@ async function calculer() {
   erreur.value = ''
   try {
     prevision.value = (await api.get('/api/admin/stock/prevision-achats', { params: { ...commandesPrevues } })).data
-  } catch (err: any) {
+  } catch (err) {
     prevision.value = null
-    erreur.value = err.response?.data?.message || 'Calcul impossible'
+    erreur.value = messageErreur(err, 'Calcul impossible')
   } finally {
     calcul.value = false
   }

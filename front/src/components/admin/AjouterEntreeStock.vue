@@ -2,7 +2,8 @@
 import { ref, watch, computed, onMounted } from 'vue'
 import { Search, Plus, Edit2, Trash2, Eye, X, Scale, SlidersHorizontal, FlaskConical, Factory } from 'lucide-vue-next'
 import api from '@/stores/api'
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
+import { messageErreur } from '@/services/erreurs'
+import { useQuery, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
 import { useFournisseurs } from '@/composables/useFournisseurs'
 import { useAuthStore } from '@/stores/auth'
@@ -106,7 +107,7 @@ const chargerProduitsReference = async () => {
 }
 onMounted(chargerProduitsReference)
 
-const fetchLotsStock = async ({ queryKey }: { queryKey: any }): Promise<PaginatedLotsResponse> => {
+const fetchLotsStock = async ({ queryKey }: QueryFunctionContext): Promise<PaginatedLotsResponse> => {
   const [, currentPage, currentSearch, aConfirmer] = queryKey
   const response = await api.get('/api/admin/stock/lots', {
     params: { page: currentPage, search: currentSearch, limit: 10, ...(aConfirmer ? { aConfirmer: '1' } : {}) }
@@ -187,8 +188,8 @@ const envoyer = async (action: () => Promise<{ data: { message?: string } }>, me
     queryClient.invalidateQueries({ queryKey: ['globalInventory'] })
     queryClient.invalidateQueries({ queryKey: ['mouvementsStock'] })
     closePanels()
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || "Une erreur est survenue lors de l'enregistrement", 'error')
+  } catch (err) {
+    showNotification(messageErreur(err, "Une erreur est survenue lors de l'enregistrement"), 'error')
   } finally {
     isSubmitting.value = false
   }

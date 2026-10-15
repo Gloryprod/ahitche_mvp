@@ -4,6 +4,7 @@ import { Salad, Trash2, Edit3 } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
 import { useToast } from 'vue-toastification'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 
 // Suivi alimentaire du client : questionnaire (données non sensibles), recommandations, menus types.
 // Aucune donnée de santé n'est demandée en v1 (autorisation APDP préalable, voir docs/conception-menu-admin.md).
@@ -67,8 +68,8 @@ async function enregistrer() {
     toast.success(data.message)
     enEdition.value = false
     await charger()
-  } catch (err: any) {
-    toast.error(err.response?.data?.message || "Impossible d'enregistrer le questionnaire.")
+  } catch (err) {
+    toast.error(messageErreur(err, "Impossible d'enregistrer le questionnaire."))
   } finally {
     envoi.value = false
   }

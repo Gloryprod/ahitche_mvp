@@ -95,23 +95,15 @@ export function useAuthStore() {
     effacerSessionLocale();
   }
 
+  // Une erreur remonte telle quelle au composant, qui l'affiche (toast rouge)
   async function forgotPassword(payload: { email: string }) {
-    try {
-      const response = await axios.post('/api/auth/forgot-password', payload);
-      return response.data;
-    } catch (error: any) {
-      // On propage l'erreur pour la gérer directement dans le composant avec le toast rouge
-      throw error;
-    }
+    const response = await axios.post('/api/auth/forgot-password', payload);
+    return response.data;
   }
 
   async function resetPassword(payload: { token: string; password: string }) {
-    try {
-      const response = await axios.post('/api/auth/reset-password', payload);
-      return response.data;
-    } catch (error: any) {
-      throw error;
-    }
+    const response = await axios.post('/api/auth/reset-password', payload);
+    return response.data;
   }
 
   return { user, inactivite, isInitialized, isAuthenticated, isAdmin, role, isEquipe, login, logout, effacerSessionLocale, checkSession, forgotPassword, resetPassword };

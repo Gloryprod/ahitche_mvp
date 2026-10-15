@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { Wallet2, Download, FileText, AlertTriangle, Lock, LockOpen } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import type { ClotureMois, LigneBudget, SyntheseFinances } from '@/type'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
@@ -87,8 +88,8 @@ async function changerCloture(c: ClotureMois) {
     notifier(message, 'success')
     queryClient.invalidateQueries({ queryKey: ['finances'] })
     queryClient.invalidateQueries({ queryKey: ['depenses'] })
-  } catch (err: any) {
-    notifier(err.response?.data?.message || 'Action impossible', 'error')
+  } catch (err) {
+    notifier(messageErreur(err, 'Action impossible'), 'error')
   }
 }
 
@@ -100,8 +101,8 @@ async function enregistrerTaux(valeur: number | null = nouveauTaux.value) {
     notifier(response.data.message, 'success')
     nouveauTaux.value = null
     queryClient.invalidateQueries({ queryKey: ['finances'] })
-  } catch (err: any) {
-    notifier(err.response?.data?.message || 'Enregistrement impossible', 'error')
+  } catch (err) {
+    notifier(messageErreur(err, 'Enregistrement impossible'), 'error')
   }
 }
 

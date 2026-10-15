@@ -2,8 +2,9 @@
 import { ref, watch } from 'vue'
 import { Search, Plus, Edit2, Trash2, Eye, X } from 'lucide-vue-next'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import type { Category } from '@/type'
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
+import { useQuery, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
 
 // --- ÉTATS ---
@@ -47,8 +48,8 @@ watch(search, (newValue) => {
 })
 
 // --- CHARGEMENT ---
-const fetchCategories = async ({ queryKey }: { queryKey: any }): Promise<PaginatedCategoryResponse> => {
-  const [_, currentPage, currentSearch] = queryKey
+const fetchCategories = async ({ queryKey }: QueryFunctionContext): Promise<PaginatedCategoryResponse> => {
+  const [, currentPage, currentSearch] = queryKey
   
   const response = await api.get('/api/admin/categories', {
     params: {
@@ -111,8 +112,8 @@ const handleSubmit = async () => {
     }
     queryClient.invalidateQueries({ queryKey: ['categories'] })
     closePanels()
-  } catch (error: any) {
-    showNotification(error.response?.data?.message || "Une erreur est survenue", "error")
+  } catch (error) {
+    showNotification(messageErreur(error, "Une erreur est survenue"), "error")
   } finally {
     isSubmitting.value = false
   }
@@ -140,7 +141,7 @@ const deleteCategory = async (id: string) => {
       showNotification("Catégorie supprimée", "success")
       queryClient.invalidateQueries({ queryKey: ['categories'] })
       if (selectedCategory.value?._id === id) closePanels()
-    } catch (error) {
+    } catch {
       showNotification("Impossible de supprimer cette catégorie", "error")
     } finally {
       isLoading.value = false;

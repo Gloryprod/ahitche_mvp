@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { UtensilsCrossed, Plus, Trash2, Edit2, CheckCircle2, Undo2, Info } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
 
@@ -72,8 +73,8 @@ async function enregistrer(statut: 'Brouillon' | 'À valider') {
     notifier(statut === 'À valider' ? 'Idée envoyée pour validation.' : 'Brouillon enregistré.', 'success')
     edition.value = null
     rafraichir()
-  } catch (err: any) {
-    notifier(err.response?.data?.message || 'Enregistrement impossible', 'error')
+  } catch (err) {
+    notifier(messageErreur(err, 'Enregistrement impossible'), 'error')
   }
 }
 
@@ -88,8 +89,8 @@ async function decider(i: Idee & { _id: string }, decision: 'publier' | 'renvoye
     const { message } = (await api.post(`/api/admin/repas/${i._id}/decision`, { decision, remarque })).data
     notifier(message, 'success')
     rafraichir()
-  } catch (err: any) {
-    notifier(err.response?.data?.message || 'Décision impossible', 'error')
+  } catch (err) {
+    notifier(messageErreur(err, 'Décision impossible'), 'error')
   }
 }
 
@@ -100,8 +101,8 @@ async function supprimer(i: Idee & { _id: string }) {
     await api.delete(`/api/admin/repas/${i._id}`)
     notifier('Idée de repas supprimée.', 'success')
     rafraichir()
-  } catch (err: any) {
-    notifier(err.response?.data?.message || 'Suppression impossible', 'error')
+  } catch (err) {
+    notifier(messageErreur(err, 'Suppression impossible'), 'error')
   }
 }
 

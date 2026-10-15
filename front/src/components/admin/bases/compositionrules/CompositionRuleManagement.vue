@@ -2,7 +2,8 @@
 import { ref, watch } from 'vue'
 import { Search, Plus, Edit2, Trash2, Eye, X } from 'lucide-vue-next'
 import api from '@/stores/api'
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
+import { messageErreur } from '@/services/erreurs'
+import { useQuery, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
 import type { CompositionRule } from '@/type'
 
@@ -45,8 +46,8 @@ watch(search, (newValue) => {
 })
 
 // --- CHARGEMENT ---
-const fetchRules = async ({ queryKey }: { queryKey: any }): Promise<PaginatedRuleResponse> => {
-  const [_, currentPage, currentSearch] = queryKey
+const fetchRules = async ({ queryKey }: QueryFunctionContext): Promise<PaginatedRuleResponse> => {
+  const [, currentPage, currentSearch] = queryKey
   const response = await api.get('/api/admin/composition-rules', {
     params: {
       page: currentPage,
@@ -109,8 +110,8 @@ const handleSubmit = async () => {
     }
     queryClient.invalidateQueries({ queryKey: ['composition-rules'] })
     closePanels()
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || "Une erreur est survenue", "error")
+  } catch (err) {
+    showNotification(messageErreur(err, "Une erreur est survenue"), "error")
   } finally {
     isSubmitting.value = false
   }
@@ -135,7 +136,7 @@ const deleteRule = async (id: string) => {
       showNotification("Règle supprimée avec succès", "success")
       queryClient.invalidateQueries({ queryKey: ['composition-rules'] })
       if (selectedRule.value?._id === id) closePanels()
-    } catch (err) {
+    } catch {
       showNotification("Impossible de supprimer cette règle", "error")
     }
   }

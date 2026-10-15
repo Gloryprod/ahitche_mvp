@@ -4,7 +4,6 @@ import { useAuthStore } from '@/stores/auth';
 import { 
   Users, 
   ShoppingBag, 
-  Layers, 
   ChevronRight, 
   Settings,
   LayoutDashboard,
@@ -18,7 +17,7 @@ import {
   UtensilsCrossed,
   Carrot
 } from 'lucide-vue-next'
-import { computed } from 'vue';
+import { computed, type Component } from 'vue';
 import { useDeconnexion } from '@/composables/useDeconnexion';
 import { peutLire, LIBELLES_ROLES, type Section } from '@/config/roles';
 
@@ -39,7 +38,7 @@ const avatarInitiale = computed(() => {
 interface MenuItem {
   id: string
   name: string
-  icon: any
+  icon: Component
   path: string
   section: Section
   hasChevron?: boolean
@@ -171,7 +170,6 @@ const { seDeconnecter, deconnexionEnCours } = useDeconnexion()
             </div>
 
             <ChevronRight 
-              v-slot:default
               v-if="item.hasChevron && route.path === item.path" 
               class="w-3.5 h-3.5 opacity-60 text-savane stroke-[2.5]" 
             />

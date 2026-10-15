@@ -3,6 +3,7 @@ import { ref, computed, reactive, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { ChevronLeft, ChevronRight, Phone, MapPin, FileText, MessageCircle, Truck } from 'lucide-vue-next'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import type { CommandeTerrain, Prestataire, ZoneLivraison } from '@/type'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
@@ -16,6 +17,8 @@ const queryClient = useQueryClient()
 const { changerVers } = useChangementStatut()
 
 const PERIODES = ['Matin', 'Après-midi'] as const
+// Rang du créneau (matin avant après-midi) ; un créneau vide passe en premier
+const rangPeriode = (periode: string | null) => (PERIODES as readonly (string | null)[]).indexOf(periode)
 const LIBELLE_ACTION: Partial<Record<StatutCommande, string>> = {
   'Confirmée': 'Commencer la préparation',
   'En préparation': 'Partir en livraison',
@@ -87,7 +90,7 @@ const tournees = computed(() => PERIODES.map(periode => {
 // Tournée complète d'un livreur sur la journée (les deux créneaux), hors livraisons terminées
 const tourneeDuLivreur = (livreurId: string) => (data.value?.duJour ?? [])
   .filter(c => c.livreur?._id === livreurId && !['Livrée', 'Annulée'].includes(c.statut))
-  .sort((a, b) => PERIODES.indexOf(a.creneau.periode as any) - PERIODES.indexOf(b.creneau.periode as any) || ordreArret(a, b))
+  .sort((a, b) => rangPeriode(a.creneau.periode) - rangPeriode(b.creneau.periode) || ordreArret(a, b))
 
 const aPreparer = computed(() => (data.value?.duJour ?? []).filter(c => !['Livrée', 'Annulée', 'Échec'].includes(c.statut)))
 
@@ -102,8 +105,8 @@ async function changer(c: CommandeTerrain, statut: StatutCommande) {
       showNotification(message, 'success')
       rafraichir()
     }
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || 'Impossible de modifier le statut', 'error')
+  } catch (err) {
+    showNotification(messageErreur(err, 'Impossible de modifier le statut'), 'error')
   } finally {
     enCours.value = null
   }
@@ -124,8 +127,8 @@ async function planifier(c: CommandeTerrain) {
     const response = await api.patch(`/api/admin/logistique/commandes/${c.id}/planification`, planifs[c.id])
     showNotification(response.data.message, 'success')
     rafraichir()
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || 'Planification impossible', 'error')
+  } catch (err) {
+    showNotification(messageErreur(err, 'Planification impossible'), 'error')
   } finally {
     enCours.value = null
   }
@@ -145,8 +148,8 @@ async function enregistrerZone(z: ZoneLivraison) {
     await api.put(`/api/admin/zones/${z.code}`, brouillonsZones[z.code])
     showNotification(`${z.nom} enregistrée.`, 'success')
     queryClient.invalidateQueries({ queryKey: ['zones-admin'] })
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || 'Enregistrement impossible', 'error')
+  } catch (err) {
+    showNotification(messageErreur(err, 'Enregistrement impossible'), 'error')
   }
 }
 

@@ -3,6 +3,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useQuery, useQueries, useQueryClient } from '@tanstack/vue-query'
 import { Sliders, FileText, Info } from 'lucide-vue-next'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import { useAuthStore } from '@/stores/auth'
 import { peutLire, peutEcrire } from '@/config/roles'
 import { genererSimulationPDF, fcfaPDF } from '@/services/pdfSimulateurs'
@@ -186,8 +187,8 @@ async function enregistrerParametres() {
     messageParams.value = { texte: message, type: 'success' }
     queryClient.invalidateQueries({ queryKey: ['parametres'] })
     queryClient.invalidateQueries({ queryKey: ['simulateur'] })
-  } catch (err: any) {
-    messageParams.value = { texte: err.response?.data?.message || 'Enregistrement impossible', type: 'error' }
+  } catch (err) {
+    messageParams.value = { texte: messageErreur(err, 'Enregistrement impossible'), type: 'error' }
   }
 }
 

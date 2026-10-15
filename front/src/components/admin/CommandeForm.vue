@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import { X, User, CheckCircle2, ArrowRight, Plus, Minus, Trash2, PlusCircle, Layers } from 'lucide-vue-next'
 import type { Client, Product, Commande, ProductItem } from '@/type'
 import { useAuthStore } from '@/stores/auth'
@@ -67,7 +68,7 @@ watch(() => props.open, (isOpen) => {
       
       // Retirer le préfixe 'ahi-' si présent dans le slug de la base
       const slug = props.commande.formuleSlug || ''
-      selectedPackSlug.value = slug.replace('ahi-', '') as any
+      selectedPackSlug.value = slug.replace('ahi-', '') as typeof selectedPackSlug.value
       
       paiement.value = props.commande.modePaiement || 'Mobile Money'
       notes.value = props.commande.notes || ''
@@ -76,7 +77,7 @@ watch(() => props.open, (isOpen) => {
       
       // Mapper l'historique des produits figés
       if (props.commande.productsSnapshot) {
-        adjustedItems.value = props.commande.productsSnapshot.map((item: any) => ({
+        adjustedItems.value = props.commande.productsSnapshot.map((item) => ({
           productId: item.productId,
           name: item.name,
           quantity: item.quantity,
@@ -236,8 +237,8 @@ const submitOrder = async () => {
     emit('success')
     resetForm()
     emit('close')
-  } catch (error: any) {
-    erreurEnvoi.value = error.response?.data?.message || "Enregistrement impossible."
+  } catch (error) {
+    erreurEnvoi.value = messageErreur(error, "Enregistrement impossible.")
   } finally {
     isSubmitting.value = false
   }

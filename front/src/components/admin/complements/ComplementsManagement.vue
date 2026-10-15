@@ -5,6 +5,7 @@ import { useToast } from 'vue-toastification'
 import Swal from 'sweetalert2'
 import { Plus, Pencil, EyeOff, Eye, Trash2, X, ImagePlus, Loader2, ExternalLink } from 'lucide-vue-next'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
 import { reduireImage, photoOptimisee } from '@/services/images'
@@ -35,10 +36,6 @@ const { data, isLoading, isError } = useQuery({
   queryKey: ['complements'],
   queryFn: async () => (await api.get('/api/admin/complements')).data.complements as Complement[],
 })
-// Message renvoyé par le serveur, sinon un message par défaut
-const messageErreur = (err: unknown, defaut: string) =>
-  (err as { response?: { data?: { message?: string } } })?.response?.data?.message || defaut
-
 const recharger = () => queryClient.invalidateQueries({ queryKey: ['complements'] })
 
 // Affiché sur le site = coché « cette semaine », disponible et avec un prix (même règle que le serveur)

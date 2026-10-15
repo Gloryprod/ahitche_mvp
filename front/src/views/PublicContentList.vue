@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router'
 import { Search, Play, FileText, Newspaper, Calendar, ArrowRight, User } from 'lucide-vue-next'
 import api from '@/stores/api'
 import LienAccueil from '@/components/ui/LienAccueil.vue'
-import { useQuery, keepPreviousData } from '@tanstack/vue-query'
+import { useQuery, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 
 export interface Post {
   _id: string
@@ -42,8 +42,8 @@ const changeType = (type: string) => {
 }
 
 // --- API FETCH ---
-const fetchPublicPosts = async ({ queryKey }: { queryKey: any }) => {
-  const [_, currentPage, currentType, currentSearch] = queryKey
+const fetchPublicPosts = async ({ queryKey }: QueryFunctionContext) => {
+  const [, currentPage, currentType, currentSearch] = queryKey
   const response = await api.get('/api/public/posts', {
     params: {
       page: currentPage,

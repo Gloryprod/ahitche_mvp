@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { finDernierTableau } from './pdfTableau'
 import type { CommandeTerrain } from '@/type'
 
 // Documents de la section Logistique : fiche de préparation du jour et feuille de tournée d'un livreur
@@ -53,7 +54,7 @@ export function genererPreparationPDF(jour: string, commandes: CommandeTerrain[]
   })
 
   autoTable(doc, {
-    startY: (doc as any).lastAutoTable.finalY + 8,
+    startY: (finDernierTableau(doc) ?? 0) + 8,
     head: [['Réf.', 'Client', 'Formule', 'Créneau', 'Livreur', 'Produits']],
     body: commandes.map(c => [
       c.reference,
@@ -93,7 +94,7 @@ export function genererTourneePDF(jour: string, livreur: { nom: string; telephon
 
   doc.setFontSize(8)
   doc.setTextColor(...COULEUR_GRIS)
-  doc.text("Appeler chaque client 30 minutes avant d'arriver. Paiement à la livraison : noter la référence Mobile Money.", 14, (doc as any).lastAutoTable.finalY + 8)
+  doc.text("Appeler chaque client 30 minutes avant d'arriver. Paiement à la livraison : noter la référence Mobile Money.", 14, (finDernierTableau(doc) ?? 0) + 8)
 
   doc.save(`tournee-${jour}-${livreur.nom.replace(/\s+/g, '-').toLowerCase()}.pdf`)
 }

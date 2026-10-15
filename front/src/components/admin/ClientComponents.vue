@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useQuery, keepPreviousData } from '@tanstack/vue-query'
+import { useQuery, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import type { Client } from '@/type'
 import api from '@/stores/api'
 import { Search } from 'lucide-vue-next'
@@ -28,8 +28,8 @@ watch(search, (newValue) => {
 })
 
 // 2. Fonction de fetch corrigée avec transmission des Query Params au backend
-const fetchUsers = async ({ queryKey }: { queryKey: any }): Promise<PaginatedClientsResponse> => {
-  const [_, currentPage, currentSearch] = queryKey
+const fetchUsers = async ({ queryKey }: QueryFunctionContext): Promise<PaginatedClientsResponse> => {
+  const [, currentPage, currentSearch] = queryKey
   
   const response = await api.get('/api/admin/users', {
     params: {

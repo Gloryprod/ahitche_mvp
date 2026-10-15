@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { finDernierTableau } from './pdfTableau'
 import { WHATSAPP_AFFICHAGE } from '@/config/contact';
 
 export interface RecuData {
@@ -24,11 +25,6 @@ export const genererRecuPDF = (data: RecuData) => {
   const vertForet = [30, 58, 31] as [number, number, number]; // #1e3a1f
   const grisTexte = [100, 116, 139] as [number, number, number];
   const noirTexte = [30, 41, 59] as [number, number, number];
-
-  // Formatage propre des prix sans caractères spéciaux problématiques pour jsPDF
-  const formatPrixPDF = (valeur: number): string => {
-  return valeur.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " FCFA"
-  }
 
 
   // --- EN-TÊTE COMPANY ---
@@ -139,7 +135,7 @@ export const genererRecuPDF = (data: RecuData) => {
   });
 
   // --- RECAPITULATIF FINANCIER ---
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  const finalY = (finDernierTableau(doc) ?? 0) + 10;
 
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');

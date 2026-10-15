@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { Upload, Plus, Trash2, AlertTriangle } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import type { LigneBudget } from '@/type'
 import ListeDepenses from './ListeDepenses.vue'
 
@@ -30,8 +31,8 @@ async function importer(evenement: Event) {
       await Swal.fire({ title: message, html: `<p style="font-size:13px;text-align:left">${erreurs.map((e: string) => e.replace(/</g, '&lt;')).join('<br>')}</p>`, icon: 'warning', confirmButtonColor: '#1A5C38' })
     } else emit('notifier', message, 'success')
     rafraichir()
-  } catch (err: any) {
-    emit('notifier', err.response?.data?.message || "Import impossible", 'error')
+  } catch (err) {
+    emit('notifier', messageErreur(err, "Import impossible"), 'error')
   } finally {
     importEnCours.value = false
     champ.value = ''
@@ -49,8 +50,8 @@ async function ajouterLigne() {
     ligne.value = ligneVide()
     formOuvert.value = false
     rafraichir()
-  } catch (err: any) {
-    emit('notifier', err.response?.data?.message || "Ajout impossible", 'error')
+  } catch (err) {
+    emit('notifier', messageErreur(err, "Ajout impossible"), 'error')
   }
 }
 
@@ -61,8 +62,8 @@ async function supprimerLigne(l: LigneBudget) {
     await api.delete(`/api/admin/finances/lignes/${l._id}`)
     emit('notifier', `Ligne ${l.code} supprimée.`, 'success')
     rafraichir()
-  } catch (err: any) {
-    emit('notifier', err.response?.data?.message || 'Suppression impossible', 'error')
+  } catch (err) {
+    emit('notifier', messageErreur(err, 'Suppression impossible'), 'error')
   }
 }
 

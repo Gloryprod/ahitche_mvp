@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import { Search, Plus, Edit2, Trash2, X, Wand2 } from 'lucide-vue-next'
 import api from '@/stores/api'
+import { messageErreur } from '@/services/erreurs'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
 import type { Product, CompositionRule, Category, PackType } from '@/type'
@@ -83,7 +84,7 @@ function openEditMode(p: Product) {
     _id: p._id, reference: p.reference || '', name: p.name, category: p.category?._id || '',
     compositionRule: p.compositionRule?._id || '', type: p.type, statut: p.statut, unit: p.unit,
     priceUnit: p.priceUnit, seuilAlerte: p.seuilAlerte, commentaire: p.commentaire || '',
-    quantites: { ...quantitesVides(), ...(p.quantites || {}) },
+    quantites: { ...quantitesVides(), ...p.quantites },
   }
   showFormPanel.value = true
 }
@@ -120,8 +121,8 @@ async function handleSubmit() {
     }
     queryClient.invalidateQueries({ queryKey: ['products'] })
     showFormPanel.value = false
-  } catch (err: any) {
-    showNotification(err.response?.data?.message || 'Une erreur est survenue', 'error')
+  } catch (err) {
+    showNotification(messageErreur(err, 'Une erreur est survenue'), 'error')
   } finally {
     isSubmitting.value = false
   }
