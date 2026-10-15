@@ -19,6 +19,7 @@ const TITRES: Record<string, string> = {
   'inventaire-page': 'Inventaire', 'mouvement-stock-page': 'Mouvements de stock', 'bon-commande-page': 'Bons de commande', 'prevision-achats-page': 'Prévision d\'achats',
   'prestataires-page': 'Prestataires', 'logistique-page': 'Logistique', 'finances-page': 'Finances', 'simulateurs-page': 'Simulateurs',
   'idees-repas-page': 'Idées de repas', 'nutrition-page': 'Nutrition', 'posts-page': 'Contenus et médias', 'complements-page': 'Compléments de la semaine',
+  'avis-page': 'Avis clients',
 }
 router.afterEach((to) => {
   const titre = TITRES[String(to.name)]

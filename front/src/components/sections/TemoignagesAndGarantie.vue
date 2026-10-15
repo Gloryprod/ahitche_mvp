@@ -1,16 +1,42 @@
 <script setup lang="ts">
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
+import api from '@/stores/api'
 import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
-import { TEMOIGNAGES } from '@/config/temoignages'
+import { TEMOIGNAGES, type Temoignage } from '@/config/temoignages'
 import { vApparition } from '@/directives/apparition'
 
 // Avatar générique (pas de vrai visage) : initiale sur une couleur de la charte
 const COULEURS_AVATAR = ['bg-foret text-or', 'bg-or text-noir', 'bg-savane text-white']
+
+// Avis publiés par l'admin depuis les espaces clients, placés avant les témoignages. Chargés à l'approche
+// de la section seulement : rien de plus à télécharger pour qui ne descend pas jusque-là.
+const avisPublies = ref<Temoignage[]>([])
+const avis = computed(() => [...avisPublies.value, ...TEMOIGNAGES])
+// Ordinateur : rangées complètes de trois (six avis au plus, les plus récents d'abord) ; téléphone : tous, à faire glisser
+const visiblesOrdinateur = computed(() => Math.min(6, Math.floor(avis.value.length / 3) * 3) || avis.value.length)
+
+const section = ref<HTMLElement | null>(null)
+let observateur: IntersectionObserver | undefined
+async function chargerAvis() {
+  observateur?.disconnect()
+  try {
+    avisPublies.value = (await api.get('/api/public/avis')).data
+  } catch {
+    // Les témoignages restent affichés
+  }
+}
+onMounted(() => {
+  if (!section.value || !('IntersectionObserver' in window)) return void chargerAvis()
+  observateur = new IntersectionObserver(([entree]) => { if (entree?.isIntersecting) chargerAvis() }, { rootMargin: '600px 0px' })
+  observateur.observe(section.value)
+})
+onBeforeUnmount(() => observateur?.disconnect())
 </script>
 
 <template>
   <div>
-    <section id="temoignages" class="py-20 bg-creme">
+    <section id="temoignages" ref="section" class="py-20 bg-creme">
       <div class="max-w-6xl mx-auto px-4">
         <div class="text-center mb-10">
           <span class="text-xs font-bold tracking-wider text-foret uppercase bg-savane/10 px-3 py-1 rounded-full">
@@ -22,12 +48,12 @@ const COULEURS_AVATAR = ['bg-foret text-or', 'bg-or text-noir', 'bg-savane text-
         </div>
 
         <!-- Mobile : cartes à faire glisser ; ordinateur : trois colonnes -->
-        <ul tabindex="0" aria-label="Avis de clients" class="flex md:grid md:grid-cols-3 gap-4 md:gap-6 -mx-4 px-4 md:mx-0 md:px-0 mb-10 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-px-4 pb-2 [scrollbar-width:none]">
+        <ul tabindex="0" aria-label="Avis de clients" class="flex md:grid md:grid-cols-3 gap-4 md:gap-6 -mx-4 px-4 md:mx-0 md:px-0 mb-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-px-4 pb-2 [scrollbar-width:none]">
           <li
-            v-for="(t, i) in TEMOIGNAGES"
-            :key="t.prenom"
-            v-apparition="i * 100"
-            class="snap-start shrink-0 w-[85%] sm:w-[60%] md:w-auto"
+            v-for="(t, i) in avis"
+            :key="`${t.prenom}-${i}`"
+            v-apparition="(i % 3) * 100"
+            :class="['snap-start shrink-0 w-[85%] sm:w-[60%] md:w-auto', i >= visiblesOrdinateur ? 'md:hidden' : '']"
           >
             <figure class="h-full flex flex-col bg-white rounded-3xl p-6 border border-creme2 shadow-xs">
               <div class="flex items-center gap-1 text-or mb-4" role="img" :aria-label="`Note : ${t.note} sur 5`">
@@ -38,12 +64,16 @@ const COULEURS_AVATAR = ['bg-foret text-or', 'bg-or text-noir', 'bg-savane text-
                 <span :class="['flex items-center justify-center w-11 h-11 rounded-full font-display font-bold text-lg', COULEURS_AVATAR[i % COULEURS_AVATAR.length]]" aria-hidden="true">{{ t.prenom.charAt(0) }}</span>
                 <span>
                   <span class="block font-bold text-foret">{{ t.prenom }}</span>
-                  <span class="block text-sm text-gris">{{ t.quartier }}</span>
+                  <span v-if="t.quartier" class="block text-sm text-gris">{{ t.quartier }}</span>
                 </span>
               </figcaption>
             </figure>
           </li>
         </ul>
+
+        <p class="text-center text-sm text-gris mb-10">
+          Déjà client&nbsp;? <RouterLink to="/dashboard/user#mon-avis" class="font-semibold text-foret underline underline-offset-2">Donnez votre avis</RouterLink> depuis votre espace.
+        </p>
 
         <!-- Offre client fondateur, en complément des avis -->
         <div class="max-w-3xl mx-auto bg-white rounded-3xl p-6 md:p-8 border border-creme2 flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">

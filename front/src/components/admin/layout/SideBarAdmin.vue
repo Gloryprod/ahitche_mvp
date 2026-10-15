@@ -15,7 +15,8 @@ import {
   LogOut,
   Globe,
   UtensilsCrossed,
-  Carrot
+  Carrot,
+  MessageSquareQuote
 } from 'lucide-vue-next'
 import { computed, type Component } from 'vue';
 import { useDeconnexion } from '@/composables/useDeconnexion';
@@ -53,6 +54,7 @@ const tousLesGroupes: { title: string; items: MenuItem[] }[] = [
       { id: 'commandes', name: 'Commandes', icon: ShoppingBag, path: '/dashboard/admin/commandes', section: 'commandes' },
       { id: 'clients', name: 'Liste des clients', icon: Users, hasChevron: true, path: '/dashboard/admin/clients', section: 'clients' },
       { id: 'complements', name: 'Compléments de la semaine', icon: Carrot, hasChevron: true, path: '/dashboard/admin/complements', section: 'complements' },
+      { id: 'avis', name: 'Avis clients', icon: MessageSquareQuote, hasChevron: true, path: '/dashboard/admin/avis', section: 'avis' },
     ]
   },
   {

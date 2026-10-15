@@ -7,7 +7,7 @@ export const EQUIPE: Role[] = ['admin', 'gestionnaire', 'comptable', 'nutritionn
 
 export type Section =
   | 'tableauDeBord' | 'commandes' | 'clients' | 'stock' | 'prestataires' | 'logistique'
-  | 'finances' | 'simulateurs' | 'nutrition' | 'repas' | 'donneesBase' | 'contenus' | 'complements' | 'mesures' | 'parametres'
+  | 'finances' | 'simulateurs' | 'nutrition' | 'repas' | 'avis' | 'donneesBase' | 'contenus' | 'complements' | 'mesures' | 'parametres'
 
 export const ACCES: Record<Section, { lecture: Role[]; ecriture: Role[] }> = {
   tableauDeBord: { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: [] },
@@ -20,6 +20,7 @@ export const ACCES: Record<Section, { lecture: Role[]; ecriture: Role[] }> = {
   simulateurs:   { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: [] },
   nutrition:     { lecture: ['admin', 'nutritionniste'],                            ecriture: ['admin', 'nutritionniste'] },
   repas:         { lecture: ['admin', 'gestionnaire', 'nutritionniste', 'coordinateur'], ecriture: ['admin', 'gestionnaire', 'nutritionniste'] },
+  avis:          { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
   donneesBase:   { lecture: ['admin', 'comptable', 'nutritionniste', 'coordinateur'], ecriture: ['admin'] },
   contenus:      { lecture: ['admin'],                                               ecriture: ['admin'] },
   complements:   { lecture: ['admin', 'gestionnaire', 'coordinateur'],              ecriture: ['admin', 'gestionnaire'] },

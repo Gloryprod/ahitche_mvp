@@ -84,6 +84,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { roles: ACCES.complements.lecture },
         component: () => import('@/components/admin/complements/ComplementsManagement.vue')
       },
+      {
+        path: 'avis',
+        name: 'avis-page',
+        meta: { roles: ACCES.avis.lecture },
+        component: () => import('@/components/admin/avis/AvisClients.vue')
+      },
       // Données de base
       {
         path: 'categories', 

@@ -6,6 +6,7 @@ const userC = require('../controllers/UserController');
 const formuleC = require('../controllers/FormuleController');
 const orderC = require('../controllers/OrderController');
 const nutritionC = require('../controllers/NutritionController');
+const avisC = require('../controllers/AvisController');
 const { limiteTentatives } = require('../middlewares/limiteTentatives');
 
 // Force brute : 5 échecs de connexion par compte en 15 minutes, 30 par adresse IP ;
@@ -19,6 +20,12 @@ const limiteCommandes = limiteTentatives({
   nom: 'commande', minutes: 60, maxParCompte: 10, maxParIp: 30,
   compteDe: (req) => (req.user?.id ? String(req.user.id) : ''),
   message: 'Trop de commandes envoyées en peu de temps. Contactez-nous sur WhatsApp si besoin.'
+});
+// Avis clients : 10 envois par heure et par compte
+const limiteAvis = limiteTentatives({
+  nom: 'avis', minutes: 60, maxParCompte: 10, maxParIp: 30,
+  compteDe: (req) => (req.user?.id ? String(req.user.id) : ''),
+  message: 'Trop d\'envois en peu de temps.'
 });
 
 // Authentification
@@ -47,6 +54,12 @@ router.route('/nutrition')
   .get(verifyToken, nutritionC.monSuivi)
   .put(verifyToken, nutritionC.enregistrerProfil)
   .delete(verifyToken, nutritionC.supprimerMonSuivi);
+
+// Mon avis (publié sur l'accueil après validation de l'admin ; un avis par client)
+router.route('/avis')
+  .get(verifyToken, avisC.monAvis)
+  .put(verifyToken, limiteAvis, avisC.enregistrerAvis)
+  .delete(verifyToken, avisC.supprimerMonAvis);
 
 module.exports = router;
         

@@ -9,6 +9,7 @@
 //                     DJEGUI est coordinateur et comptable (D-17)
 //  - auditeur       : lecture seule des finances et du stock, compte créé à la demande
 //  Idées de repas (D-18) : rédigées par les gestionnaires et le nutritionniste, publiées par l'admin
+//  Avis clients : rédigés par les clients dans leur espace, publiés (ou refusés) par l'admin
 
 const ROLES = ['user', 'admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
 const EQUIPE = ['admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
@@ -31,6 +32,7 @@ const ACCES = {
   simulateurs:   { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable', 'coordinateur'] },
   nutrition:     { lecture: ['admin', 'nutritionniste'],                            ecriture: ['admin', 'nutritionniste'] },
   repas:         { lecture: ['admin', 'gestionnaire', 'nutritionniste', 'coordinateur'], ecriture: ['admin', 'gestionnaire', 'nutritionniste'] },
+  avis:          { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
   // Réglages des simulateurs (charges, objectifs, coefficient, marge) : journalisés (Q 10.4)
   parametres:    { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable', 'coordinateur'] },
 };

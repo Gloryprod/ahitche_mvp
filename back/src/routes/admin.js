@@ -18,6 +18,7 @@ const parametresC = require('../controllers/admin/ParametresController');
 const nutritionC = require('../controllers/NutritionController');
 const complementC = require('../controllers/admin/ComplementController');
 const mesureC = require('../controllers/admin/MesureController');
+const avisC = require('../controllers/AvisController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -42,6 +43,7 @@ router.use('/simulateurs', acces(ACCES.simulateurs));
 router.use('/nutrition', acces(ACCES.nutrition));
 router.use('/parametres', acces(ACCES.parametres));
 router.use('/repas', acces(ACCES.repas));
+router.use('/avis', acces(ACCES.avis));
 
 // Users
 router.get('/users', userC.index);
@@ -198,6 +200,11 @@ router.route('/repas/:id')
   .put(nutritionC.modifierMenu)
   .delete(nutritionC.supprimerMenu);
 router.post('/repas/:id/decision', nutritionC.deciderMenu); // Admin seulement (contrôlé dans le contrôleur)
+
+// Avis clients : publication ou refus motivé (admin), suppression des indésirables
+router.get('/avis', avisC.listerAvis);
+router.post('/avis/:id/decision', avisC.deciderAvis);
+router.delete('/avis/:id', avisC.supprimerAvis);
 
 module.exports = router;
         

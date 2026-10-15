@@ -13,6 +13,7 @@ import {
 import { genererRecuPDF } from '@/services/pdfRecuCommande';
 import { ANNULABLES_PAR_CLIENT, classeStatut, type StatutCommande } from '@/config/commandes';
 import SuiviAlimentaire from '@/components/client/SuiviAlimentaire.vue';
+import MonAvis from '@/components/client/MonAvis.vue';
 import { useDeconnexion } from '@/composables/useDeconnexion';
 import { lienWhatsApp } from '@/config/contact';
 
@@ -717,6 +718,9 @@ onMounted(async () => {
 
         </div>
       </div>
+
+      <!-- MON AVIS (publié sur l'accueil après validation de l'admin) -->
+      <MonAvis />
 
       <!-- SUIVI ALIMENTAIRE (questionnaire, conseils, menus) -->
       <SuiviAlimentaire />
