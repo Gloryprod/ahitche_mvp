@@ -107,9 +107,9 @@ const changerTaux = async () => {
 }
 
 // --- 4. GESTION DES RENOUVELLEMENTS ---
-// Relance si le client ne se manifeste pas : 14 jours après la livraison (Essentiel, Fraîcheur) ou 30 jours
-// (autres packs), selon le cycle enregistré sur la formule ; alerte à J-5.
-const CYCLES_PAR_DEFAUT: Record<string, number> = { 'ahi-essentiel': 14, 'ahi-fraicheur': 14 }
+// Relance si le client ne se manifeste pas : à la fin du cycle enregistré sur la formule (réglable dans l'écran
+// Formules) ; alerte à J-5. Sans valeur chargée : 30 jours (packs mensuels), 7 pour Fraîcheur.
+const CYCLES_PAR_DEFAUT: Record<string, number> = { 'ahi-fraicheur': 7 }
 const cycleJours = (formuleSlug: string): number => {
   const index = PACKS_CONFIG.findIndex(pack => `ahi-${pack.key}` === formuleSlug)
   return formulaQueries.value[index]?.data?.formule?.cycleJours ?? CYCLES_PAR_DEFAUT[formuleSlug] ?? 30

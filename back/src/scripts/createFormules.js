@@ -10,7 +10,8 @@ dotenv.config();
 // un pack Essentiel, Équilibré ou Confort couvre un mois (prix, repas et heures par mois, relance à 30 jours),
 // Réserve et Fraîcheur « bientôt disponibles », prix de Fraîcheur à définir.
 // Le script fait un upsert par slug : il crée les formules manquantes et remet les valeurs du référentiel sur les
-// formules existantes, sans toucher à prixCommercial (prix fixé par l'admin). Une valeur absente reste vide.
+// formules existantes, sans toucher à prixCommercial (prix fixé par l'admin) ni au cycle de relance, réglé dans
+// l'écran Formules de l'admin (le cycle ci-dessous ne sert qu'à la création). Une valeur absente reste vide.
 const formulesData = [
   {
     slug: 'ahi-essentiel', nom: 'AHI ESSENTIEL', emoji: '🌿',
@@ -73,9 +74,10 @@ const seedDB = async () => {
     console.log('⏳ Insertion/Mise à jour des formules en cours...');
 
     for (const formule of formulesData) {
+      const { cycleJours, ...valeurs } = formule;
       await Formule.findOneAndUpdate(
         { slug: formule.slug },
-        { $set: { ...formule, lienWhatsApp: lienWhatsAppFormule(formule) }, $unset: { ancienPrix: '' } },
+        { $set: { ...valeurs, lienWhatsApp: lienWhatsAppFormule(formule) }, $setOnInsert: { cycleJours }, $unset: { ancienPrix: '' } },
         { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
       );
       console.log(`  ✔ ${formule.nom} : ${formule.prixActuel === null ? 'prix à définir' : `${formule.prixActuel.toLocaleString('fr-FR')} FCFA`}`);
