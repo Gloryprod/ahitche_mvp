@@ -15,6 +15,7 @@
 - `front/` : Vue 3 + TypeScript, Vite 8, Tailwind CSS 4 (`@tailwindcss/vite`), vue-router, Pinia, TanStack Query (admin), vue-toastification, sweetalert2, jsPDF.
 - `back/` : Node.js + Express 5 (CommonJS), MongoDB Atlas via Mongoose, JWT dans un cookie HttpOnly, Resend (e-mails), Cloudinary + multer (uploads).
 - Production : front sur `https://ahitchebj.com`, API sur `https://api.ahitchebj.com`. En dev, Vite proxifie `/api` vers `http://localhost:5000`.
+- Déploiement : le front est sur le compte Vercel gratuit (Hobby) de Gloryprod et le dépôt est privé, donc Vercel ne déploie que les commits dont l'auteur est Gloryprod. `main` n'avance que par une Pull Request fusionnée par Gloryprod avec « Create a merge commit » (pas « Squash » ni « Rebase », qui gardent l'auteur des commits) ; jamais de push direct sur `main`. L'API (Render) n'a pas cette limite.
 
 ## Commandes
 ```bash
