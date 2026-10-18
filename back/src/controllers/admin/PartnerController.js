@@ -32,7 +32,7 @@ async function nomDejaPris(nom, idExclu) {
   return !!(await Partner.exists(filtre));
 }
 
-// GET /api/admin/prestataires?page&limit&search&type&actif
+// GET /api/admin/prestataires?page&limit&search&type&actif (recherche : nom, téléphone, quartier, IFU/RCCM)
 async function listerPrestataires(req, res) {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -43,9 +43,9 @@ async function listerPrestataires(req, res) {
     const filtre = { deletedAt: null };
     if (type && TYPES_PRESTATAIRE.includes(type)) filtre.type = type;
     if (actif === 'true') filtre.actif = true;
-    if (search && search.trim()) {
+    if (typeof search === 'string' && search.trim()) {
       const motif = { $regex: echapperRegex(search.trim()), $options: 'i' };
-      filtre.$or = [{ nom: motif }, { telephone: motif }, { quartier: motif }];
+      filtre.$or = [{ nom: motif }, { telephone: motif }, { quartier: motif }, { ifuRccm: motif }];
     }
 
     const [prestataires, total] = await Promise.all([
