@@ -123,14 +123,15 @@ router.get('/stock/prevision-achats', simulateurC.simulerAchats); // Besoins et 
 router.post('/stock/transformations', stockC.enregistrerTransformation);
 
 // État et Historique
-router.get('/inventory/global', invC.obtenirInventaireGlobal);
+router.get('/inventory/global', invC.obtenirInventaireGlobal); // ?famille=P|V|MP|EMB
 router.get('/mouvements', invC.obtenirHistoriqueMouvements);
 
-// Bons de commande fournisseurs
+// Bons de commande fournisseurs (ancien format : items ; nouveau format : lignes de la facture d'achat)
 router.post('/bons-commande', invC.creerBonCommande);
 router.get('/bons-commande', invC.obtenirBonsCommande);
 router.put('/bons-commande/:id', invC.modifierBonCommande);
 router.delete('/bons-commande/:id', invC.supprimerBonCommande);
+router.post('/bons-commande/:id/reception', invC.receptionnerBon); // Un lot par ligne reçue, en transaction
 
 // Prestataires (fournisseurs, livreurs, autres)
 router.route('/prestataires')

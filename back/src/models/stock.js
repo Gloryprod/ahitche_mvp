@@ -36,6 +36,7 @@ const lotStockFifoSchema = new mongoose.Schema({
   // Pièce de l'achat : l'entrée se rattache à la dépense existante, sans en créer une seconde (Q 6.3)
   numeroPiece: { type: String, trim: true, default: '' },
   depenseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Expense', default: null },
+  bonCommandeId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder', default: null }, // Lot créé par la réception d'un bon
   transformationId: { type: mongoose.Schema.Types.ObjectId, default: null }, // Lot produit par une transformation
   commentaire: { type: String, trim: true, default: '' },
   deletedAt: { type: Date, default: null }

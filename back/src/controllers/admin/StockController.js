@@ -1,11 +1,10 @@
 const mongoose = require('mongoose');
 const { LotStockFifo, MouvementStock, FOURNISSEUR_INTERNE } = require('../../models/stock');
 const Product = require('../../models/product');
-const User = require('../../models/user');
 const { trouverFournisseur } = require('../../services/fournisseurService');
 const { echapperRegex } = require('../../utils/texte');
 const { rattacherDepenseAchat, mettreAJourDepenseAchat, annulerDepenseAchat } = require('../../services/depenseStockService');
-const { consommerStockFIFO } = require('../../services/stockService');
+const { consommerStockFIFO, genererNumeroLot, nomResponsable } = require('../../services/stockService');
 const { journaliser } = require('../../services/journalService');
 const BudgetLine = require('../../models/budgetLine');
 
@@ -20,22 +19,7 @@ function nombreOuVide(v) {
 }
 const texte = (v, max = 300) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const estDate = (v) => v && !Number.isNaN(new Date(v).getTime());
-
-async function nomResponsable(req) {
-  const u = await User.findById(req.user.id).select('username');
-  return u?.username || req.user.role || 'Équipe';
-}
-
-// Numéro de lot généré : LOT-<référence produit>-AAAAMMJJ-NN (Q 6.4)
-async function genererNumeroLot(produit, date, session = null) {
-  if (!produit.reference) return null;
-  // Jour à l'heure du Bénin (une date « AAAA-MM-JJ » reste ce jour-là)
-  const jour = new Date(date || Date.now()).toLocaleDateString('sv-SE', { timeZone: 'Africa/Porto-Novo' }).replace(/-/g, '');
-  const prefixe = `LOT-${produit.reference}-${jour}-`;
-  const existants = await LotStockFifo.find({ numeroLot: { $regex: '^' + echapperRegex(prefixe) } }).select('numeroLot').session(session);
-  const max = existants.reduce((m, l) => Math.max(m, parseInt(l.numeroLot.slice(prefixe.length), 10) || 0), 0);
-  return prefixe + String(max + 1).padStart(2, '0');
-}
+// Numéro de lot (LOT-<référence>-AAAAMMJJ-NN) et responsable des mouvements : services/stockService.js
 
 /**
  * 1. LIRE LES LOTS (GET /api/admin/stock/lots) - Avec Pagination & Recherche
@@ -191,6 +175,9 @@ async function modifierLotStock(req, res) {
     const prix = nombreOuVide(req.body.prixAchatUnitaire);
     if (Number.isNaN(prix)) return res.status(400).json({ message: "Prix d'achat invalide." });
     if (req.body.prixAchatUnitaire !== undefined && lot.quantiteInitiale !== null) {
+      // Lot compté dont le prix change : sa valeur suit (l'inventaire et le coût des sorties se calculent au prorata
+      // de valeurFcfa). Un prix inchangé ne touche pas la valeur facturée ; un prix vidé la laisse telle quelle.
+      if (prix !== null && prix !== lot.prixAchatUnitaire) lot.valeurFcfa = Math.round(lot.quantiteInitiale * prix);
       lot.prixAchatUnitaire = prix;
     }
 
@@ -223,8 +210,8 @@ async function modifierLotStock(req, res) {
     await journaliser(req, {
       action: 'Modification', entite: 'Lot de stock', entiteId: lot._id,
       resume: `Lot ${lot.numeroLot} modifié`,
-      avant: { prixAchatUnitaire: avant.prixAchatUnitaire, fournisseur: avant.fournisseur, dateReception: avant.dateReception, aConfirmer: avant.aConfirmer, numeroPiece: avant.numeroPiece },
-      apres: { prixAchatUnitaire: lot.prixAchatUnitaire, fournisseur: lot.fournisseur, dateReception: lot.dateReception, aConfirmer: lot.aConfirmer, numeroPiece: lot.numeroPiece }
+      avant: { prixAchatUnitaire: avant.prixAchatUnitaire, valeurFcfa: avant.valeurFcfa, fournisseur: avant.fournisseur, dateReception: avant.dateReception, aConfirmer: avant.aConfirmer, numeroPiece: avant.numeroPiece },
+      apres: { prixAchatUnitaire: lot.prixAchatUnitaire, valeurFcfa: lot.valeurFcfa, fournisseur: lot.fournisseur, dateReception: lot.dateReception, aConfirmer: lot.aConfirmer, numeroPiece: lot.numeroPiece }
     });
 
     return res.status(200).json({ message: "Lot mis à jour avec succès !", lot });
