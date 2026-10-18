@@ -131,7 +131,7 @@ async function importerProduits(lignes, categories, regles, s) {
     const regle = texte(l.regle) ? regles.get(normaliser(l.regle)) : null;
     if (texte(l.regle) && !regle) ecart('03', l._ligne, `${reference} : règle « ${l.regle} » absente de 02`);
     const type = texte(l.type);
-    if (!['base fixe', 'extra'].includes(type)) ecart('03', l._ligne, `${reference} : type « ${type} » inconnu`);
+    if (!Product.TYPES_PRODUIT.includes(type)) ecart('03', l._ligne, `${reference} : type « ${type} » inconnu`);
     const statut = texte(l.statut) || null;
     if (statut && !['disponible', 'indisponible'].includes(statut)) ecart('03', l._ligne, `${reference} : statut « ${statut} » inconnu`);
 
@@ -166,7 +166,7 @@ async function importerProduits(lignes, categories, regles, s) {
     await p.save({ session: s });
   }
 
-  // D-15 : matières premières stockées, introduites en produits variables, sans prix (non vendues)
+  // D-15 : matières premières stockées, de type « matière première » (famille MP), sans prix (non vendues)
   const matieres = [
     { reference: 'MP01', name: 'Maïs trié', unit: 'kg' },
     { reference: 'MP02', name: 'Arachide', unit: 'sac' }
@@ -174,14 +174,14 @@ async function importerProduits(lignes, categories, regles, s) {
   for (const m of matieres) {
     if (actifs.some(x => x.reference === m.reference)) continue;
     const [cree] = await Product.create([{
-      ...m, type: 'extra', statut: 'indisponible', priceUnit: null, category: null, compositionRule: null,
+      ...m, type: 'matière première', statut: 'indisponible', priceUnit: null, category: null, compositionRule: null,
       quantites: { essentiel: null, equilibre: null, confort: null, reserve: null, fraicheur: null },
       commentaire: 'Matière première (D-15) : stockée, non vendue ; catégorie et prix à renseigner'
     }], { session: s });
     actifs.push(cree);
     crees++;
   }
-  ecart('03', '-', 'D-15 : MP01 « Maïs trié » (kg) et MP02 « Arachide » (sac, unité de suivi à préciser) créés hors fichier, statut indisponible, sans prix ni catégorie');
+  ecart('03', '-', 'D-15 : MP01 « Maïs trié » (kg) et MP02 « Arachide » (sac, unité de suivi à préciser) créés hors fichier s\'ils manquent, type matière première, statut indisponible, sans prix ni catégorie');
 
   // Produits actifs hors référentiel (ancien catalogue) : signalés, jamais supprimés
   const references = new Set([...vus, ...matieres.map(m => m.reference)]);
