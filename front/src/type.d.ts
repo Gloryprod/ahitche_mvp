@@ -51,13 +51,17 @@ export interface CompositionRule {
 
 export type PackType = 'essentiel' | 'equilibre' | 'confort' | 'reserve' | 'fraicheur'
 
+// Familles du catalogue (voir config/produits.ts) : P « base fixe », V « extra », MP « matière première »,
+// EMB « fourniture » ; MP et EMB ne se vendent jamais
+export type TypeProduit = 'base fixe' | 'extra' | 'matière première' | 'fourniture'
+
 export interface Product {
   _id: string
   reference: string | null
   name: string
   category: Category | null
   compositionRule: CompositionRule | null // Libellé seulement (les quantités par pack font foi)
-  type: 'base fixe' | 'extra'
+  type: TypeProduit
   statut: 'disponible' | 'indisponible'
   quantites: Record<PackType, number | null> // Vide = absent du pack
   unit: string
@@ -128,6 +132,57 @@ export interface Prestataire {
   modePaiement: 'Mobile Money' | 'Espèces' | 'Virement' | 'Chèque'
   notes: string
   actif: boolean
+}
+
+// --- Achats : bons de commande fournisseurs (GET /api/admin/bons-commande) ---
+// Deux formats : l'ancien (`items` : quantité et prix prévus) et la facture d'achat (`lignes`, une par ligne de la
+// facture, rattachée à un produit du catalogue ; la réception crée un lot par ligne)
+export type StatutBon = 'En attente' | 'Reçu partiellement' | 'Reçu' | 'Annulé'
+export type TypeCommandeBon = 'Bon de commande' | 'Achat direct'
+
+// Produit peuplé par le serveur
+export interface ProduitLigneBon {
+  _id: string
+  name: string
+  unit: string
+  reference?: string | null
+  type?: TypeProduit
+}
+
+export interface LigneBonFacture {
+  _id: string
+  designation: string // Telle qu'écrite sur la facture
+  quantiteFacture: string // Ex : « 1 carton »
+  montantFcfa: number
+  productId: ProduitLigneBon | string | null // null : fiche produit introuvable
+  quantite: number // Dans l'unité du produit
+  detailQuantite: string // Ex : « 15 bouteilles de 1 L »
+  quantiteRecue: number | null // Vide tant que la ligne n'est pas réceptionnée
+  lotFournisseur: string
+  numeroLot: string
+  lotId: { _id: string; numeroLot: string } | string | null // Lot créé à la réception
+}
+
+export interface BonCommande {
+  _id: string
+  numeroBon: string // Référence du bon signé, « Achat direct – facture n° … » ou BC-xxxxxx (ancien format)
+  typeCommande?: TypeCommandeBon
+  fournisseur: string // Nom recopié de la fiche prestataire
+  fournisseurId?: string | null
+  statut: StatutBon
+  // Ancien format
+  items?: { productId: ProduitLigneBon | string; quantiteCommandee: number; prixUnitairePrevu: number }[]
+  // Format facture
+  numeroFacture?: string
+  dateFacture?: string | null
+  lignes?: LigneBonFacture[]
+  montantTotalFcfa?: number | null
+  ligneBudgetaire?: string
+  sousLigne?: string
+  dateReception?: string | null
+  commentaire?: string
+  dateEmission?: string // Date du bon signé, ou de la facture pour un achat direct
+  createdAt?: string
 }
 
 // Commande vue par la Logistique (GET /api/admin/logistique)

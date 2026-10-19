@@ -1,31 +1,34 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { Search, Eye, X, AlertTriangle, CheckCircle2, Plus } from 'lucide-vue-next'
+import { Search, AlertTriangle, Plus } from 'lucide-vue-next'
 import api from '@/stores/api'
 import { useQuery, keepPreviousData } from '@tanstack/vue-query'
+import type { TypeProduit } from '@/type'
+import { FAMILLES_PRODUIT, familleDe, type CodeFamille } from '@/config/produits'
+import { formatFcfa, formatQuantite } from '@/services/bonsCommande'
 
-// --- INTERFACES TYPES ---
+// Inventaire : tous les produits actifs du catalogue, même à 0, triés par famille (P, V, MP, EMB) puis référence.
+// Le filtre par famille se fait ici, sur la liste chargée une fois (pas de nouvelle requête à chaque pastille).
 interface InventoryItem {
   productId: string
+  reference: string | null
   nom: string
   unite: string
-  reference: string | null
+  type: TypeProduit
+  famille: CodeFamille | null
   stockTotal: number
   nbLotsActifs: number
   lotsACompter: number // Lots dont la quantité n'est pas encore comptée : stock incomplet
   lotsAConfirmer: number
-  valeurFcfa: number
+  valeurFcfa: number // Au prix d'achat ; un lot à compter compte pour sa valeur facturée
   seuilAlerte: number | null // Vide : seuil à renseigner, pas d'alerte
-  enAlerte: boolean
+  enAlerte: boolean // Stock au seuil ou en dessous
 }
 
 // --- ÉTATS ---
 const search = ref('')
 const debouncedSearch = ref('')
-
-// Gestion de l'affichage du volet de détails latéral
-const showDetailPanel = ref(false)
-const selectedItem = ref<InventoryItem | null>(null)
+const filtreFamille = ref<'' | CodeFamille>('')
 
 // Debounce fait maison (évite d'installer une dépendance lourde)
 let timeoutId: ReturnType<typeof setTimeout>
@@ -36,7 +39,7 @@ watch(search, (newValue) => {
   }, 400) // Attend 400ms d'inactivité avant de lancer le filtrage
 })
 
-// --- CHARGEMENT DES DONNÉES (TanStack Query v5) ---
+// --- CHARGEMENT DES DONNÉES (TanStack Query v5), clé partagée avec le tableau de bord ---
 const fetchGlobalInventory = async (): Promise<InventoryItem[]> => {
   const response = await api.get('/api/admin/inventory/global')
   if (!response?.data) throw new Error('Aucune donnée d\'inventaire reçue')
@@ -49,215 +52,170 @@ const { data: inventaireRaw, isLoading, isError, error } = useQuery({
   placeholderData: keepPreviousData,
 })
 
-// --- CLIENT-SIDE FILTERING & STATS (Basé sur le raw data de TanStack) ---
+// --- FILTRES ET TOTAUX ---
+const sansAccents = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+const codeFamille = (i: InventoryItem) => i.famille ?? familleDe(i.type)?.code ?? null
+
+const filtres = computed(() => {
+  const liste = inventaireRaw.value ?? []
+  return [
+    { code: '' as const, libelle: '', nombre: liste.length },
+    ...FAMILLES_PRODUIT.map(f => ({ code: f.code, libelle: f.libelle, nombre: liste.filter(i => codeFamille(i) === f.code).length })),
+  ]
+})
+
 const filteredInventory = computed(() => {
-  if (!inventaireRaw.value) return []
-  return inventaireRaw.value.filter(item => 
-    item.nom.toLowerCase().includes(debouncedSearch.value.toLowerCase())
-  )
+  const mots = sansAccents(debouncedSearch.value).split(/\s+/).filter(Boolean)
+  return (inventaireRaw.value ?? []).filter(item =>
+    (!filtreFamille.value || codeFamille(item) === filtreFamille.value)
+    && mots.every(m => sansAccents(`${item.reference ?? ''} ${item.nom}`).includes(m)))
 })
 
+// Valeur de la liste affichée (famille et recherche appliquées)
+const valeurAffichee = computed(() => filteredInventory.value.reduce((s, i) => s + (i.valeurFcfa || 0), 0))
 const totalACompter = computed(() => (inventaireRaw.value ?? []).reduce((n, i) => n + (i.lotsAConfirmer || 0), 0))
-const formatFcfa = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
+const totalAlertes = computed(() => (inventaireRaw.value ?? []).filter(item => item.enAlerte).length)
 
-const totalAlertes = computed(() => {
-  if (!inventaireRaw.value) return 0
-  return inventaireRaw.value.filter(item => item.enAlerte).length
-})
-
-// --- ACTIONS ---
-const openDetailMode = (item: InventoryItem) => {
-  selectedItem.value = item
-  showDetailPanel.value = true
+// Ligne à 0 (aucun lot, même à compter) : grisée
+const estVide = (i: InventoryItem) => i.stockTotal === 0 && !i.lotsACompter
+const alerte = (i: InventoryItem) => {
+  if (i.enAlerte) return { texte: i.stockTotal === 0 ? 'Rupture' : 'Seuil atteint', badge: true }
+  if (i.seuilAlerte === null) return { texte: 'Seuil à renseigner', badge: false }
+  return { texte: 'Correct', badge: false }
 }
-
-const closePanels = () => {
-  showDetailPanel.value = false
-  selectedItem.value = null
-}
+const libelleFamille = (i: InventoryItem) => familleDe(i.type)?.libelle ?? ''
 </script>
 
 <template>
   <div class="space-y-6 animate-fadeIn text-xs font-medium text-gris">
 
-    <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
-      <h1 class="font-display font-bold text-xl text-noir flex items-center gap-2">
-        État Global de l'Inventaire
-      </h1>
+    <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-creme2">
+      <h1 class="font-display font-bold text-xl text-noir">État global de l'inventaire</h1>
       <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
         <div class="relative w-full sm:w-60">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris stroke-[2.5]" />
-          <input v-model="search" type="text" placeholder="Rechercher un produit..." class="w-full pl-9 pr-4 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret focus:bg-white transition-all" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris" aria-hidden="true" />
+          <input v-model="search" type="search" placeholder="Référence ou nom…" aria-label="Rechercher un produit" class="w-full pl-9 pr-4 py-2 bg-creme border border-creme2 rounded-xl text-xs font-medium text-noir focus:outline-none focus:border-foret" />
         </div>
-        <RouterLink to="/dashboard/admin/saveStock" class="cursor-pointer flex items-center gap-1.5 px-2 py-2 bg-foret text-white text-xs font-bold rounded-xl hover:bg-opacity-95 transition-all shadow-sm shrink-0">
-          <Plus class="w-3.5 h-3.5 stroke-3" />
+        <RouterLink to="/dashboard/admin/saveStock" class="cursor-pointer flex items-center gap-1.5 px-3 py-2 bg-foret text-white text-xs font-bold rounded-xl hover:bg-foret/90 shrink-0">
+          <Plus class="w-3.5 h-3.5" aria-hidden="true" />
           Entrée Stock
         </RouterLink>
       </div>
     </div>
 
-    <div v-if="totalAlertes > 0" class="bg-red-50 text-red-700 border border-red-100 p-4 rounded-xl flex items-center gap-2.5 shadow-2xs font-semibold">
-      <AlertTriangle class="w-4 h-4 text-red-600 shrink-0" />
-      <span>Attention : {{ totalAlertes }} produit(s) requiert(ent) un réapprovisionnement immédiat auprès de vos grossistes.</span>
+    <div v-if="totalAlertes > 0" class="bg-red-50 text-red-800 border border-red-200 p-4 rounded-xl flex items-start gap-2.5 font-semibold">
+      <AlertTriangle class="w-4 h-4 text-red-700 shrink-0 mt-0.5" aria-hidden="true" />
+      <span>Attention : {{ totalAlertes }} produit(s) au seuil d'alerte ou en dessous, à réapprovisionner auprès des fournisseurs.</span>
     </div>
 
     <RouterLink v-if="totalACompter > 0" to="/dashboard/admin/saveStock" class="block bg-amber-50 text-amber-900 border border-amber-200 p-4 rounded-xl font-semibold">
       {{ totalACompter }} lot(s) à compter ou à vérifier : les quantités affichées sont incomplètes. Voir les entrées de stock →
     </RouterLink>
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 bg-white p-4 rounded-2xl shadow-2xs">
-        <div v-if="!filteredInventory || filteredInventory.length === 0" class="text-center py-2 text-sm text-gris">
-            Aucun produit ne correspond à votre recherche actuelle.
-        </div>
-
-        <div class="flex items-center gap-4 text-xs font-semibold text-gris">
-            <div class="flex items-center gap-2">
-              <span>Articles en Stock :</span>
-              <span class="px-2.5 py-1 bg-foret/10 text-foret rounded-full font-bold text-[11px]">
-                {{ inventaireRaw?.length || 0 }}
-              </span>
-            </div>
-            <div class="w-px h-4 bg-gray-200"></div>
-            <div class="flex items-center gap-2">
-              <span class="text-red-700">Alertes Actives :</span>
-              <span class="px-2.5 py-1 bg-red-50 text-red-800 rounded-full font-bold text-[11px] border border-red-100">
-                {{ totalAlertes }}
-              </span>
-            </div>
-        </div>
+    <!-- PASTILLES DE FAMILLE ET TOTAL DE LA LISTE AFFICHÉE -->
+    <div class="bg-white p-4 rounded-2xl border border-creme2 space-y-3">
+      <div class="flex flex-wrap gap-2" role="group" aria-label="Filtrer par famille">
+        <button
+          v-for="f in filtres"
+          :key="f.code || 'tous'"
+          type="button"
+          :aria-pressed="filtreFamille === f.code"
+          :title="f.libelle || 'Toutes les familles'"
+          :class="['cursor-pointer px-3 py-1.5 rounded-full text-xs font-bold border', filtreFamille === f.code ? 'bg-foret text-white border-foret' : 'bg-white text-noir border-creme2 hover:bg-creme']"
+          @click="filtreFamille = f.code"
+        >
+          {{ f.code || 'Tous' }}<span v-if="f.libelle" class="sr-only sm:not-sr-only font-medium"> · {{ f.libelle }}</span> ({{ f.nombre }})
+        </button>
+      </div>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p class="text-noir">
+          Valeur de la liste affichée :
+          <span class="font-mono font-bold text-base text-foret">{{ formatFcfa(valeurAffichee) }}</span>
+          <span class="text-gris whitespace-nowrap"> · {{ filteredInventory.length }} produit(s)</span>
+        </p>
+        <p class="text-[11px]">Alertes actives : <span class="font-bold" :class="totalAlertes ? 'text-red-700' : 'text-noir'">{{ totalAlertes }}</span></p>
+      </div>
+      <p class="text-[10px] text-gris">Valeur au prix d'achat ; un lot à compter compte pour sa valeur facturée.</p>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-      
-      <div :class="[showDetailPanel ? 'lg:col-span-2' : 'lg:col-span-3', 'bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden transition-all']">
-        <div v-if="isLoading" class="text-sm font-medium text-gris p-8 text-center">
-          Calcul des volumes cumulés en entrepôt...
-        </div>
-    
-        <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-100">
-          Erreur : {{ error?.message || "Impossible de générer le bilan de l'inventaire." }}
-        </div>
+    <div class="bg-white rounded-2xl border border-creme2 overflow-hidden">
+      <div v-if="isLoading" class="text-sm font-medium text-gris p-8 text-center">
+        Calcul de l'inventaire en cours…
+      </div>
 
-        <div v-defilable="'Inventaire'" v-else class="p-4 overflow-x-auto">
-            <table class="w-full text-left border-collapse">
+      <div v-else-if="isError" class="m-4 p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200">
+        Erreur : {{ error?.message || "Impossible de générer le bilan de l'inventaire." }}
+      </div>
+
+      <p v-else-if="!filteredInventory.length" class="p-8 text-center text-sm text-gris">
+        Aucun produit ne correspond à votre recherche.
+      </p>
+
+      <template v-else>
+        <!-- ORDINATEUR : TABLEAU -->
+        <div v-defilable="'Inventaire'" class="hidden md:block p-4 overflow-x-auto">
+          <table class="w-full text-left border-collapse">
             <thead>
-                <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
-                <th class="py-3 px-4">Produit référencé</th>
-                <th class="py-3 px-4 text-right">Volume Global restant</th>
-                <th class="py-3 px-4 text-right hidden md:table-cell">Seuil Sécurité</th>
-                <th class="py-3 px-4 text-center hidden sm:table-cell">Lots actifs</th>
-                <th class="py-3 px-4 text-center">Statut</th>
-                <th class="py-3 px-4 text-center">Détails</th>
-                </tr>
+              <tr class="border-b border-creme2 text-[10px] font-bold uppercase tracking-wider text-gris">
+                <th class="py-2.5 px-2">Réf.</th>
+                <th class="py-2.5 px-2">Produit</th>
+                <th class="py-2.5 px-2">Famille</th>
+                <th class="py-2.5 px-2 text-right">Stock</th>
+                <th class="py-2.5 px-2 text-center">Lots</th>
+                <th class="py-2.5 px-2 text-center">À compter</th>
+                <th class="py-2.5 px-2 text-right">Valeur</th>
+                <th class="py-2.5 px-2">Alerte</th>
+              </tr>
             </thead>
-            <tbody class="divide-y divide-gray-50 text-noir">
-                <tr v-for="item in filteredInventory" :key="item.productId" :class="[item.enAlerte ? 'bg-red-50/20 hover:bg-red-50/40' : 'hover:bg-gray-50/50', 'transition-colors']">
-                
-                <td class="py-3 px-4 font-bold text-gray-900">{{ item.nom }}</td>
-                
-                <td class="py-3 px-4 text-right font-mono font-bold" :class="item.enAlerte ? 'text-red-600' : 'text-gray-700'">
-                  {{ item.stockTotal }} <span class="text-[10px] text-gris font-sans font-medium">{{ item.unite }}</span>
-                  <span v-if="item.lotsACompter" class="block text-[10px] font-sans font-semibold text-amber-800">+ {{ item.lotsACompter }} lot(s) à compter</span>
+            <tbody class="divide-y divide-creme2">
+              <tr v-for="item in filteredInventory" :key="item.productId" :class="estVide(item) ? 'bg-creme text-gris' : 'text-noir'">
+                <td class="py-2.5 px-2 font-mono font-bold whitespace-nowrap">{{ item.reference || '—' }}</td>
+                <td class="py-2.5 px-2 font-semibold">{{ item.nom }}</td>
+                <td class="py-2.5 px-2">
+                  <span class="inline-block px-1.5 py-0.5 rounded bg-creme2 text-noir font-bold text-[10px]" :title="libelleFamille(item)">{{ codeFamille(item) ?? '?' }}</span>
                 </td>
-                
-                <td class="py-3 px-4 text-right font-mono text-gris hidden md:table-cell">
-                  <template v-if="item.seuilAlerte !== null">{{ item.seuilAlerte }} <span class="text-[10px] font-sans">{{ item.unite }}</span></template>
-                  <span v-else class="text-[10px] font-sans">à renseigner</span>
+                <td class="py-2.5 px-2 text-right font-mono font-bold whitespace-nowrap">
+                  {{ formatQuantite(item.stockTotal) }} <span class="font-body font-medium text-[10px]">{{ item.unite }}</span>
                 </td>
-
-                <td class="py-3 px-4 text-center hidden sm:table-cell">
-                  <span class="px-2 py-0.5 bg-gray-100 text-gris rounded font-mono text-[11px] border border-gray-200">
-                    {{ item.nbLotsActifs }}
-                  </span>
+                <td class="py-2.5 px-2 text-center font-mono">{{ item.nbLotsActifs }}</td>
+                <td class="py-2.5 px-2 text-center font-mono" :class="item.lotsACompter ? 'text-amber-800 font-bold' : ''">{{ item.lotsACompter || '—' }}</td>
+                <td class="py-2.5 px-2 text-right font-mono whitespace-nowrap">{{ formatFcfa(item.valeurFcfa) }}</td>
+                <td class="py-2.5 px-2">
+                  <span v-if="alerte(item).badge" class="inline-block px-2 py-0.5 rounded-full font-bold text-[10px] bg-red-50 text-red-800 border border-red-200 uppercase tracking-wide whitespace-nowrap">{{ alerte(item).texte }}</span>
+                  <span v-else class="text-[11px]" :class="alerte(item).texte === 'Correct' ? 'text-savane font-semibold' : 'text-gris'">{{ alerte(item).texte }}</span>
+                  <span v-if="item.seuilAlerte !== null" class="block text-[10px] text-gris whitespace-nowrap">seuil {{ formatQuantite(item.seuilAlerte) }} {{ item.unite }}</span>
                 </td>
-
-                <td class="py-3 px-4 text-center">
-                  <span v-if="item.lotsACompter" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-amber-50 text-amber-800 border border-amber-200 uppercase tracking-wide">
-                    À compter
-                  </span>
-                  <span v-else-if="item.enAlerte" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-red-100 text-red-700 border border-red-200 uppercase tracking-wide">
-                    Rupture proche
-                  </span>
-                  <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-green-50 text-green-700 border border-green-100 uppercase tracking-wide">
-                    Disponible
-                  </span>
-                </td>
-
-                <td class="py-3 px-4 text-center">
-                    <button @click="openDetailMode(item)" class="cursor-pointer p-1.5 text-gris hover:text-noir hover:bg-gray-100 rounded-lg transition-colors" title="Consulter la fiche" aria-label="Voir le détail">
-                        <Eye class="w-3.5 h-3.5" />
-                    </button>
-                </td>
-                </tr>
+              </tr>
             </tbody>
-            </table>
-        </div>   
-      </div>
-
-      <div v-if="showDetailPanel && selectedItem" class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 animate-fadeIn sticky top-6">
-        
-        <div class="flex items-center justify-between border-b pb-2.5">
-          <h3 class="font-bold text-noir text-sm">Analyse d'inventaire</h3>
-          <button @click="closePanels" class="p-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-gris transition-all" aria-label="Fermer">
-            <X class="w-3.5 h-3.5" />
-          </button>
+          </table>
         </div>
 
-        <div class="space-y-4 text-xs">
-          <div class="space-y-1">
-            <span class="text-[10px] uppercase font-bold text-gris tracking-wider">Référence Produit ID</span>
-            <p class="font-mono bg-gray-50 p-2 rounded-lg text-gris select-all">{{ selectedItem.productId }}</p>
-          </div>
-          
-          <div class="space-y-1">
-            <span class="text-[10px] uppercase font-bold text-gris tracking-wider">Libellé</span>
-            <p class="text-noir font-bold text-sm">{{ selectedItem.nom }}</p>
-          </div>
-
-          <div class="p-3.5 rounded-xl border flex items-start gap-2.5" :class="selectedItem.enAlerte ? 'bg-red-50/50 border-red-100 text-red-800' : 'bg-green-50/30 border-green-100 text-green-800'">
-            <AlertTriangle v-if="selectedItem.enAlerte" class="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
-            <CheckCircle2 v-else class="w-4 h-4 text-green-800 mt-0.5 shrink-0" />
-            <div>
-              <p class="font-bold text-[11px] uppercase tracking-wide">
-                {{ selectedItem.enAlerte ? 'Réapprovisionnement Urgent' : 'Niveau de Stock Correct' }}
+        <!-- TÉLÉPHONE : CARTES -->
+        <ul class="md:hidden p-3 space-y-2" aria-label="Inventaire">
+          <li v-for="item in filteredInventory" :key="item.productId" :class="[estVide(item) ? 'bg-creme' : 'bg-white', 'p-3 rounded-xl border border-creme2']">
+            <div class="flex items-start justify-between gap-2">
+              <p class="min-w-0 break-words" :class="estVide(item) ? 'text-gris' : 'text-noir'">
+                <span class="font-mono font-bold">{{ item.reference || '—' }}</span>
+                <span class="mx-1 inline-block px-1.5 rounded bg-creme2 text-noir font-bold text-[10px]" :title="libelleFamille(item)">{{ codeFamille(item) ?? '?' }}</span>
+                <span class="font-semibold">{{ item.nom }}</span>
               </p>
-              <p class="text-[11px] opacity-90 mt-0.5">
-                {{ selectedItem.enAlerte ? 'Le volume physique global est descendu en-dessous ou est égal au seuil de sécurité imposé pour la composition des packs d\'Ahitché.' : 'Le stock disponible permet de couvrir la préparation des formules et packs d\'abonnements en cours.' }}
-              </p>
+              <span v-if="alerte(item).badge" class="shrink-0 px-2 py-0.5 rounded-full font-bold text-[10px] bg-red-50 text-red-800 border border-red-200 uppercase tracking-wide">{{ alerte(item).texte }}</span>
             </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3 pt-1">
-            <div class="bg-[#f9f9fb] p-3 rounded-xl border border-gray-100">
-              <span class="text-[9px] uppercase font-bold text-gris block">Total en rayon</span>
-              <p class="text-noir font-mono font-bold text-base mt-0.5">
-                {{ selectedItem.stockTotal }} <span class="text-xs font-sans font-medium text-gris">{{ selectedItem.unite }}</span>
-              </p>
-            </div>
-            <div class="bg-[#f9f9fb] p-3 rounded-xl border border-gray-100">
-              <span class="text-[9px] uppercase font-bold text-gris block">Seuil critique</span>
-              <p class="text-gray-700 font-mono font-bold text-base mt-0.5">
-                <template v-if="selectedItem.seuilAlerte !== null">{{ selectedItem.seuilAlerte }} <span class="text-xs font-sans font-medium text-gris">{{ selectedItem.unite }}</span></template>
-                <span v-else class="text-xs font-sans">à renseigner</span>
-              </p>
-            </div>
-            <div class="bg-[#f9f9fb] p-3 rounded-xl border border-gray-100 col-span-2">
-              <span class="text-[9px] uppercase font-bold text-gris block">Valeur au prix d'achat</span>
-              <p class="text-noir font-mono font-bold text-base mt-0.5">{{ formatFcfa(selectedItem.valeurFcfa) }}</p>
-              <p v-if="selectedItem.lotsACompter" class="text-[10px] text-amber-800">Dont {{ selectedItem.lotsACompter }} lot(s) à compter, à leur valeur facturée</p>
-            </div>
-          </div>
-
-          <div class="space-y-1 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
-            <span class="text-[10px] uppercase font-bold text-gris tracking-wider block">Dispersion physique</span>
-            <p class="text-gray-700 font-medium leading-relaxed">
-              Ce volume global est actuellement réparti et segmenté sur <span class="font-bold text-noir">{{ selectedItem.nbLotsActifs }} lot(s) physique(s)</span> distinct(s) non vidés et traçables au sein de votre base FIFO.
-            </p>
-          </div>
-        </div>
-
-      </div>
-
+            <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+              <div class="flex flex-wrap gap-x-1"><dt>Stock :</dt><dd class="font-mono font-bold" :class="estVide(item) ? 'text-gris' : 'text-noir'">{{ formatQuantite(item.stockTotal) }} {{ item.unite }}</dd></div>
+              <div class="flex flex-wrap gap-x-1"><dt>Valeur :</dt><dd class="font-mono text-noir">{{ formatFcfa(item.valeurFcfa) }}</dd></div>
+              <div class="flex flex-wrap gap-x-1"><dt>Lots :</dt><dd class="text-noir">{{ item.nbLotsActifs }}</dd></div>
+              <div class="flex flex-wrap gap-x-1"><dt>À compter :</dt><dd :class="item.lotsACompter ? 'text-amber-800 font-bold' : 'text-noir'">{{ item.lotsACompter || '—' }}</dd></div>
+              <div class="col-span-2 flex flex-wrap gap-x-1">
+                <dt>Alerte :</dt>
+                <dd :class="alerte(item).badge ? 'text-red-800 font-bold' : alerte(item).texte === 'Correct' ? 'text-savane font-semibold' : 'text-gris'">
+                  {{ alerte(item).texte }}<template v-if="item.seuilAlerte !== null"> (seuil {{ formatQuantite(item.seuilAlerte) }} {{ item.unite }})</template>
+                </dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+      </template>
     </div>
   </div>
 </template>
