@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, computed, nextTick } from 'vue'
 import { Search, Plus, Edit2, Trash2, X, Wand2 } from 'lucide-vue-next'
 import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
-import type { Product, CompositionRule, Category, PackType } from '@/type'
+import type { Product, CompositionRule, Category, PackType, TypeProduit } from '@/type'
+import { FAMILLES_PRODUIT, estVendu, familleDe } from '@/config/produits'
 
-// Catalogue du référentiel packs v4 : produits fixes (base des packs) et produits variables (extras).
+// Catalogue du référentiel packs v4, quatre familles : produits fixes (P, base des packs), produits variables
+// (V, extras), matières premières (MP) et fournitures (EMB). MP et EMB ne se vendent pas : ni quantités par pack,
+// ni affichage sur le site (le serveur vide leurs quantités).
 // Les quantités par pack font foi (D-14) ; la règle sert seulement à proposer les quantités d'un nouveau produit.
 // Une valeur vide reste vide et s'affiche « à renseigner ».
 const PACKS: { cle: PackType; libelle: string }[] = [
@@ -21,7 +24,7 @@ const PACKS: { cle: PackType; libelle: string }[] = [
 const page = ref(1)
 const search = ref('')
 const debouncedSearch = ref('')
-const filtreType = ref<'' | 'base fixe' | 'extra'>('')
+const filtreType = ref<'' | TypeProduit>('')
 const isSubmitting = ref(false)
 const notification = ref({ text: '', type: '' })
 const queryClient = useQueryClient()
@@ -71,11 +74,25 @@ const { data, isLoading, isError, error, isPlaceholderData } = useQuery({
 const aRenseigner = 'à renseigner'
 const prix = (n: number | null) => n === null || n === undefined ? aRenseigner : `${n.toLocaleString('fr-FR')} F`
 const quantite = (n: number | null | undefined) => n === null || n === undefined ? '—' : n.toLocaleString('fr-FR')
+// Prix facultatif : un prix vide n'est « à renseigner » que pour un produit vendu
+const prixManquant = (p: Product) => p.priceUnit === null && estVendu(p.type)
+const prixAffiche = (p: Product) => (p.priceUnit === null && !estVendu(p.type) ? '—' : prix(p.priceUnit))
+const formVendu = computed(() => estVendu(form.value.type))
+
+// Sur téléphone, le formulaire s'ouvre au-dessus de la liste : on l'amène à l'écran s'il n'y est pas
+const panneau = ref<HTMLElement | null>(null)
+function montrerPanneau() {
+  showFormPanel.value = true
+  void nextTick(() => {
+    const haut = panneau.value?.getBoundingClientRect().top
+    if (haut !== undefined && (haut < 0 || haut > window.innerHeight)) panneau.value?.scrollIntoView({ block: 'start' })
+  })
+}
 
 function openCreateMode() {
   isEditing.value = false
   form.value = formVide()
-  showFormPanel.value = true
+  montrerPanneau()
 }
 
 function openEditMode(p: Product) {
@@ -86,7 +103,7 @@ function openEditMode(p: Product) {
     priceUnit: p.priceUnit, seuilAlerte: p.seuilAlerte, commentaire: p.commentaire || '',
     quantites: { ...quantitesVides(), ...p.quantites },
   }
-  showFormPanel.value = true
+  montrerPanneau()
 }
 
 // Proposition à partir de la règle (nouveau produit) : Équilibré et Confort = Essentiel × multiplicateurs
@@ -109,7 +126,8 @@ async function handleSubmit() {
     ...form.value,
     priceUnit: versNombre(form.value.priceUnit),
     seuilAlerte: versNombre(form.value.seuilAlerte),
-    quantites: Object.fromEntries(PACKS.map(p => [p.cle, versNombre(form.value.quantites[p.cle])])),
+    // Matière première ou fourniture : hors packs (le serveur vide aussi ces quantités)
+    quantites: Object.fromEntries(PACKS.map(p => [p.cle, formVendu.value ? versNombre(form.value.quantites[p.cle]) : null])),
   }
   try {
     if (isEditing.value) {
@@ -141,8 +159,9 @@ async function deleteProduct(p: Product) {
     await api.delete(`/api/admin/products/${p._id}`)
     showNotification('Produit supprimé.', 'success')
     queryClient.invalidateQueries({ queryKey: ['products'] })
-  } catch {
-    showNotification('Impossible de supprimer le produit', 'error')
+  } catch (err) {
+    // Ex. : produit qui a encore du stock, refusé par le serveur avec le nombre de lots
+    showNotification(messageErreur(err, 'Impossible de supprimer le produit'), 'error')
   }
 }
 
@@ -157,17 +176,16 @@ function showNotification(text: string, type: string) {
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-creme2">
       <div>
         <h1 class="font-display font-bold text-xl text-noir">Catalogue des produits</h1>
-        <p class="text-[11px] text-gris">Référentiel packs v4 · quantités par pack, dans l'unité du produit (« — » = absent du pack)</p>
+        <p class="text-[11px] text-gris">Référentiel packs v4 · quantités par pack, dans l'unité du produit (« — » = absent du pack) · matières premières et fournitures : jamais vendues</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <div class="relative w-full sm:w-56">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris-lt" />
           <input v-model="search" type="search" placeholder="Nom ou référence..." aria-label="Rechercher un produit" class="w-full pl-9 pr-3 py-2 bg-creme border border-creme2 rounded-xl text-xs text-noir focus:outline-none focus:border-foret" />
         </div>
-        <select v-model="filtreType" aria-label="Filtrer par type" class="px-3 py-2 rounded-xl border border-creme2 bg-creme text-xs text-noir">
-          <option value="">Tous les produits</option>
-          <option value="base fixe">Base fixe des packs</option>
-          <option value="extra">Extras (variables)</option>
+        <select v-model="filtreType" aria-label="Filtrer par famille" class="px-3 py-2 rounded-xl border border-creme2 bg-creme text-xs text-noir">
+          <option value="">Toutes les familles</option>
+          <option v-for="f in FAMILLES_PRODUIT" :key="f.type" :value="f.type">{{ f.code }} · {{ f.libelle }}</option>
         </select>
         <button @click="openCreateMode" class="cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 bg-foret text-white text-xs font-bold rounded-xl">
           <Plus class="w-3.5 h-3.5" /> Ajouter
@@ -190,6 +208,7 @@ function showNotification(text: string, type: string) {
               <thead>
                 <tr class="border-b border-creme2 text-[10px] font-bold uppercase tracking-wider text-gris">
                   <th class="py-2 pr-2">Réf.</th>
+                  <th class="py-2 pr-2">Famille</th>
                   <th class="py-2 pr-2">Produit</th>
                   <th class="py-2 pr-2 text-right">P.U.</th>
                   <th v-for="p in PACKS" :key="p.cle" class="py-2 px-1 text-right">{{ p.libelle }}</th>
@@ -201,14 +220,20 @@ function showNotification(text: string, type: string) {
                 <tr v-for="prod in data?.products" :key="prod._id" :class="prod.statut === 'indisponible' ? 'bg-creme/70' : ''">
                   <td class="py-2.5 pr-2 font-mono font-bold">{{ prod.reference || '—' }}</td>
                   <td class="py-2.5 pr-2">
+                    <span class="inline-block px-1.5 py-0.5 rounded bg-creme2 text-noir font-bold text-[10px]" :title="familleDe(prod.type)?.libelle">{{ familleDe(prod.type)?.code ?? '?' }}</span>
+                  </td>
+                  <td class="py-2.5 pr-2">
                     <span class="font-bold">{{ prod.name }}</span>
                     <span class="block text-[10px] text-gris">
-                      {{ prod.category?.name || 'Catégorie à renseigner' }} · {{ prod.type === 'extra' ? 'extra' : 'base fixe' }} · {{ prod.unit }}
+                      {{ prod.category?.name || 'Catégorie à renseigner' }} · {{ prod.unit }}
                       <span v-if="prod.statut === 'indisponible'" class="ml-1 px-1.5 rounded bg-red-50 text-red-800 font-bold">indisponible</span>
                     </span>
                   </td>
-                  <td class="py-2.5 pr-2 text-right font-mono" :class="prod.priceUnit === null ? 'text-amber-800' : ''">{{ prix(prod.priceUnit) }}</td>
-                  <td v-for="p in PACKS" :key="p.cle" class="py-2.5 px-1 text-right tabular-nums">{{ quantite(prod.quantites?.[p.cle]) }}</td>
+                  <td class="py-2.5 pr-2 text-right font-mono" :class="prixManquant(prod) ? 'text-amber-800' : ''">{{ prixAffiche(prod) }}</td>
+                  <template v-if="estVendu(prod.type)">
+                    <td v-for="p in PACKS" :key="p.cle" class="py-2.5 px-1 text-right tabular-nums">{{ quantite(prod.quantites?.[p.cle]) }}</td>
+                  </template>
+                  <td v-else :colspan="PACKS.length" class="py-2.5 px-1 text-center text-[10px] text-gris">Non vendu · hors packs</td>
                   <td class="py-2.5 px-1 text-right tabular-nums" :class="prod.seuilAlerte === null ? 'text-amber-800' : ''">{{ prod.seuilAlerte === null ? aRenseigner : quantite(prod.seuilAlerte) }}</td>
                   <td class="py-2.5 text-right whitespace-nowrap">
                     <button @click="openEditMode(prod)" class="cursor-pointer p-1.5 text-gris hover:text-foret" :aria-label="`Modifier ${prod.name}`"><Edit2 class="w-3.5 h-3.5" /></button>
@@ -226,7 +251,8 @@ function showNotification(text: string, type: string) {
         </div>
       </div>
 
-      <div v-if="showFormPanel" class="bg-white p-5 rounded-2xl border border-creme2 space-y-4 xl:sticky xl:top-6">
+      <!-- Au-dessus de la liste sur téléphone et tablette, à côté sur grand écran -->
+      <div v-if="showFormPanel" ref="panneau" class="order-first xl:order-none scroll-mt-20 bg-white p-5 rounded-2xl border border-creme2 space-y-4 xl:sticky xl:top-6">
         <div class="flex items-center justify-between border-b border-creme2 pb-2.5">
           <h3 class="font-bold text-noir text-sm">{{ isEditing ? 'Modifier le produit' : 'Ajouter au catalogue' }}</h3>
           <button @click="showFormPanel = false" class="p-1 rounded-lg bg-creme" aria-label="Fermer"><X class="w-3.5 h-3.5" /></button>
@@ -242,10 +268,9 @@ function showNotification(text: string, type: string) {
             </label>
           </div>
           <div class="grid grid-cols-2 gap-2">
-            <label class="block text-[10px] font-bold uppercase text-gris">Type
+            <label class="col-span-2 block text-[10px] font-bold uppercase text-gris">Famille
               <select id="produit-type" v-model="form.type" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case">
-                <option value="base fixe">Base fixe des packs</option>
-                <option value="extra">Extra (variable)</option>
+                <option v-for="f in FAMILLES_PRODUIT" :key="f.type" :value="f.type">{{ f.code }} · {{ f.libelle }}</option>
               </select>
             </label>
             <label class="block text-[10px] font-bold uppercase text-gris">Statut
@@ -264,14 +289,15 @@ function showNotification(text: string, type: string) {
               <input id="produit-unite" v-model="form.unit" type="text" required placeholder="kg, L, lot, boîte…" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
             </label>
             <label class="block text-[10px] font-bold uppercase text-gris">Prix unitaire (FCFA)
-              <input id="produit-prix" v-model="form.priceUnit" type="number" min="0" step="any" placeholder="à renseigner" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
+              <input id="produit-prix" v-model="form.priceUnit" type="number" min="0" step="any" :placeholder="formVendu ? 'à renseigner' : 'facultatif'" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
             </label>
             <label class="block text-[10px] font-bold uppercase text-gris">Seuil d'alerte
               <input id="produit-seuil" v-model="form.seuilAlerte" type="number" min="0" step="any" placeholder="à renseigner" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
             </label>
           </div>
 
-          <fieldset class="p-3 rounded-xl border border-creme2 space-y-2">
+          <p v-if="!formVendu" class="p-3 rounded-xl bg-creme text-[11px] text-noir">Non vendu : hors packs, jamais affiché sur le site.</p>
+          <fieldset v-else class="p-3 rounded-xl border border-creme2 space-y-2">
             <legend class="px-1 text-[10px] font-bold uppercase text-gris">Quantités par pack ({{ form.unit || 'unité' }}) · vide = absent</legend>
             <div class="grid grid-cols-5 gap-1.5">
               <label v-for="p in PACKS" :key="p.cle" class="block text-[9px] font-bold uppercase text-gris text-center">{{ p.libelle }}

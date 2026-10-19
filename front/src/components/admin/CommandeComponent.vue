@@ -11,6 +11,7 @@ import { STATUTS, TRANSITIONS, classeStatut, type StatutCommande } from '@/confi
 import { useChangementStatut } from '@/composables/useChangementStatut'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
+import { estVendu } from '@/config/produits'
 
 const authStore = useAuthStore()
 const ecriture = computed(() => peutEcrire(authStore.role.value, 'commandes'))
@@ -55,10 +56,11 @@ onMounted(async () => {
   try {
     const [userRes, productRes] = await Promise.all([
       api.get('/api/admin/users?limit=100'),
-      api.get('/api/admin/products?limit=100')
+      api.get('/api/admin/products?limit=200') // Maximum du serveur : les matières premières et fournitures en font partie
     ])
     usersList.value = userRes.data.users || []
-    prodList.value = productRes.data.products || []
+    // Seuls les produits vendus (fixes et variables) peuvent entrer dans une commande ; le serveur refuse les autres
+    prodList.value = ((productRes.data.products || []) as Product[]).filter(p => estVendu(p.type))
   } catch {
     showNotification("Erreur lors du chargement des options de formulaire", "error")
   }

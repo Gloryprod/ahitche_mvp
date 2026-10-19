@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Product = require('../models/product');
+const { TYPES_VENDUS } = require('../models/product');
 const { prixDeVente } = require('./formuleService');
 
 // Prix d'une commande saisie dans l'admin (décision D-10) : le serveur impose le prix de la formule.
@@ -36,6 +37,8 @@ async function calculerPrixCommande({ formule, lignes, remise, utilisateur, remi
     const produit = produits.get(String(ligne.productId));
     const quantite = nombre(ligne.quantity);
     if (!produit) return { erreur: 'Un produit du panier est introuvable dans le catalogue.' };
+    // Matière première et fourniture : stockées, jamais vendues (ni dans un pack, ni en extra)
+    if (!TYPES_VENDUS.includes(produit.type)) return { erreur: `${produit.name} n'est pas vendu : matière première ou fourniture.` };
     if (!(quantite > 0)) return { erreur: `Quantité invalide pour ${produit.name}.` };
     const prix = produit.priceUnit;
     if (ligne.isExtra) {

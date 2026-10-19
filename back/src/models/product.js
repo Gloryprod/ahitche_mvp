@@ -1,10 +1,17 @@
 const mongoose = require('mongoose');
 
-// Catalogue (référentiel packs v4) : produits fixes P01 à P17 (base des packs), produits variables V01 à V19
-// (extras) et matières premières MP (stockées, transformées). Les quantités par pack font foi (décision D-14) ;
-// la règle de composition n'est plus qu'un libellé, qui sert à proposer les quantités d'un nouveau produit.
+// Catalogue (référentiel packs v4), quatre familles :
+//  - P   (« base fixe »)        : produits fixes P01 à P17, base des packs ;
+//  - V   (« extra »)            : produits variables, vendus à la demande (compléments de la semaine) ;
+//  - MP  (« matière première ») : matières premières stockées puis transformées (ex. maïs → farine), jamais vendues ;
+//  - EMB (« fourniture »)       : fournitures et emballages, stockés mais non vendus, hors packs, invisibles sur le site.
+// Seuls P et V se vendent (TYPES_VENDUS) : MP et EMB n'ont ni quantité par pack ni affichage « cette semaine ».
+// Les quantités par pack font foi (décision D-14) ; la règle de composition n'est plus qu'un libellé, qui sert à
+// proposer les quantités d'un nouveau produit.
 // Une valeur absente reste vide (null) et s'affiche « à renseigner » : aucune valeur n'est inventée.
-const TYPES_PRODUIT = ['base fixe', 'extra'];
+const TYPES_PRODUIT = ['base fixe', 'extra', 'matière première', 'fourniture'];
+const TYPES_VENDUS = ['base fixe', 'extra'];
+const FAMILLES = { 'base fixe': 'P', 'extra': 'V', 'matière première': 'MP', 'fourniture': 'EMB' };
 const STATUTS_PRODUIT = ['disponible', 'indisponible'];
 const PACKS = ['essentiel', 'equilibre', 'confort', 'reserve', 'fraicheur'];
 
@@ -15,7 +22,7 @@ const quantitesSchema = new mongoose.Schema(
 );
 
 const ProductSchema = new mongoose.Schema({
-  reference: { type: String, trim: true, default: null }, // Ex : "P01", "V13", "MP01"
+  reference: { type: String, trim: true, default: null }, // Ex : "P01", "V13", "MP01", "EMB01"
   name: { type: String, required: true, trim: true }, // ex: "Riz local", "Coquillettes"
   category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
   compositionRule: { type: mongoose.Schema.Types.ObjectId, ref: 'CompositionRule', default: null }, // Libellé seulement
@@ -42,5 +49,7 @@ ProductSchema.index(
 
 module.exports = mongoose.model('Product', ProductSchema);
 module.exports.TYPES_PRODUIT = TYPES_PRODUIT;
+module.exports.TYPES_VENDUS = TYPES_VENDUS;
+module.exports.FAMILLES = FAMILLES;
 module.exports.STATUTS_PRODUIT = STATUTS_PRODUIT;
 module.exports.PACKS = PACKS;

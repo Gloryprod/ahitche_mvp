@@ -25,13 +25,14 @@ interface PaginatedCommandesResponse {
   total?: number
 }
 
+// Inventaire complet (même les produits à 0) : un produit à 0 qui a un seuil compte parmi les alertes
 interface InventoryItem {
   productId: string
   nom: string
   unite: string
   stockTotal: number
   nbLotsActifs: number
-  seuilAlerte: number
+  seuilAlerte: number | null // Vide : pas d'alerte
   enAlerte: boolean
 }
 
@@ -402,7 +403,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
               <span v-if="stockAlerts.length > 3"> et {{ stockAlerts.length - 3 }} autre(s)</span>.
             </p>
           </div>
-          <router-link to="/dashboard/admin/inventory" class="text-[11px] font-bold text-red-700 underline shrink-0">Voir stock →</router-link>
+          <router-link to="/dashboard/admin/inventaire" class="text-[11px] font-bold text-red-700 underline shrink-0">Voir stock →</router-link>
         </div>
 
         <!-- Alerte Renouvellements imminents (J-5) -->

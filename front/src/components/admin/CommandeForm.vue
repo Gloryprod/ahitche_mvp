@@ -7,6 +7,7 @@ import { X, User, CheckCircle2, ArrowRight, Plus, Minus, Trash2, PlusCircle, Lay
 import type { Client, Product, Commande, ProductItem } from '@/type'
 import { useAuthStore } from '@/stores/auth'
 import { MODES_PAIEMENT } from '@/config/commandes'
+import { estVendu } from '@/config/produits'
 
 interface AdjustedItem {
   productId: string;
@@ -96,10 +97,11 @@ watch(() => props.open, (isOpen) => {
 // --- CALCULS AUXILIAIRES ---
 const cl = computed(() => props.clients.find(c => String(c._id) === String(clientId.value)))
 
-// Filtre pour ne pas afficher dans la liste "Ajouter" les produits déjà présents dans le panier
+// Filtre pour ne pas afficher dans la liste "Ajouter" les produits déjà présents dans le panier,
+// ni les produits jamais vendus (matières premières et fournitures, refusées par le serveur)
 const availableExtras = computed(() => {
-  return props.allProducts.filter(p => 
-    !adjustedItems.value.some(item => String(item.productId) === String(p._id))
+  return props.allProducts.filter(p =>
+    estVendu(p.type) && !adjustedItems.value.some(item => String(item.productId) === String(p._id))
   )
 })
 
@@ -182,7 +184,7 @@ const addExtraProduct = () => {
   
   const prod = props.allProducts.find(p => String(p._id) === String(selectedExtraProductId.value))
   // Un produit sans prix (à renseigner) ou indisponible ne peut pas être ajouté : il compterait pour 0 FCFA
-  if (prod && prod.priceUnit !== null && prod.statut !== 'indisponible') {
+  if (prod && estVendu(prod.type) && prod.priceUnit !== null && prod.statut !== 'indisponible') {
     adjustedItems.value.push({
       productId: prod._id,
       name: prod.name,
@@ -321,7 +323,7 @@ const submitOrder = async () => {
           <div v-if="!isReadOnly" class="bg-gray-50 p-2.5 border border-gray-200 rounded-xl space-y-2">
             <label class="block font-bold text-noir text-[10px] uppercase tracking-wide">➕ Ajouter un produit hors-pack</label>
             <div class="flex gap-2">
-              <select v-model="selectedExtraProductId" class="flex-1 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-noir focus:outline-none focus:border-foret">
+              <select v-model="selectedExtraProductId" class="flex-1 min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-noir focus:outline-none focus:border-foret">
                 <option value="">— Choisir un produit du catalogue —</option>
                 <option v-for="p in availableExtras" :key="p._id" :value="p._id" :disabled="p.priceUnit === null || p.statut === 'indisponible'">
                   {{ p.name }} ({{ p.priceUnit === null ? 'prix à renseigner' : `${p.priceUnit} F` }} / {{ p.unit || 'u' }}){{ p.statut === 'indisponible' ? ' · indisponible' : '' }}

@@ -13,6 +13,7 @@ const { lireCsv, lireNombre, ecrireCsv } = require('../../utils/csv');
 const { ficheJustificatif, lienSigne, supprimerFichier, DUREE_LIEN_SECONDES } = require('../../services/justificatifService');
 const { moisProjet, bornesMois, MOIS_CONVENTION, etatPieces, appliquerValiditeAudit, estMoisClos } = require('../../services/financeService');
 const { SOURCES_FINANCEMENT, MODES_PAIEMENT_DEPENSE } = require('../../config/convention');
+const { lireDate } = require('../../utils/dates');
 
 const arrondir = (n, decimales = 0) => Math.round(n * 10 ** decimales) / 10 ** decimales;
 const formatFcfa = (n) => `${Math.round(n ?? 0).toLocaleString('fr-FR').replace(/\s/g, ' ')} FCFA`;
@@ -249,6 +250,8 @@ function filtreDepenses(query) {
   if (query.effectue === 'true') filtre.estEffectue = true;
   if (query.effectue === 'false') filtre.estEffectue = false;
   if (typeof query.mois === 'string' && /^M\d{1,2}$/.test(query.mois)) filtre.moisProjet = query.mois;
+  // Numéro de pièce exact (facture ou reçu) : retrouve la dépense d'une facture d'achat
+  if (typeof query.piece === 'string' && query.piece.trim()) filtre.numeroPiece = query.piece.trim();
   return filtre;
 }
 
@@ -258,7 +261,7 @@ function avecControles(d) {
   return { ...d, pieces: etatPieces(d), horsPeriode: !!d.estEffectue && d.categorie === 'Budget' && periode.horsPeriode };
 }
 
-// GET /api/admin/finances/depenses?categorie&ligne&effectue&mois&page&limit
+// GET /api/admin/finances/depenses?categorie&ligne&effectue&mois&piece&page&limit
 async function listerDepenses(req, res) {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -328,8 +331,9 @@ async function lireDepense(body, taux) {
   return { depense };
 }
 
-// POST /api/admin/finances/depenses
+// POST /api/admin/finances/depenses (avec dejaPayee: true : voir creerDepensePayee)
 async function creerDepense(req, res) {
+  if (req.body?.dejaPayee === true) return creerDepensePayee(req, res);
   try {
     const { depense, erreur } = await lireDepense(req.body, await tauxCourant());
     if (erreur) return res.status(400).json({ message: erreur });
@@ -341,6 +345,64 @@ async function creerDepense(req, res) {
     return res.status(201).json(creee);
   } catch (error) {
     console.error("Erreur creerDepense:", error);
+    return res.status(500).json({ message: "Erreur lors de la création de la dépense." });
+  }
+}
+
+// POST /api/admin/finances/depenses { …dépense, dejaPayee: true, datePaiement, montantReelFcfa, modePaiement, fichiersAttendus }
+// Admin seulement : facture déjà payée, saisie depuis une fiche facture. Comme pour l'import de 08_depenses, la dépense
+// est effectuée sans justificatif joint : hors audit tant que les pièces attendues (fichiersAttendus) manquent.
+// Montant prévu : celui fourni, sinon le montant payé.
+async function creerDepensePayee(req, res) {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Seul l'admin saisit une dépense déjà payée." });
+    const body = req.body;
+
+    const datePaiement = lireDate(body.datePaiement);
+    if (!datePaiement) return res.status(400).json({ message: "Indiquez la date de paiement (AAAA-MM-JJ)." });
+    // Montant payé : nombre (ou texte numérique) fini, contrôlé APRÈS l'arrondi au franc (0,4 FCFA donnerait 0)
+    const saisi = typeof body.montantReelFcfa === 'number' || (typeof body.montantReelFcfa === 'string' && body.montantReelFcfa.trim() !== '')
+      ? Number(body.montantReelFcfa) : NaN;
+    const reel = Number.isFinite(saisi) ? Math.round(saisi) : NaN;
+    if (!(reel > 0)) return res.status(400).json({ message: "Indiquez le montant payé en FCFA (1 FCFA au moins, arrondi au franc)." });
+    if (!MODES_PAIEMENT_DEPENSE.includes(body.modePaiement)) return res.status(400).json({ message: "Mode de paiement invalide." });
+    const fichiers = (Array.isArray(body.fichiersAttendus) ? body.fichiersAttendus : [body.fichiersAttendus])
+      .map(f => texte(f, 200)).filter(Boolean).slice(0, 20);
+    if (!fichiers.length) return res.status(400).json({ message: "Indiquez au moins un nom de fichier justificatif attendu (fichiersAttendus)." });
+
+    const taux = await tauxCourant();
+    const prevuFourni = [body.montantPrevuFcfa, body.montantPrevuUsd].some(v => v !== undefined && v !== null && v !== '' && v !== 0);
+    const { depense, erreur } = await lireDepense(prevuFourni ? body : { ...body, montantPrevuFcfa: reel, montantPrevuUsd: 0 }, taux);
+    if (erreur) return res.status(400).json({ message: erreur });
+    if (!(depense.montantPrevuFcfa > 0)) return res.status(400).json({ message: "Montant prévu invalide (1 FCFA au moins, arrondi au franc)." });
+
+    const periode = moisProjet(datePaiement);
+    if (await estMoisClos(periode.mois)) return res.status(400).json({ message: MESSAGE_MOIS_CLOS(periode.mois) });
+    // Une seule dépense par pièce (Q 6.3)
+    if (depense.numeroPiece) {
+      const existante = await Expense.findOne({ numeroPiece: depense.numeroPiece, deletedAt: null }).select('libelle').lean();
+      if (existante) return res.status(409).json({ message: `La pièce ${depense.numeroPiece} est déjà saisie (dépense « ${existante.libelle} »).` });
+    }
+
+    Object.assign(depense, {
+      estEffectue: true,
+      datePaiement,
+      moisProjet: periode.mois || '',
+      montantReelFcfa: reel,
+      montantReelUsd: arrondir(reel / taux, 2),
+      estValidePourAudit: false, // Aucun justificatif joint : se coche quand les pièces exigées sont complètes
+      fichiersAttendus: fichiers
+    });
+    const creee = await Expense.create({ ...depense, creePar: req.user.id });
+    await journaliser(req, {
+      action: 'Création', entite: 'Dépense', entiteId: creee._id,
+      resume: `Dépense « ${creee.libelle} » saisie payée depuis une fiche facture (pièce attendue : ${fichiers.join(', ')}) : ${formatFcfa(creee.montantReelFcfa)}${creee.moisProjet ? `, ${creee.moisProjet}` : ''}${creee.numeroPiece ? `, pièce ${creee.numeroPiece}` : ''}`,
+      apres: depense
+    });
+    const alerte = creee.categorie === 'Budget' && periode.horsPeriode ? ' Attention : paiement daté hors de la période de la convention.' : '';
+    return res.status(201).json({ ...creee.toObject(), message: `Dépense enregistrée comme payée, hors audit jusqu'au dépôt des justificatifs.${alerte}` });
+  } catch (error) {
+    console.error("Erreur creerDepensePayee:", error);
     return res.status(500).json({ message: "Erreur lors de la création de la dépense." });
   }
 }
