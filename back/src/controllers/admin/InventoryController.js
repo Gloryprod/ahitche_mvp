@@ -178,11 +178,22 @@ function peuplerBon(requete) {
 const estAncienFormat = (body) => body.items !== undefined && body.lignes === undefined;
 const ligneRecue = (l) => !!l.lotId || (l.quantiteRecue !== null && l.quantiteRecue !== undefined);
 
+const MESSAGE_LIGNES_FIGEES = "Ce bon est réceptionné : ses lignes (produit, quantité, montant) sont en stock et ne se modifient plus. Seuls le fournisseur, les références, les dates, l'imputation et le commentaire se corrigent ; une quantité se corrige dans le stock (correction motivée).";
+
+// Lignes renvoyées identiques à celles du bon (même ordre) : produit, quantité et montant, qui ont fait les lots
+const memesLignes = (figees, envoyees) => Array.isArray(envoyees) && envoyees.length === figees.length
+  && figees.every((l, i) => envoyees[i] && typeof envoyees[i] === 'object'
+    && String(l.productId) === String(envoyees[i].productId)
+    && l.quantite === nombre(envoyees[i].quantite)
+    && arrondi2(l.montantFcfa) === arrondi2(nombre(envoyees[i].montantFcfa)));
+
 /**
  * Lit et valide un bon au nouveau format (création ou modification).
+ * lignesFigees : lignes d'un bon réceptionné, gardées telles quelles (le corps peut les omettre ou les renvoyer
+ * identiques) ; seul l'en-tête est alors renvoyé, sans lignes ni total.
  * Renvoie { bon } (champs à enregistrer) ou { statut, message }.
  */
-async function lireBonFacture(body) {
+async function lireBonFacture(body, { lignesFigees = null } = {}) {
   const refus = (message) => ({ statut: 400, message });
 
   const typeCommande = body.typeCommande === undefined || body.typeCommande === null || body.typeCommande === '' ? 'Bon de commande' : body.typeCommande;
@@ -208,6 +219,37 @@ async function lireBonFacture(body) {
   const fournisseurFiche = await trouverFournisseur(body.fournisseurId);
   if (!fournisseurFiche) return refus("Fournisseur introuvable ou inactif (voir Prestataires).");
 
+  const ligneBudgetaire = texte(body.ligneBudgetaire, 20);
+  const enTete = {
+    typeCommande, numeroBon, numeroFacture,
+    dateFacture: dateFacture || (achatDirect ? dateEmission : null),
+    dateEmission,
+    fournisseurId: fournisseurFiche._id, fournisseur: fournisseurFiche.nom,
+    ligneBudgetaire, sousLigne: texte(body.sousLigne, 20), commentaire: texte(body.commentaire, 1000)
+  };
+  const verifierTotalEtLigne = async (somme) => {
+    if (!vide(body.totalFacture)) {
+      const total = nombre(body.totalFacture);
+      if (!(total >= 0)) return "Total de la facture invalide.";
+      if (arrondi2(total) !== somme) {
+        return `Le total de la facture (${formatFcfa(total)}) ne correspond pas à la somme des lignes (${formatFcfa(somme)}).`;
+      }
+    }
+    if (ligneBudgetaire && !await BudgetLine.exists({ code: ligneBudgetaire, deletedAt: null })) {
+      return `La ligne budgétaire ${ligneBudgetaire} n'existe pas.`;
+    }
+    return null;
+  };
+
+  // Bon réceptionné : lignes en stock, gardées telles quelles (le catalogue n'est pas relu : un produit archivé
+  // depuis la réception ne bloque pas la correction de l'en-tête)
+  if (lignesFigees) {
+    if (body.lignes !== undefined && !memesLignes(lignesFigees, body.lignes)) return refus(MESSAGE_LIGNES_FIGEES);
+    const somme = arrondi2(lignesFigees.reduce((s, l) => s + l.montantFcfa, 0));
+    const probleme = await verifierTotalEtLigne(somme);
+    return probleme ? refus(probleme) : { bon: enTete };
+  }
+
   if (!Array.isArray(body.lignes) || !body.lignes.length) return refus("Ajoutez au moins une ligne de facture.");
   if (body.lignes.length > MAX_LIGNES) return refus(`${MAX_LIGNES} lignes au plus par bon.`);
   const ids = body.lignes.map(l => l?.productId).filter(id => mongoose.isValidObjectId(id));
@@ -232,29 +274,8 @@ async function lireBonFacture(body) {
   }
 
   const somme = arrondi2(lignes.reduce((s, l) => s + l.montantFcfa, 0));
-  if (!vide(body.totalFacture)) {
-    const total = nombre(body.totalFacture);
-    if (!(total >= 0)) return refus("Total de la facture invalide.");
-    if (arrondi2(total) !== somme) {
-      return refus(`Le total de la facture (${formatFcfa(total)}) ne correspond pas à la somme des lignes (${formatFcfa(somme)}).`);
-    }
-  }
-
-  const ligneBudgetaire = texte(body.ligneBudgetaire, 20);
-  if (ligneBudgetaire && !await BudgetLine.exists({ code: ligneBudgetaire, deletedAt: null })) {
-    return refus(`La ligne budgétaire ${ligneBudgetaire} n'existe pas.`);
-  }
-
-  return {
-    bon: {
-      typeCommande, numeroBon, numeroFacture,
-      dateFacture: dateFacture || (achatDirect ? dateEmission : null),
-      dateEmission,
-      fournisseurId: fournisseurFiche._id, fournisseur: fournisseurFiche.nom,
-      lignes, montantTotalFcfa: somme,
-      ligneBudgetaire, sousLigne: texte(body.sousLigne, 20), commentaire: texte(body.commentaire, 1000)
-    }
-  };
+  const probleme = await verifierTotalEtLigne(somme);
+  return probleme ? refus(probleme) : { bon: { ...enTete, lignes, montantTotalFcfa: somme } };
 }
 
 // Numéro de bon déjà pris ou facture déjà saisie dans un bon actif. L'index de numeroBon est global (bons supprimés
@@ -276,7 +297,9 @@ async function conflitBon(bon, idExclu = null) {
   return null;
 }
 
-const resumeBon = (b) => `${b.typeCommande} ${b.numeroBon}${b.numeroFacture && b.typeCommande !== 'Achat direct' ? `, facture ${b.numeroFacture}` : ''} : ${b.lignes.length} ligne(s), ${formatFcfa(b.montantTotalFcfa)}, fournisseur ${b.fournisseur}`;
+// « Achat direct – facture n° … » porte déjà son type : on ne le répète pas
+const libelleBon = (b) => (b.typeCommande === 'Achat direct' ? b.numeroBon : `${b.typeCommande} ${b.numeroBon}`);
+const resumeBon = (b) => `${libelleBon(b)}${b.numeroFacture && b.typeCommande !== 'Achat direct' ? `, facture ${b.numeroFacture}` : ''} : ${b.lignes.length} ligne(s), ${formatFcfa(b.montantTotalFcfa)}, fournisseur ${b.fournisseur}`;
 
 /**
  * 3. CRÉER UN BON DE COMMANDE FOURNISSEUR (POST /api/admin/bons-commande)
@@ -293,7 +316,7 @@ async function creerBonCommande(req, res) {
 
     const bon = await PurchaseOrder.create(lu.bon);
     await journaliser(req, { action: 'Création', entite: 'Bon de commande', entiteId: bon._id, resume: `${resumeBon(bon)} créé` });
-    return res.status(201).json({ message: `${bon.typeCommande} ${bon.numeroBon} enregistré.`, bon: await peuplerBon(PurchaseOrder.findById(bon._id)) });
+    return res.status(201).json({ message: `${libelleBon(bon)} enregistré.`, bon: await peuplerBon(PurchaseOrder.findById(bon._id)) });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ message: "Ce numéro de bon ou cette facture est déjà enregistré." });
     console.error("Erreur creerBonCommande:", error);
@@ -333,7 +356,8 @@ async function creerBonAncienFormat(req, res) {
 
 /**
  * MODIFIER UN BON (PUT /api/admin/bons-commande/:id)
- * Ancien format inchangé ; nouveau format seulement tant qu'aucune ligne n'est réceptionnée, mêmes contrôles qu'à la création
+ * Ancien format inchangé ; nouveau format : mêmes contrôles qu'à la création. Bon réceptionné (même en partie) :
+ * l'en-tête seulement, ses lignes sont en stock (choix du porteur du 19/10/2026), voir modifierBonRecu.
  */
 async function modifierBonCommande(req, res) {
   const body = req.body || {};
@@ -344,15 +368,17 @@ async function modifierBonCommande(req, res) {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Bon introuvable." });
     const existant = await PurchaseOrder.findOne({ _id: req.params.id, deletedAt: null });
     if (!existant) return res.status(404).json({ message: "Bon introuvable." });
-    if (existant.lignes.some(ligneRecue) || ['Reçu', 'Reçu partiellement'].includes(existant.statut)) {
-      return res.status(400).json({ message: "Ce bon est déjà réceptionné (en tout ou en partie) : il ne se modifie plus." });
-    }
     if (existant.statut === 'Annulé') return res.status(400).json({ message: "Ce bon est annulé : il ne se modifie plus." });
+    const recu = existant.lignes.some(ligneRecue) || ['Reçu', 'Reçu partiellement'].includes(existant.statut);
+    if (recu && !existant.lignes.length) {
+      return res.status(400).json({ message: "Ce bon à l'ancien format est déjà réceptionné : modifiez-le avec l'ancien formulaire." });
+    }
 
-    const lu = await lireBonFacture(body);
+    const lu = await lireBonFacture(body, { lignesFigees: recu ? existant.lignes : null });
     if (lu.message) return res.status(lu.statut).json({ message: lu.message });
     const conflit = await conflitBon(lu.bon, existant._id);
     if (conflit) return res.status(409).json({ message: conflit });
+    if (recu) return modifierBonRecu(req, res, existant, lu.bon);
 
     const etat = (b) => ({ numeroBon: b.numeroBon, numeroFacture: b.numeroFacture, fournisseur: b.fournisseur, montantTotalFcfa: b.montantTotalFcfa, lignes: b.lignes.length });
     const avant = etat(existant);
@@ -367,6 +393,50 @@ async function modifierBonCommande(req, res) {
     if (error.code === 11000) return res.status(409).json({ message: "Ce numéro de bon ou cette facture est déjà enregistré." });
     console.error("Erreur modifierBonCommande:", error);
     return res.status(500).json({ message: "Erreur lors de la mise à jour." });
+  }
+}
+
+// Bon réceptionné : l'en-tête se corrige (fournisseur, références, dates, imputation, commentaire) et ses lots
+// suivent (fournisseur, numéro de pièce et dépense de cette pièce), en une transaction. Les lignes ne changent pas :
+// elles ont fait les lots, dont la quantité ne change que par comptage ou correction motivée. La dépense elle-même
+// (Finances) n'est jamais modifiée ici.
+async function modifierBonRecu(req, res, existant, enTete) {
+  const etat = (b) => ({
+    numeroBon: b.numeroBon, numeroFacture: b.numeroFacture, fournisseur: b.fournisseur, dateEmission: b.dateEmission,
+    dateFacture: b.dateFacture, ligneBudgetaire: b.ligneBudgetaire, sousLigne: b.sousLigne
+  });
+  const avant = etat(existant);
+  const factureChangee = (enTete.numeroFacture || '') !== (existant.numeroFacture || '');
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    Object.assign(existant, enTete);
+    const suivi = { fournisseurId: existant.fournisseurId, fournisseur: existant.fournisseur, numeroPiece: existant.numeroFacture };
+    if (factureChangee) {
+      const depense = await depenseDeLaPiece(existant.numeroFacture, session); // Jamais créée ici
+      existant.depenseId = depense?._id || null;
+      suivi.depenseId = existant.depenseId;
+    }
+    await existant.save({ session });
+    const { modifiedCount } = await LotStockFifo.updateMany({ bonCommandeId: existant._id, deletedAt: null }, { $set: suivi }, { session });
+    await journaliser(req, {
+      action: 'Modification', entite: 'Bon de commande', entiteId: existant._id,
+      resume: `${resumeBon(existant)} (modifié après réception${modifiedCount ? `, ${modifiedCount} lot(s) mis à jour` : ''})`,
+      avant, apres: etat(existant)
+    }, session);
+    await session.commitTransaction();
+    const lots = modifiedCount ? ` ${modifiedCount} lot(s) du bon mis à jour.` : '';
+    return res.status(200).json({ message: `Bon mis à jour avec succès.${lots}`, bon: await peuplerBon(PurchaseOrder.findById(existant._id)) });
+  } catch (error) {
+    if (session.inTransaction()) {
+      try { await session.abortTransaction(); } catch { /* transaction déjà annulée par le serveur */ }
+    }
+    if (conflitTransaction(error)) return res.status(409).json({ message: "Une réception est en cours sur ce bon : réessayez." });
+    if (error.code === 11000) return res.status(409).json({ message: "Ce numéro de bon ou cette facture est déjà enregistré." });
+    console.error("Erreur modifierBonRecu:", error);
+    return res.status(500).json({ message: "Erreur lors de la mise à jour." });
+  } finally {
+    session.endSession();
   }
 }
 
