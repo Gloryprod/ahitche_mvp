@@ -2,10 +2,12 @@
 // Aucun accès direct à la base : tout passe par l'API, avec un compte de l'équipe (admin pour écrire), donc par les
 // mêmes contrôles et le même journal que l'écran d'administration. Node 22 ou plus (fetch natif).
 // Simulation par défaut ; --appliquer pour écrire. Relancer une saisie reprend là où elle s'est arrêtée.
+// `facture` accepte plusieurs fiches : toutes contrôlées avant toute écriture, puis écrites une par une.
 // Les fiches JSON (données réelles : fournisseurs, montants, numéros) restent dans docs-internes/, exclu de Git.
 // Identifiants : demandés dans le terminal (mot de passe masqué) ; SAISIE_EMAIL et SAISIE_MOT_DE_PASSE seulement pour
 // les tests locaux. Le cookie de session reste en mémoire : jamais affiché ni écrit.
 const fs = require('fs');
+const path = require('path');
 const readline = require('readline');
 const { TYPES_PRODUIT, STATUTS_PRODUIT, FAMILLES } = require('../models/product'); // Constantes seulement : aucune connexion
 const { MODES_PAIEMENT_PRESTATAIRE } = require('../models/partner');
@@ -13,6 +15,7 @@ const { MODES_PAIEMENT_DEPENSE } = require('../config/convention');
 const { lireCsv, lireNombre } = require('../utils/csv');
 const { normaliser } = require('../utils/texte');
 const { lireDate } = require('../utils/dates');
+const { moisProjet } = require('../services/financeService'); // Mois du projet (du 26 au 25) : même calcul que le serveur
 
 const API_DEFAUT = 'https://api.ahitchebj.com';
 const SOURCE_SUBVENTION = 'Subvention N°171';
@@ -32,9 +35,21 @@ Commandes :
                        "categorie": "Emballages", "priceUnit": null, "statut": "indisponible" }],
         "archiver": ["V99"] }
 
-  facture <fichier.json> [--lignes <chemin de 07_budget_lignes.csv>]
-      Fournisseur, dépense payée, bon de commande et réception (un lot par ligne), dans cet ordre.
-      Exemple fictif : voir la fin de cette aide.
+  facture <fiche1.json> [fiche2.json …] [--lignes <chemin de 07_budget_lignes.csv>]
+      Pour chaque fiche, dans cet ordre : fournisseur, dépense payée, bon de commande et réception (un lot par
+      ligne). Exemple fictif de fiche : voir la fin de cette aide.
+      Plusieurs fiches : une seule connexion, fiches traitées dans l'ordre donné.
+        1. Toutes les fiches sont contrôlées avant toute écriture, puis entre elles : pas deux fois le même
+           numéro de facture, le même numéro de lot, ni la même référence de bon pour deux factures.
+           Une dépense à créer dont le paiement tombe dans un mois du projet clos est refusée dès le contrôle.
+        2. Sans --appliquer : plan de chaque fiche et bilan (prête / déjà saisie / erreurs) ; code 1 si une
+           fiche est en erreur.
+        3. Avec --appliquer : une seule fiche en erreur et rien n'est écrit, pour aucune fiche. Sinon les fiches
+           sont écrites une par une ; les fiches déjà saisies sont signalées et sautées. Si une écriture échoue,
+           l'outil s'arrête, dit ce qui est fait et ce qui reste ; relancer la même commande reprend sans doublon.
+      Usage conseillé : une commande de simulation, puis la même avec --appliquer.
+        node src/scripts/saisirFacture.js facture fiches\\FAC-0001.json fiches\\FAC-0002.json
+        node src/scripts/saisirFacture.js facture fiches\\FAC-0001.json fiches\\FAC-0002.json --appliquer
 
   transformation --matiere <REF> --quantite <n> --produit <REF> --obtenu <n> --date AAAA-MM-JJ
                  [--lot <numéro>] [--commentaire "…"]
@@ -516,43 +531,26 @@ function lignesDuCsv(chemin) {
   }).filter(([code]) => code));
 }
 
-async function commandeFacture(client, chemin, options) {
-  const erreurs = [];
-  const infos = [];
-  const fiche = analyserFiche(lireJson(chemin), erreurs);
-  const numero = fiche.facture.numero;
-  const achatDirect = fiche.commande.type === 'Achat direct';
-  const numeroBonAttendu = achatDirect ? `Achat direct – facture n° ${numero}` : fiche.commande.reference;
+// « AAAA-MM-JJ » -> « JJ/MM/AAAA »
+const dateFr = (iso) => iso.split('-').reverse().join('/');
 
-  // 6 (d'abord) : facture déjà saisie et reçue -> rien à faire
-  let bon = null;
-  if (numero) {
-    const bons = (await tout(client, '/api/admin/bons-commande', 'bonsCommande', { search: numero })).filter(b => b.numeroFacture === numero);
-    if (bons.length > 1) erreurs.push(`Plusieurs bons actifs portent la facture ${numero} : ${bons.map(b => b.numeroBon).join(', ')}.`);
-    bon = bons[0] || null;
-    if (bon?.statut === 'Reçu') {
-      console.log(`\nFacture ${numero} déjà saisie (bon ${bon.numeroBon}, reçu le ${String(bon.dateReception || '').slice(0, 10) || '?'}) : rien à faire.`);
-      return;
-    }
+// Mois du projet clos, lus une seule fois par lancement par l'API (seulement si une fiche doit créer sa dépense).
+// Lecture refusée ou impossible : erreur de contrôle (on ne sait pas vérifier, donc rien ne sera écrit).
+function clotures(client, ctx) {
+  if (!ctx.clotures) {
+    ctx.clotures = client.get('/api/admin/finances/clotures')
+      .then(liste => ({ clos: new Set((Array.isArray(liste) ? liste : []).filter(m => m.close).map(m => m.mois)), erreur: null }))
+      .catch(error => ({
+        clos: null,
+        erreur: `Clôtures des mois du projet illisibles (${error.statut === 403 ? 'lecture refusée pour ce compte, 403' : error.message}) : impossible de vérifier que le mois du paiement n'est pas clos.`
+      }));
   }
+  return ctx.clotures;
+}
 
-  const [produits, prestataires, lignesBudget] = await Promise.all([
-    tout(client, '/api/admin/products', 'products'),
-    tout(client, '/api/admin/prestataires', 'prestataires'),
-    client.get('/api/admin/finances/lignes')
-  ]);
-
-  // 3. Produits : référence active, même unité
-  const parRef = new Map(produits.filter(p => p.reference).map(p => [p.reference.toUpperCase(), p]));
-  for (const l of fiche.lignes) {
-    l.produitBase = parRef.get(l.produit) || null;
-    if (l.produit && !l.produitBase) erreurs.push(`Ligne ${l.rang} : produit ${l.produit} introuvable dans le catalogue actif.`);
-    else if (l.produitBase && l.unite && l.produitBase.unit !== l.unite) {
-      erreurs.push(`Ligne ${l.rang} : unité « ${l.unite} » différente de celle du produit ${l.produit} (« ${l.produitBase.unit} »).`);
-    }
-  }
-
-  // 4. Fournisseur : par IFU (chiffres seuls, fiches Fournisseur), sinon par nom exact (casse ignorée), sinon à créer
+// Fournisseur d'une fiche : par IFU (chiffres seuls, fiches Fournisseur), sinon par nom exact (casse ignorée).
+// `prestataires` contient aussi les fournisseurs que les fiches précédentes du lancement vont créer (aCreerPar).
+function resoudreFournisseur(fiche, prestataires, erreurs, infos) {
   let fournisseur = null, trouvePar = null;
   const ifu = chiffres(fiche.fournisseur.ifu);
   if (ifu.length >= 9) {
@@ -566,17 +564,63 @@ async function commandeFacture(client, chemin, options) {
       erreurs.push(`Fournisseur : « ${parNom[0].nom} » existe comme prestataire de type ${parNom[0].type} : passez sa fiche en Fournisseur.`);
     } else if (parNom.length) { fournisseur = parNom[0]; trouvePar = 'nom'; }
   }
-  if (fournisseur && !fournisseur.actif) erreurs.push(`Fournisseur « ${fournisseur.nom} » : fiche inactive, réactivez-la dans Prestataires.`);
+  if (fournisseur && fournisseur.actif === false) erreurs.push(`Fournisseur « ${fournisseur.nom} » : fiche inactive, réactivez-la dans Prestataires.`);
   if (fournisseur && trouvePar === 'IFU' && normaliser(fournisseur.nom) !== normaliser(fiche.fournisseur.nom)) {
     infos.push(`Fournisseur trouvé par IFU : fiche « ${fournisseur.nom} » (nom sur la facture : « ${fiche.fournisseur.nom} »).`);
   }
   if (fournisseur && trouvePar === 'nom' && ifu && chiffres(fournisseur.ifuRccm) && !chiffres(fournisseur.ifuRccm).includes(ifu)) {
     infos.push(`Attention : la fiche « ${fournisseur.nom} » porte un autre IFU que la facture.`);
   }
+  return { fournisseur, trouvePar };
+}
+
+/**
+ * Contrôles d'une fiche, sans aucune écriture (contrôles 1 à 7). Renvoie
+ * { nom, chemin, numero, deja, erreurs, infos, plan } ; plan : tout ce qu'il faut pour écrire la fiche.
+ * ctx : données lues une fois pour tout le lancement (produits, prestataires, lignes budgétaires, CSV des lignes),
+ * complétées au fil des fiches par ce que les fiches précédentes vont créer (fournisseur, ligne budgétaire).
+ */
+async function controlerFiche(client, chemin, ctx) {
+  const c = { nom: path.basename(chemin), chemin, numero: null, deja: null, erreurs: [], infos: [], plan: null };
+  let brut;
+  try { brut = lireJson(chemin); } catch (error) { c.erreurs.push(error.message); return c; }
+  const { erreurs, infos } = c;
+  const fiche = analyserFiche(brut, erreurs);
+  const numero = fiche.facture.numero;
+  c.numero = numero || null;
+  const achatDirect = fiche.commande.type === 'Achat direct';
+  const numeroBonAttendu = achatDirect ? `Achat direct – facture n° ${numero}` : fiche.commande.reference;
+
+  // 6 (d'abord) : facture déjà saisie et reçue -> rien à faire pour cette fiche
+  let bon = null;
+  if (numero) {
+    const bons = (await tout(client, '/api/admin/bons-commande', 'bonsCommande', { search: numero })).filter(b => b.numeroFacture === numero);
+    if (bons.length > 1) erreurs.push(`Plusieurs bons actifs portent la facture ${numero} : ${bons.map(b => b.numeroBon).join(', ')}.`);
+    bon = bons[0] || null;
+    if (bon?.statut === 'Reçu') { c.deja = bon; return c; }
+  }
+
+  // 3. Produits : référence active, même unité
+  for (const l of fiche.lignes) {
+    l.produitBase = ctx.parRef.get(l.produit) || null;
+    if (l.produit && !l.produitBase) erreurs.push(`Ligne ${l.rang} : produit ${l.produit} introuvable dans le catalogue actif.`);
+    else if (l.produitBase && l.unite && l.produitBase.unit !== l.unite) {
+      erreurs.push(`Ligne ${l.rang} : unité « ${l.unite} » différente de celle du produit ${l.produit} (« ${l.produitBase.unit} »).`);
+    }
+  }
+
+  // 4. Fournisseur : trouvé, à créer par une fiche précédente du lancement, ou à créer par celle-ci
+  let { fournisseur, trouvePar } = resoudreFournisseur(fiche, ctx.prestataires, erreurs, infos);
+  if (!fournisseur && !erreurs.some(e => e.startsWith('Fournisseur :')) && fiche.fournisseur.nom) {
+    const ifuRccm = [fiche.fournisseur.ifu, fiche.fournisseur.rccm ? `RCCM ${fiche.fournisseur.rccm}` : ''].filter(Boolean).join(' / ');
+    fournisseur = { _id: null, nom: fiche.fournisseur.nom, type: 'Fournisseur', actif: true, ifuRccm, aCreerPar: c.nom };
+    ctx.prestataires.push(fournisseur); // Une fiche suivante du même fournisseur le retrouvera (pas de seconde création)
+  }
 
   // 5. Dépense de la pièce (et ligne budgétaire)
-  let depense = null, depenseACreer = false, ligneACreer = null;
-  const ligneExiste = (lignesBudget || []).some(l => l.code === fiche.financement.ligne);
+  let depense = null, depenseACreer = false, ligneACreer = null, ligneParFiche = null;
+  const code = fiche.financement.ligne;
+  const ligneExiste = !!code && ctx.codesLignes.has(code);
   if (numero) {
     const depenses = await tout(client, '/api/admin/finances/depenses', 'depenses', { piece: numero });
     if (depenses.length > 1) erreurs.push(`Dépense : ${depenses.length} dépenses portent la pièce ${numero} (doublon à corriger dans les Finances).`);
@@ -584,21 +628,36 @@ async function commandeFacture(client, chemin, options) {
       depense = depenses[0];
       const montant = depense.estEffectue ? depense.montantReelFcfa : depense.montantPrevuFcfa;
       if (depense.categorie !== 'Budget') erreurs.push(`Dépense de la pièce ${numero} : catégorie ${depense.categorie}, « Budget » attendue.`);
-      if (depense.referenceLigne !== fiche.financement.ligne) erreurs.push(`Dépense de la pièce ${numero} : ligne ${depense.referenceLigne || 'vide'}, la fiche dit ${fiche.financement.ligne}.`);
+      if (depense.referenceLigne !== code) erreurs.push(`Dépense de la pièce ${numero} : ligne ${depense.referenceLigne || 'vide'}, la fiche dit ${code}.`);
       if (fiche.financement.sousLigne && depense.sousLigne !== fiche.financement.sousLigne) erreurs.push(`Dépense de la pièce ${numero} : sous-ligne ${depense.sousLigne || 'vide'}, la fiche dit ${fiche.financement.sousLigne}.`);
       if (fiche.facture.totalTtc > 0 && arrondi2(montant ?? 0) !== arrondi2(fiche.facture.totalTtc)) {
         erreurs.push(`Dépense de la pièce ${numero} : montant ${depense.estEffectue ? 'payé' : 'prévu'} ${fmt(montant)}, total de la facture ${fmt(fiche.facture.totalTtc)}.`);
       }
     } else depenseACreer = true;
   }
-  if (fiche.financement.ligne && !ligneExiste) {
-    if (options.lignes) {
-      try {
-        ligneACreer = lignesDuCsv(options.lignes).get(fiche.financement.ligne) || null;
-        if (!ligneACreer) erreurs.push(`Ligne budgétaire ${fiche.financement.ligne} : absente de la base et de ${options.lignes}.`);
-      } catch (error) { erreurs.push(error.message); }
+  // 5 bis. Dépense à créer : son mois du projet ne doit pas être clos (l'API la refuserait en cours d'écriture).
+  // Une dépense déjà existante ne déclenche pas ce contrôle.
+  if (depenseACreer && fiche.paiement.date) {
+    const { mois } = moisProjet(lireDate(fiche.paiement.date));
+    if (mois) {
+      const { clos, erreur } = await clotures(client, ctx);
+      if (erreur) erreurs.push(erreur);
+      else if (clos.has(mois)) {
+        erreurs.push(`Paiement du ${dateFr(fiche.paiement.date)} en ${mois}, mois clos : rouvrez-le dans Finances (motif tracé) avant la saisie.`);
+      }
+    }
+  }
+  if (code && !ligneExiste) {
+    if (ctx.lignesPrevues.has(code)) ligneParFiche = ctx.lignesPrevues.get(code); // Créée par une fiche précédente
+    else if (ctx.optionLignes) {
+      if (ctx.erreurCsv) erreurs.push(ctx.erreurCsv);
+      else {
+        ligneACreer = ctx.lignesCsv.get(code) || null;
+        if (!ligneACreer) erreurs.push(`Ligne budgétaire ${code} : absente de la base et de ${ctx.optionLignes}.`);
+        else ctx.lignesPrevues.set(code, c.nom);
+      }
     } else {
-      erreurs.push(`Ligne budgétaire ${fiche.financement.ligne} : absente de la base (ajoutez --lignes <chemin de 07_budget_lignes.csv> pour la créer).`);
+      erreurs.push(`Ligne budgétaire ${code} : absente de la base (ajoutez --lignes <chemin de 07_budget_lignes.csv> pour la créer).`);
     }
   }
 
@@ -607,8 +666,8 @@ async function commandeFacture(client, chemin, options) {
     const ecarts = [];
     if (bon.typeCommande !== fiche.commande.type) ecarts.push(`type ${bon.typeCommande}`);
     if (numeroBonAttendu && bon.numeroBon !== numeroBonAttendu) ecarts.push(`numéro ${bon.numeroBon}`);
-    if (fournisseur && String(bon.fournisseurId) !== String(fournisseur._id)) ecarts.push(`fournisseur ${bon.fournisseur}`);
-    if (!fournisseur) ecarts.push(`fournisseur ${bon.fournisseur} (fiche de la facture introuvable)`);
+    if (fournisseur?._id && String(bon.fournisseurId) !== String(fournisseur._id)) ecarts.push(`fournisseur ${bon.fournisseur}`);
+    if (!fournisseur?._id) ecarts.push(`fournisseur ${bon.fournisseur} (fiche de la facture introuvable)`);
     if (bon.lignes.length !== fiche.lignes.length) ecarts.push(`${bon.lignes.length} ligne(s) au lieu de ${fiche.lignes.length}`);
     else {
       bon.lignes.forEach((lb, i) => {
@@ -638,90 +697,243 @@ async function commandeFacture(client, chemin, options) {
     if (lots.length) erreurs.push(`Ligne ${l.rang} : le numéro de lot ${l.numeroLot} existe déjà.`);
   }
 
-  // Plan
-  console.log(`\nFacture ${numero || '?'} du ${fiche.facture.date || '?'} · total ${fmt(fiche.facture.totalTtc)} · ${fiche.lignes.length} ligne(s)`);
-  console.log(`  Fournisseur      : ${fournisseur ? `trouvé par ${trouvePar} (« ${fournisseur.nom} »)` : `à créer (« ${fiche.fournisseur.nom} »)`}`);
-  console.log(`  Ligne budgétaire : ${fiche.financement.ligne || '?'}${fiche.financement.sousLigne ? ` / ${fiche.financement.sousLigne}` : ''} ${ligneExiste ? '(existante)' : ligneACreer ? '(à créer depuis le CSV)' : '(absente)'}`);
-  console.log(`  Dépense          : ${depense ? `existante, pièce ${numero} (${depense.estEffectue ? 'payée' : 'prévue'})` : `à créer, payée le ${fiche.paiement.date || '?'} (${fiche.paiement.mode || '?'}), pièce attendue : ${fiche.depense.fichiersAttendus.join(', ')}`}`);
-  console.log(`  Bon              : ${bon ? `existant ${bon.numeroBon} (${bon.statut}) : réception reprise` : `à créer : ${achatDirect ? numeroBonAttendu : `${fiche.commande.type || '?'} ${numeroBonAttendu || '?'}`}`}`);
-  console.log(`  Réception du ${fiche.reception.date || '?'} : ${aRecevoir.length} lot(s)`);
-  for (const l of aRecevoir) {
-    console.log(`    ${l.produit} · ${l.produitBase?.name || '?'} : ${nb(l.quantite)} ${l.produitBase?.unit || l.unite}, ${fmt(l.montant)}, lot ${l.numeroLot || 'numéroté à la réception'}`);
+  c.plan = { fiche, numero, achatDirect, numeroBonAttendu, bon, fournisseur, trouvePar, depense, depenseACreer, code, ligneExiste, ligneACreer, ligneParFiche, aRecevoir };
+  return c;
+}
+
+// Contrôles entre les fiches d'un même lancement : pas deux fois la même facture, le même numéro de lot, ni la même
+// référence de bon de commande pour deux factures (l'API refuserait la seconde en cours d'écriture)
+function controlerEntreFiches(controles) {
+  const grouper = (cle) => {
+    const groupes = new Map();
+    for (const x of controles.flatMap(cle)) groupes.set(x.cle, [...(groupes.get(x.cle) || []), x]);
+    return [...groupes.values()];
+  };
+  for (const groupe of grouper(c => (c.numero ? [{ cle: c.numero, c }] : []))) {
+    if (groupe.length < 2) continue;
+    for (const { c } of groupe) c.erreurs.push(`Facture ${c.numero} : présente dans ${groupe.length} fiches de ce lancement (${groupe.map(x => x.c.nom).join(', ')}).`);
   }
-  for (const i of infos) console.log(`  ℹ ${i}`);
+  for (const groupe of grouper(c => (c.plan?.aRecevoir || []).filter(l => l.numeroLot).map(l => ({ cle: l.numeroLot, c, l })))) {
+    if (new Set(groupe.map(x => x.c)).size < 2) continue; // Doublon dans une seule fiche : déjà signalé par la fiche
+    for (const { c, l } of groupe) {
+      const autres = groupe.filter(x => x.c !== c).map(x => `${x.c.nom} (ligne ${x.l.rang})`);
+      c.erreurs.push(`Ligne ${l.rang} : numéro de lot ${l.numeroLot} aussi demandé par ${autres.join(', ')}.`);
+    }
+  }
+  for (const groupe of grouper(c => (c.plan && !c.plan.bon && !c.plan.achatDirect && c.plan.numeroBonAttendu ? [{ cle: c.plan.numeroBonAttendu, c }] : []))) {
+    if (new Set(groupe.map(x => x.c.numero)).size < 2) continue;
+    for (const { c } of groupe) {
+      c.erreurs.push(`La référence de bon ${c.plan.numeroBonAttendu} est aussi celle de ${groupe.filter(x => x.c !== c).map(x => `${x.c.nom} (facture ${x.c.numero})`).join(', ')}.`);
+    }
+  }
+}
 
-  if (erreurs.length) return afficherErreurs(erreurs);
-  if (!options.appliquer) { console.log('\n🔎 SIMULATION : rien n\'a été écrit. Relancez avec --appliquer pour enregistrer.'); return; }
+const etatFiche = (c) => (c.erreurs.length ? 'erreurs' : c.deja ? 'déjà saisie' : 'prête');
 
-  // Écritures : fournisseur → ligne budgétaire → dépense → bon → réception ; une relance reprend à l'étape manquante
+function afficherControle(c, rang, total) {
+  if (total > 1) console.log(`\n══ Fiche ${rang}/${total} : ${c.nom} ══`);
+  if (c.deja) {
+    console.log(`\nFacture ${c.numero} déjà saisie (bon ${c.deja.numeroBon}, reçu le ${String(c.deja.dateReception || '').slice(0, 10) || '?'}) : rien à faire.`);
+  } else if (c.plan) {
+    const p = c.plan, f = p.fiche;
+    const fournisseur = p.fournisseur;
+    const texteFournisseur = !fournisseur ? `à créer (« ${f.fournisseur.nom} »)`
+      : fournisseur._id ? `trouvé par ${p.trouvePar} (« ${fournisseur.nom} »)`
+        : fournisseur.aCreerPar === c.nom ? `à créer (« ${fournisseur.nom} »)` : `à créer par la fiche ${fournisseur.aCreerPar} (« ${fournisseur.nom} »)`;
+    const texteLigne = p.ligneExiste ? '(existante)' : p.ligneACreer ? '(à créer depuis le CSV)' : p.ligneParFiche ? `(à créer depuis le CSV par la fiche ${p.ligneParFiche})` : '(absente)';
+    console.log(`\nFacture ${p.numero || '?'} du ${f.facture.date || '?'} · total ${fmt(f.facture.totalTtc)} · ${f.lignes.length} ligne(s)`);
+    console.log(`  Fournisseur      : ${texteFournisseur}`);
+    console.log(`  Ligne budgétaire : ${p.code || '?'}${f.financement.sousLigne ? ` / ${f.financement.sousLigne}` : ''} ${texteLigne}`);
+    console.log(`  Dépense          : ${p.depense ? `existante, pièce ${p.numero} (${p.depense.estEffectue ? 'payée' : 'prévue'})` : `à créer, payée le ${f.paiement.date || '?'} (${f.paiement.mode || '?'}), pièce attendue : ${f.depense.fichiersAttendus.join(', ')}`}`);
+    console.log(`  Bon              : ${p.bon ? `existant ${p.bon.numeroBon} (${p.bon.statut}) : réception reprise` : `à créer : ${p.achatDirect ? p.numeroBonAttendu : `${f.commande.type || '?'} ${p.numeroBonAttendu || '?'}`}`}`);
+    console.log(`  Réception du ${f.reception.date || '?'} : ${p.aRecevoir.length} lot(s)`);
+    for (const l of p.aRecevoir) {
+      console.log(`    ${l.produit} · ${l.produitBase?.name || '?'} : ${nb(l.quantite)} ${l.produitBase?.unit || l.unite}, ${fmt(l.montant)}, lot ${l.numeroLot || 'numéroté à la réception'}`);
+    }
+  }
+  for (const i of c.infos) console.log(`  ℹ ${i}`);
+  if (c.erreurs.length) {
+    console.error(`\n❌ ${c.erreurs.length} contrôle(s) en échec, rien n'a été écrit :`);
+    for (const e of c.erreurs) console.error(`  - ${e}`);
+  }
+}
+
+// Étapes d'écriture d'une fiche prête, dans l'ordre : fournisseur → ligne budgétaire → dépense → bon → réception
+function etapesPrevues(c) {
+  const p = c.plan;
+  return [
+    !p.fournisseur._id && p.fournisseur.aCreerPar === c.nom ? ['fournisseur', 'création du fournisseur'] : null,
+    p.ligneACreer ? ['ligne', `création de la ligne budgétaire ${p.code}`] : null,
+    p.depenseACreer ? ['depense', 'création de la dépense'] : null,
+    !p.bon ? ['bon', 'création du bon'] : null,
+    p.aRecevoir.length ? ['reception', `réception (${p.aRecevoir.length} lot(s))`] : null
+  ].filter(Boolean);
+}
+
+// Écrit une fiche prête ; `fait` reçoit chaque étape terminée (pour dire, en cas d'arrêt, ce qui est fait et ce qui reste)
+async function ecrireFiche(client, c, ctx, fait) {
+  const p = c.plan, fiche = p.fiche, numero = p.numero;
+  const fournisseur = p.fournisseur;
+  let bon = p.bon;
   const recap = [];
-  try {
-    if (!fournisseur) {
-      const ifuRccm = [fiche.fournisseur.ifu, fiche.fournisseur.rccm ? `RCCM ${fiche.fournisseur.rccm}` : ''].filter(Boolean).join(' / ');
-      fournisseur = await client.post('/api/admin/prestataires', {
-        nom: fiche.fournisseur.nom, type: 'Fournisseur', telephone: fiche.fournisseur.telephone, quartier: fiche.fournisseur.adresse,
-        ifuRccm, ...(fiche.fournisseur.modePaiement ? { modePaiement: fiche.fournisseur.modePaiement } : {}),
-        notes: `Fiche créée à la saisie de la facture ${numero}`
-      });
-      recap.push(`Fournisseur : créé (« ${fournisseur.nom} »)`);
-    } else recap.push(`Fournisseur : trouvé (« ${fournisseur.nom} »)`);
 
-    if (ligneACreer) {
-      await client.post('/api/admin/finances/lignes', ligneACreer);
-      recap.push(`Ligne budgétaire ${ligneACreer.code} : créée depuis le CSV`);
-    }
+  if (!fournisseur._id) {
+    if (fournisseur.aCreerPar !== c.nom) throw new Error(`le fournisseur « ${fournisseur.nom} » devait être créé par la fiche ${fournisseur.aCreerPar}.`);
+    const cree = await client.post('/api/admin/prestataires', {
+      nom: fiche.fournisseur.nom, type: 'Fournisseur', telephone: fiche.fournisseur.telephone, quartier: fiche.fournisseur.adresse,
+      ifuRccm: fournisseur.ifuRccm, ...(fiche.fournisseur.modePaiement ? { modePaiement: fiche.fournisseur.modePaiement } : {}),
+      notes: `Fiche créée à la saisie de la facture ${numero}`
+    });
+    Object.assign(fournisseur, cree); // Les fiches suivantes du même fournisseur reçoivent son identifiant
+    fait.push('fournisseur');
+    recap.push(`Fournisseur : créé (« ${fournisseur.nom} »)`);
+  } else {
+    recap.push(`Fournisseur : trouvé (« ${fournisseur.nom} »${fournisseur.aCreerPar && fournisseur.aCreerPar !== c.nom ? `, créé par la fiche ${fournisseur.aCreerPar}` : ''})`);
+  }
 
-    if (depenseACreer) {
-      const commentaire = [fiche.commentaire, fiche.facture.mecef ? `MECeF ${fiche.facture.mecef}` : '', fiche.facture.references.length ? `Références : ${fiche.facture.references.join(', ')}` : ''].filter(Boolean).join(' ; ');
-      depense = await client.post('/api/admin/finances/depenses', {
-        dejaPayee: true, categorie: 'Budget', referenceLigne: fiche.financement.ligne, sousLigne: fiche.financement.sousLigne,
-        libelle: fiche.depense.libelle, partenaireId: fournisseur._id, numeroPiece: numero,
-        montantReelFcfa: fiche.facture.totalTtc, datePaiement: fiche.paiement.date,
-        modePaiement: fiche.paiement.mode, detailPaiement: fiche.paiement.detail, referencePaiement: fiche.paiement.reference,
-        fichiersAttendus: fiche.depense.fichiersAttendus, commentaire
-      });
-      recap.push(`Dépense : créée (pièce ${numero}, payée, hors audit jusqu'au dépôt des justificatifs)`);
-    } else recap.push(`Dépense : existante (pièce ${numero})`);
+  if (p.ligneACreer) {
+    await client.post('/api/admin/finances/lignes', p.ligneACreer);
+    ctx.codesLignes.add(p.code);
+    fait.push('ligne');
+    recap.push(`Ligne budgétaire ${p.code} : créée depuis le CSV`);
+  }
 
-    if (!bon) {
-      const r = await client.post('/api/admin/bons-commande', {
-        typeCommande: fiche.commande.type, ...(achatDirect ? {} : { numeroBon: fiche.commande.reference }),
-        numeroFacture: numero, dateFacture: fiche.facture.date, dateEmission: fiche.commande.date,
-        fournisseurId: fournisseur._id, totalFacture: fiche.facture.totalTtc,
-        ligneBudgetaire: fiche.financement.ligne, sousLigne: fiche.financement.sousLigne, commentaire: fiche.commentaire,
-        lignes: fiche.lignes.map(l => ({
-          designation: l.designation, quantiteFacture: l.quantiteFacture, montantFcfa: l.montant,
-          productId: l.produitBase._id, quantite: l.quantite, detailQuantite: l.detailQuantite
-        }))
-      });
-      bon = r.bon;
-      fiche.lignes.forEach((l, i) => { l.ligneBon = bon.lignes[i]; });
-    }
+  if (p.depenseACreer) {
+    const commentaire = [fiche.commentaire, fiche.facture.mecef ? `MECeF ${fiche.facture.mecef}` : '', fiche.facture.references.length ? `Références : ${fiche.facture.references.join(', ')}` : ''].filter(Boolean).join(' ; ');
+    await client.post('/api/admin/finances/depenses', {
+      dejaPayee: true, categorie: 'Budget', referenceLigne: p.code, sousLigne: fiche.financement.sousLigne,
+      libelle: fiche.depense.libelle, partenaireId: fournisseur._id, numeroPiece: numero,
+      montantReelFcfa: fiche.facture.totalTtc, datePaiement: fiche.paiement.date,
+      modePaiement: fiche.paiement.mode, detailPaiement: fiche.paiement.detail, referencePaiement: fiche.paiement.reference,
+      fichiersAttendus: fiche.depense.fichiersAttendus, commentaire
+    });
+    fait.push('depense');
+    recap.push(`Dépense : créée (pièce ${numero}, payée, hors audit jusqu'au dépôt des justificatifs)`);
+  } else recap.push(`Dépense : existante (pièce ${numero})`);
 
-    const lignesReception = fiche.lignes
-      .filter(l => !(l.ligneBon.lotId || l.ligneBon.quantiteRecue !== null))
-      .map(l => ({ ligneId: l.ligneBon._id, quantiteRecue: l.quantite, lotFournisseur: l.lotFournisseur, numeroLot: l.numeroLot }));
-    let lots = [];
-    if (lignesReception.length) {
-      const r = await client.post(`/api/admin/bons-commande/${bon._id}/reception`, { dateReception: fiche.reception.date, lignes: lignesReception });
-      bon = r.bon;
-      lots = r.lots || [];
+  if (!bon) {
+    const r = await client.post('/api/admin/bons-commande', {
+      typeCommande: fiche.commande.type, ...(p.achatDirect ? {} : { numeroBon: fiche.commande.reference }),
+      numeroFacture: numero, dateFacture: fiche.facture.date, dateEmission: fiche.commande.date,
+      fournisseurId: fournisseur._id, totalFacture: fiche.facture.totalTtc,
+      ligneBudgetaire: p.code, sousLigne: fiche.financement.sousLigne, commentaire: fiche.commentaire,
+      lignes: fiche.lignes.map(l => ({
+        designation: l.designation, quantiteFacture: l.quantiteFacture, montantFcfa: l.montant,
+        productId: l.produitBase._id, quantite: l.quantite, detailQuantite: l.detailQuantite
+      }))
+    });
+    bon = r.bon;
+    fiche.lignes.forEach((l, i) => { l.ligneBon = bon.lignes[i]; });
+    fait.push('bon');
+  }
+
+  const lignesReception = fiche.lignes
+    .filter(l => !(l.ligneBon.lotId || l.ligneBon.quantiteRecue !== null))
+    .map(l => ({ ligneId: l.ligneBon._id, quantiteRecue: l.quantite, lotFournisseur: l.lotFournisseur, numeroLot: l.numeroLot }));
+  let lots = [];
+  if (lignesReception.length) {
+    const r = await client.post(`/api/admin/bons-commande/${bon._id}/reception`, { dateReception: fiche.reception.date, lignes: lignesReception });
+    bon = r.bon;
+    lots = r.lots || [];
+    fait.push('reception');
+  }
+  recap.push(`Bon : ${bon.numeroBon} (${bon.statut})`);
+
+  console.log(`\n✅ FACTURE SAISIE${ctx.total > 1 ? ` : ${c.nom}` : ''}`);
+  for (const ligne of recap) console.log(`  ${ligne}`);
+  console.log(`  Lots créés (${lots.length}) :`);
+  for (const lot of lots) {
+    const produit = ctx.produitParId.get(String(lot.product));
+    console.log(`    ${lot.numeroLot} · ${produit ? nomProduit(produit) : '?'} : ${nb(lot.quantiteInitiale)} ${produit?.unit || ''}, ${fmt(lot.valeurFcfa)}`);
+  }
+  const dejaRecues = fiche.lignes.length - lignesReception.length;
+  console.log(`  Total des lots créés : ${fmt(lots.reduce((s, l) => s + (l.valeurFcfa || 0), 0))} (facture : ${fmt(fiche.facture.totalTtc)})${dejaRecues ? ` ; ${dejaRecues} ligne(s) déjà réceptionnée(s) avant cette reprise` : ''}`);
+}
+
+/**
+ * facture <fiche1.json> [fiche2.json …] : une seule connexion, fiches traitées dans l'ordre donné.
+ * 1. Toutes les fiches sont contrôlées (aucune écriture), puis les contrôles entre fiches ; plan et erreurs affichés.
+ * 2. Simulation : bilan, code 1 si une fiche est en erreur.
+ *    --appliquer : une seule fiche en erreur et rien n'est écrit, pour aucune ; sinon écriture fiche par fiche (les
+ *    fiches déjà saisies sont sautées). Un échec en route arrête tout : ce qui est fait et ce qui reste sont affichés,
+ *    et la relance de la même commande reprend sans doublon (chaque étape déjà enregistrée est retrouvée).
+ */
+async function commandeFacture(client, chemins, options) {
+  const [produits, prestataires, lignesBudget] = await Promise.all([
+    tout(client, '/api/admin/products', 'products'),
+    tout(client, '/api/admin/prestataires', 'prestataires'),
+    client.get('/api/admin/finances/lignes')
+  ]);
+  const ctx = {
+    total: chemins.length,
+    parRef: new Map(produits.filter(p => p.reference).map(p => [p.reference.toUpperCase(), p])),
+    produitParId: new Map(produits.map(p => [String(p._id), p])),
+    prestataires: [...prestataires],
+    codesLignes: new Set((lignesBudget || []).map(l => l.code)),
+    lignesPrevues: new Map(), // code -> fiche qui crée la ligne depuis le CSV
+    optionLignes: options.lignes || null, lignesCsv: null, erreurCsv: null
+  };
+  if (options.lignes) {
+    try { ctx.lignesCsv = lignesDuCsv(options.lignes); } catch (error) { ctx.erreurCsv = error.message; }
+  }
+
+  const controles = [];
+  for (const chemin of chemins) controles.push(await controlerFiche(client, chemin, ctx));
+  controlerEntreFiches(controles);
+  controles.forEach((c, i) => afficherControle(c, i + 1, controles.length));
+
+  const enErreur = controles.filter(c => etatFiche(c) === 'erreurs');
+  const pretes = controles.filter(c => etatFiche(c) === 'prête');
+  if (controles.length > 1) {
+    console.log(`\nBilan des ${controles.length} fiches :`);
+    for (const c of controles) {
+      const etat = etatFiche(c);
+      console.log(`  ${(etat === 'erreurs' ? `erreurs (${c.erreurs.length})` : etat).padEnd(13)} ${c.nom}${c.numero ? ` · facture ${c.numero}` : ''}`);
     }
-    recap.push(`Bon : ${bon.numeroBon} (${bon.statut})`);
-    const produitParId = new Map(produits.map(p => [String(p._id), p]));
-    console.log('\n✅ FACTURE SAISIE');
-    for (const ligne of recap) console.log(`  ${ligne}`);
-    console.log(`  Lots créés (${lots.length}) :`);
-    for (const lot of lots) {
-      const p = produitParId.get(String(lot.product));
-      console.log(`    ${lot.numeroLot} · ${p ? nomProduit(p) : '?'} : ${nb(lot.quantiteInitiale)} ${p?.unit || ''}, ${fmt(lot.valeurFcfa)}`);
+  }
+
+  if (enErreur.length) {
+    if (controles.length > 1) {
+      console.error(`\n❌ ${enErreur.length} fiche(s) en erreur sur ${controles.length} : rien n'a été écrit, pour aucune fiche. Corrigez-les puis relancez.`);
     }
-    const dejaRecues = fiche.lignes.length - lignesReception.length;
-    console.log(`  Total des lots créés : ${fmt(lots.reduce((s, l) => s + (l.valeurFcfa || 0), 0))} (facture : ${fmt(fiche.facture.totalTtc)})${dejaRecues ? ` ; ${dejaRecues} ligne(s) déjà réceptionnée(s) avant cette reprise` : ''}`);
-  } catch (error) {
-    console.error(`\n❌ Arrêt : ${error.message}`);
-    if (recap.length) console.error(`Déjà fait : ${recap.join(' ; ')}. Relancez la même commande pour reprendre.`);
     process.exitCode = 1;
+    return;
+  }
+  if (!pretes.length) {
+    if (controles.length > 1) console.log('\nToutes les fiches sont déjà saisies : rien à faire.');
+    return;
+  }
+  if (!options.appliquer) {
+    console.log(`\n🔎 SIMULATION : rien n'a été écrit. Relancez avec --appliquer pour enregistrer${pretes.length > 1 ? ` les ${pretes.length} fiches prêtes` : ''}.`);
+    return;
+  }
+
+  // Écriture, fiche par fiche, dans l'ordre donné
+  const saisies = [], sautees = [];
+  for (const [i, c] of controles.entries()) {
+    if (c.deja) {
+      sautees.push(c.nom);
+      if (controles.length > 1) console.log(`\n── ${c.nom} : facture ${c.numero} déjà saisie, sautée.`);
+      continue;
+    }
+    const prevues = etapesPrevues(c);
+    const fait = [];
+    try {
+      await ecrireFiche(client, c, ctx, fait);
+      saisies.push(c.nom);
+    } catch (error) {
+      const restantes = controles.slice(i + 1).filter(x => !x.deja).map(x => x.nom);
+      const resteFiche = prevues.filter(([cle]) => !fait.includes(cle)).map(([, libelle]) => libelle);
+      console.error(`\n❌ Arrêt pendant la fiche ${c.nom} : ${error.message}`);
+      console.error(`Fait : ${saisies.length ? `fiche(s) saisie(s) : ${saisies.join(', ')}` : 'aucune fiche complète'}${fait.length ? ` ; pour ${c.nom} : ${prevues.filter(([cle]) => fait.includes(cle)).map(([, libelle]) => libelle).join(', ')}` : ''}.`);
+      console.error(`Reste : ${c.nom}${resteFiche.length ? ` (${resteFiche.join(', ')})` : ''}${restantes.length ? `, puis ${restantes.join(', ')}` : ''}.`);
+      console.error('Relancez la même commande : ce qui est déjà enregistré (fournisseur, ligne budgétaire, dépense, bon, lots) est retrouvé et sauté, sans doublon.');
+      process.exitCode = 1;
+      return;
+    }
+  }
+  if (controles.length > 1) {
+    console.log(`\n✅ ${saisies.length} fiche(s) saisie(s)${sautees.length ? `, ${sautees.length} déjà saisie(s) sautée(s) (${sautees.join(', ')})` : ''}.`);
   }
 }
 
@@ -847,16 +1059,24 @@ async function executer() {
 
   try {
     const base = adresseApi(options.api);
-    if (['catalogue', 'facture'].includes(commande)) {
-      if (!positions[0]) throw new Error(`Indiquez le fichier JSON : ${commande} <fichier.json>.`);
+    if (commande === 'catalogue') {
+      if (!positions[0]) throw new Error('Indiquez le fichier JSON : catalogue <fichier.json>.');
+      if (positions.length > 1) throw new Error('catalogue : un seul fichier JSON à la fois.');
       lireJson(positions[0]); // Fichier lisible avant de demander les identifiants
+    }
+    if (commande === 'facture') {
+      if (!positions.length) throw new Error('Indiquez le fichier JSON : facture <fiche1.json> [fiche2.json …].');
+      // Avant de demander les identifiants : si aucune fiche n'est lisible, inutile d'aller plus loin. Une fiche
+      // illisible parmi d'autres est signalée dans le bilan, avec les erreurs des autres fiches.
+      const illisibles = positions.map(p => { try { lireJson(p); return null; } catch (error) { return error.message; } }).filter(Boolean);
+      if (illisibles.length === positions.length) throw new Error(illisibles.join('\n❌ '));
     }
     console.log(`API : ${base} · ${options.appliquer ? 'ÉCRITURE (--appliquer)' : 'simulation'}`);
     const client = creerClient(base);
     await connecter(client, { adminRequis: commande !== 'controle' });
 
     if (commande === 'catalogue') await commandeCatalogue(client, positions[0], !!options.appliquer);
-    else if (commande === 'facture') await commandeFacture(client, positions[0], options);
+    else if (commande === 'facture') await commandeFacture(client, positions, options);
     else if (commande === 'transformation') await commandeTransformation(client, options);
     else await commandeControle(client, options);
   } catch (error) {
