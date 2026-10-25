@@ -7,6 +7,8 @@ const formuleC = require('../controllers/FormuleController');
 const orderC = require('../controllers/OrderController');
 const nutritionC = require('../controllers/NutritionController');
 const avisC = require('../controllers/AvisController');
+const ficheC = require('../controllers/FicheController');
+const vipC = require('../controllers/VipController');
 const { limiteTentatives } = require('../middlewares/limiteTentatives');
 
 // Force brute : 5 échecs de connexion par compte en 15 minutes, 30 par adresse IP ;
@@ -26,6 +28,13 @@ const limiteAvis = limiteTentatives({
   nom: 'avis', minutes: 60, maxParCompte: 10, maxParIp: 30,
   compteDe: (req) => (req.user?.id ? String(req.user.id) : ''),
   message: 'Trop d\'envois en peu de temps.'
+});
+// Codes VIP (force brute) : 5 codes refusés par heure et par compte, 30 par adresse IP ; un code accepté remet
+// le compteur du compte à zéro
+const limiteCodeVip = limiteTentatives({
+  nom: 'code-vip', minutes: 60, maxParCompte: 5, maxParIp: 30, echecsSeulement: true,
+  compteDe: (req) => (req.user?.id ? String(req.user.id) : ''),
+  message: 'Trop de codes refusés.'
 });
 
 // Authentification
@@ -60,6 +69,14 @@ router.route('/avis')
   .get(verifyToken, avisC.monAvis)
   .put(verifyToken, limiteAvis, avisC.enregistrerAvis)
   .delete(verifyToken, avisC.supprimerMonAvis);
+
+// Fiches produits (bandeau publicitaire de l'espace client)
+router.get('/fiches', verifyToken, ficheC.fichesPubliees);
+
+// VIP : saisie d'un code, catalogue au prix VIP et achat libre (même limite que les autres commandes)
+router.post('/vip/code', verifyToken, limiteCodeVip, vipC.utiliserCode);
+router.get('/vip/catalogue', verifyToken, vipC.catalogueVip);
+router.post('/vip/commande', verifyToken, limiteCommandes, orderC.saveAchatLibre);
 
 module.exports = router;
         

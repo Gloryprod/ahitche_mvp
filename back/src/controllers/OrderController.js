@@ -1,31 +1,56 @@
+const mongoose = require('mongoose');
 const Order = require('../models/order');
 const Formule = require('../models/formules');
+const User = require('../models/user');
+const OrderProductSnapshot = require('../models/orderProductSnapshot');
 const { genererReferenceCommande } = require('../services/orderReferenceService');
 const { ANNULABLES_PAR_CLIENT } = require('../services/commandeService');
 const { prixDeVente } = require('../services/formuleService');
+const { SLUG_ACHAT_LIBRE, NOM_ACHAT_LIBRE, lireAchatLibre, preparerLignes, totalAchatLibre } = require('../services/achatLibreService');
 
-const CHAMPS_CLIENT = 'reference formule formuleSlug total modePaiement statut creneau dateLivraison paiement.statut createdAt';
+const CHAMPS_CLIENT = 'reference formule formuleSlug typeCommande total modePaiement statut creneau dateLivraison paiement.statut createdAt demandesLibres';
 
-// Même sélection pour une commande déjà chargée (réponse à la création)
-function versClient(order) {
-    const o = order.toObject();
+// Commande telle que renvoyée au client (liste et réponse à la création) : jamais le coût interne de la course,
+// le livreur, les notes internes, l'historique avec les identifiants de l'équipe, ni les prix du catalogue d'un pack.
+// Achat libre : ses lignes (au prix VIP, celui que paie le client) et ses demandes libres, sans le motif interne.
+function versClient(o, lignes = []) {
+    const commande = {
+        _id: o._id, reference: o.reference, formule: o.formule, formuleSlug: o.formuleSlug,
+        typeCommande: o.typeCommande || 'pack', total: o.total,
+        modePaiement: o.modePaiement, statut: o.statut,
+        creneau: o.creneau ?? { date: null, periode: null }, dateLivraison: o.dateLivraison ?? null,
+        paiement: { statut: o.paiement?.statut ?? 'En attente' }, createdAt: o.createdAt
+    };
+    if (commande.typeCommande !== 'achat-libre') return commande;
     return {
-        _id: o._id, reference: o.reference, formule: o.formule, formuleSlug: o.formuleSlug, total: o.total,
-        modePaiement: o.modePaiement, statut: o.statut, creneau: o.creneau, dateLivraison: o.dateLivraison,
-        paiement: { statut: o.paiement?.statut }, createdAt: o.createdAt
+        ...commande,
+        lignes: lignes.map(l => ({ nom: l.name, quantite: l.quantity, unite: l.unit, prixUnitaire: l.unitPrice, total: l.totalPrice })),
+        demandesLibres: (o.demandesLibres || []).map(d => ({ _id: d._id, designation: d.designation, quantite: d.quantite, prix: d.prix ?? null, retiree: !!d.retiree }))
     };
 }
 
 async function index(req, res){
 
     try {
-        // Seuls les champs utiles au client : jamais le coût interne de la course, le livreur, les notes
-        // internes ni l'historique avec les identifiants de l'équipe
         const orders = await Order.find({ userId: req.user.id, deletedAt: null })
             .select(CHAMPS_CLIENT)
-            .sort({ createdAt: -1 });
-        res.status(200).json(orders);
+            .sort({ createdAt: -1 })
+            .lean();
+        // Lignes des achats libres seulement (une requête) : celles d'un pack portent le prix du catalogue
+        const achatsLibres = orders.filter(o => o.typeCommande === 'achat-libre').map(o => o._id);
+        const lignesParCommande = new Map();
+        if (achatsLibres.length) {
+            const lignes = await OrderProductSnapshot.find({ orderId: { $in: achatsLibres } })
+                .select('orderId name quantity unit unitPrice totalPrice').lean();
+            for (const l of lignes) {
+                const cle = String(l.orderId);
+                if (!lignesParCommande.has(cle)) lignesParCommande.set(cle, []);
+                lignesParCommande.get(cle).push(l);
+            }
+        }
+        res.status(200).json(orders.map(o => versClient(o, lignesParCommande.get(String(o._id)))));
     } catch (error) {
+        console.error("Erreur index commandes client:", error);
         res.status(500).json({ message: "Erreur lors de la récupération des commandes" });
     }
     
@@ -79,13 +104,81 @@ async function saveOrder(req, res){
 
         return res.status(201).json({
             message: "Commande enregistrée avec succès !",
-            commande: versClient(nouvelleCommande)
+            commande: versClient(nouvelleCommande.toObject())
         });
     } catch (error) {
         console.error("Erreur lors de la création de la commande :", error);
         return res.status(500).json({ message: "Erreur interne du serveur." });
     }
 
+}
+
+// Deux commandes au même instant peuvent recevoir la même référence : l'index unique refuse la seconde,
+// qui reprend alors la référence suivante (3 essais)
+const doublonDeReference = (error) => error?.code === 11000 && /reference/.test(String(error.message || ''));
+
+// POST /api/auth/vip/commande  { lignes: [{ productId, quantite }], demandesLibres: [{ designation, quantite }], notes }
+// Comptes VIP seulement. Le serveur vérifie chaque produit et fixe le total (prix VIP) ; les demandes libres
+// restent sans prix jusqu'au chiffrage par l'admin. Ensuite, même parcours qu'un pack (WhatsApp, livraison, paiement).
+async function saveAchatLibre(req, res) {
+    try {
+        const compte = await User.findById(req.user.id).select('role vip').lean();
+        if (!compte) return res.status(401).json({ message: "Session expirée, reconnectez-vous." });
+        if (compte.role !== 'user' || compte.vip?.actif !== true) {
+            return res.status(403).json({ message: "Les achats libres sont réservés aux comptes VIP." });
+        }
+
+        const lu = lireAchatLibre(req.body);
+        if (lu.erreur) return res.status(400).json({ message: lu.erreur });
+        const prepa = await preparerLignes(lu.lignes);
+        if (prepa.erreur) return res.status(400).json({ message: prepa.erreur });
+
+        const orderId = new mongoose.Types.ObjectId();
+        const lignes = prepa.snapshots.length
+            ? await OrderProductSnapshot.insertMany(prepa.snapshots.map(s => ({ ...s, orderId })))
+            : [];
+        const demandesLibres = lu.demandes.map(d => ({ ...d, prix: null, retiree: false, motif: '' }));
+
+        let commande = null;
+        try {
+            for (let essai = 1; !commande; essai++) {
+                const nouvelle = new Order({
+                    _id: orderId,
+                    userId: req.user.id,
+                    reference: await genererReferenceCommande(),
+                    formule: NOM_ACHAT_LIBRE,
+                    formuleSlug: SLUG_ACHAT_LIBRE,
+                    typeCommande: 'achat-libre',
+                    total: totalAchatLibre(lignes, demandesLibres),
+                    prixFormule: null,
+                    montantExtras: 0,
+                    notes: lu.notes,
+                    productsSnapshot: lignes.map(l => l._id),
+                    demandesLibres,
+                    statut: 'En attente',
+                    historique: [{ statut: 'En attente', date: new Date(), par: req.user.id }]
+                });
+                try {
+                    commande = await nouvelle.save();
+                } catch (error) {
+                    if (!doublonDeReference(error) || essai >= 3) throw error;
+                }
+            }
+        } catch (error) {
+            await OrderProductSnapshot.deleteMany({ orderId }); // Pas de lignes orphelines
+            throw error;
+        }
+
+        return res.status(201).json({
+            message: demandesLibres.length
+                ? "Commande enregistrée ! Nous vous confirmons le prix de vos demandes libres sur WhatsApp."
+                : "Commande enregistrée avec succès !",
+            commande: versClient(commande.toObject(), lignes.map(l => l.toObject()))
+        });
+    } catch (error) {
+        console.error("Erreur saveAchatLibre:", error);
+        return res.status(500).json({ message: "Erreur interne du serveur." });
+    }
 }
 
 async function deleteOrder(req, res) {
@@ -114,4 +207,4 @@ async function deleteOrder(req, res) {
     }   
 }
 
-module.exports = {index, saveOrder, deleteOrder};
+module.exports = {index, saveOrder, saveAchatLibre, deleteOrder};

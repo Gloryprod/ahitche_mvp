@@ -10,8 +10,13 @@ const Zone = require('../../models/zone');
 const { TRANSITIONS, genererCompositionSiAbsente } = require('../../services/commandeService');
 const { MODES_PAIEMENT_ACCEPTES, calculerPrixCommande } = require('../../services/prixCommandeService');
 const { journaliser } = require('../../services/journalService');
+const { ACCES } = require('../../config/roles');
+const {
+  MAX_DEMANDES, MAX_PRIX, nombre, nettoyer, demandesAChiffrer, demandesChiffrees, totalAchatLibre
+} = require('../../services/achatLibreService');
 
 const formaterFcfa = (n) => `${Math.round(n).toLocaleString('fr-FR')} FCFA`;
+const estAchatLibre = (order) => order?.typeCommande === 'achat-libre';
 
 
 async function createAdminOrder(req, res) {
@@ -97,9 +102,13 @@ async function updateAdminOrder(req, res) {
     }
 
     // 2. Vérifier si la commande existe
-    const order = await Order.findById(id);
+    const order = mongoose.isValidObjectId(id) ? await Order.findById(id) : null;
     if (!order) {
       return res.status(404).json({ message: "Commande introuvable." });
+    }
+    // Un achat libre VIP n'a pas de formule : son prix ne se recalcule jamais comme celui d'un pack
+    if (estAchatLibre(order)) {
+      return res.status(409).json({ message: "Un achat libre VIP ne se modifie pas avec le formulaire d'un pack : chiffrez ou retirez ses demandes libres." });
     }
 
     // 3. Récupérer les informations de la formule (au cas où elle a changé)
@@ -176,6 +185,9 @@ async function updateOrderStatus(req, res) {
   if (!STATUTS.includes(statut)) {
     return res.status(400).json({ message: "Statut inconnu." });
   }
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(404).json({ message: "Commande introuvable." });
+  }
 
   // Transaction : changement de statut et sortie de stock FIFO réussissent ou échouent ensemble
   const session = await mongoose.startSession();
@@ -194,6 +206,16 @@ async function updateOrderStatus(req, res) {
       if (order.statut === 'Échec') {
         order.creneau = { date: null, periode: null };
         order.livreurId = null;
+      }
+      // Achat libre VIP : chaque demande libre doit être chiffrée ou retirée, et il doit rester quelque chose à livrer
+      if (estAchatLibre(order)) {
+        const aChiffrer = demandesAChiffrer(order.demandesLibres);
+        if (aChiffrer) {
+          throw new ErreurStatut(`Achat libre : chiffrez ou retirez d'abord ${aChiffrer > 1 ? `les ${aChiffrer} demandes libres en attente` : 'la demande libre en attente'}.`);
+        }
+        if (!order.productsSnapshot?.length && !demandesChiffrees(order.demandesLibres).length) {
+          throw new ErreurStatut("Achat libre sans produit ni demande chiffrée : rien à livrer. Annulez la commande.");
+        }
       }
       // Zone de livraison du client, et composition du pack pour les commandes passées par le client
       if (!order.zone) {
@@ -225,9 +247,14 @@ async function updateOrderStatus(req, res) {
       const zone = order.zone ? await Zone.findOne({ code: order.zone }).session(session) : null;
       order.coutLivraison = zone?.tarifCourse || 0;
 
-      // Sortie de stock FIFO de tous les produits (fixes et extras) de la commande
+      // Sortie de stock FIFO de tous les produits (fixes et extras) de la commande. Achat libre : ses lignes au prix VIP
+      // sortent de la même façon ; ses demandes libres chiffrées se livrent sans toucher au stock.
       const orderProducts = await OrderProductSnapshot.find({ orderId: order._id }).session(session);
-      if (!orderProducts.length) {
+      if (estAchatLibre(order) && demandesAChiffrer(order.demandesLibres)) {
+        throw new ErreurStatut("Achat libre : une demande libre n'est ni chiffrée ni retirée.");
+      }
+      const demandesALivrer = estAchatLibre(order) ? demandesChiffrees(order.demandesLibres).length : 0;
+      if (!orderProducts.length && !demandesALivrer) {
         throw new ErreurStatut("Impossible de valider une commande sans produits associés.");
       }
       for (const item of orderProducts) {
@@ -302,8 +329,9 @@ async function deciderRemise(req, res) {
     const decision = req.body?.decision;
     if (!['valider', 'refuser'].includes(decision)) return res.status(400).json({ message: "Décision invalide (valider ou refuser)." });
 
-    const order = await Order.findOne({ _id: req.params.id, deletedAt: null });
+    const order = mongoose.isValidObjectId(req.params.id) ? await Order.findOne({ _id: req.params.id, deletedAt: null }) : null;
     if (!order) return res.status(404).json({ message: "Commande introuvable." });
+    if (estAchatLibre(order)) return res.status(400).json({ message: "Pas de remise sur un achat libre VIP : son prix vient des prix VIP et du chiffrage des demandes." });
     if (order.remise?.statut !== 'À valider') return res.status(400).json({ message: "Aucune remise en attente sur cette commande." });
     if (order.paiement?.statut === 'Payé') return res.status(400).json({ message: "La commande est déjà payée." });
 
@@ -324,8 +352,96 @@ async function deciderRemise(req, res) {
   }
 }
 
+// Statuts où les demandes libres d'un achat libre se chiffrent encore : avant le départ en livraison
+const CHIFFRABLES = ['En attente', 'Confirmée', 'En préparation', 'Échec'];
+
+// Demandes libres renvoyées à l'équipe (écran Commandes)
+const versEquipe = (d) => ({ _id: d._id, designation: d.designation, quantite: d.quantite, prix: d.prix ?? null, retiree: !!d.retiree, motif: d.motif || '' });
+
+// PATCH /api/admin/orders/:id/demandes  { demandes: [{ _id, prix } | { _id, retiree: true, motif }] } : écriture de la
+// section « vip » (admin seulement).
+// Fixe le prix (FCFA) de demandes libres d'un achat libre VIP, ou les retire avec un motif ; le total est recalculé
+// (lignes au prix VIP + demandes chiffrées) et journalisé. Une demande chiffrée ou retirée ne redevient jamais
+// « à chiffrer » : la confirmation reste acquise.
+async function chiffrerDemandes(req, res) {
+  try {
+    if (!ACCES.vip.ecriture.includes(req.user.role)) return res.status(403).json({ message: "Seul l'admin chiffre ou retire les demandes libres." });
+    const recues = req.body?.demandes;
+    if (!Array.isArray(recues) || !recues.length || recues.length > MAX_DEMANDES) {
+      return res.status(400).json({ message: "Indiquez les demandes libres à chiffrer ou à retirer." });
+    }
+
+    const order = mongoose.isValidObjectId(req.params.id) ? await Order.findOne({ _id: req.params.id, deletedAt: null }) : null;
+    if (!order) return res.status(404).json({ message: "Commande introuvable." });
+    if (!estAchatLibre(order)) return res.status(400).json({ message: "Cette commande n'est pas un achat libre VIP." });
+    if (!CHIFFRABLES.includes(order.statut) || order.paiement?.statut === 'Payé') {
+      return res.status(400).json({ message: `Commande « ${order.statut} » : ses demandes libres ne se modifient plus.` });
+    }
+
+    // Tout est vérifié avant la moindre modification
+    const vues = new Set();
+    const decisions = [];
+    for (const r of recues) {
+      if (!r || typeof r !== 'object') return res.status(400).json({ message: "Demande libre invalide." });
+      const id = r._id ?? r.id;
+      const demande = mongoose.isValidObjectId(id) ? order.demandesLibres.id(id) : null;
+      if (!demande) return res.status(400).json({ message: "Demande libre introuvable sur cette commande." });
+      if (vues.has(String(demande._id))) return res.status(400).json({ message: `« ${demande.designation} » apparaît deux fois.` });
+      vues.add(String(demande._id));
+
+      if (r.retiree === true) {
+        if (r.motif !== undefined && r.motif !== null && typeof r.motif !== 'string') return res.status(400).json({ message: "Motif invalide." });
+        const motif = nettoyer(r.motif);
+        if (motif.length < 3 || motif.length > 300) {
+          return res.status(400).json({ message: `Indiquez le motif du retrait de « ${demande.designation} » (3 à 300 caractères).` });
+        }
+        decisions.push({ demande, retiree: true, prix: null, motif });
+      } else {
+        if (r.retiree !== undefined && r.retiree !== false) return res.status(400).json({ message: "Retrait : oui ou non." });
+        const prix = nombre(r.prix);
+        if (!(prix >= 0 && prix <= MAX_PRIX)) {
+          return res.status(400).json({ message: `Indiquez le prix de « ${demande.designation} » en FCFA (0 ou plus).` });
+        }
+        decisions.push({ demande, retiree: false, prix: Math.round(prix), motif: '' });
+      }
+    }
+
+    const avant = { total: order.total, demandesLibres: order.demandesLibres.map(versEquipe) };
+    const changements = [];
+    for (const { demande, retiree, prix, motif } of decisions) {
+      if (retiree && (!demande.retiree || demande.motif !== motif)) changements.push(`« ${demande.designation} » retirée (${motif})`);
+      if (!retiree && (demande.retiree || demande.prix !== prix)) changements.push(`« ${demande.designation} » chiffrée ${formaterFcfa(prix)}`);
+      Object.assign(demande, { retiree, prix, motif });
+    }
+
+    const reponse = () => ({
+      id: order._id, reference: order.reference, total: order.total,
+      demandesLibres: order.demandesLibres.map(versEquipe), demandesAChiffrer: demandesAChiffrer(order.demandesLibres)
+    });
+    if (!changements.length) return res.status(200).json({ message: "Aucune modification.", order: reponse() });
+
+    const lignes = await OrderProductSnapshot.find({ orderId: order._id }).select('totalPrice').lean();
+    order.total = totalAchatLibre(lignes, order.demandesLibres);
+    await order.save();
+    await journaliser(req, {
+      action: 'Modification', entite: 'Commande', entiteId: order._id,
+      resume: `Achat libre ${order.reference} : ${changements.join(' ; ')} ; total ${formaterFcfa(avant.total)} → ${formaterFcfa(order.total)}`,
+      avant, apres: { total: order.total, demandesLibres: order.demandesLibres.map(versEquipe) }
+    });
+    const restantes = demandesAChiffrer(order.demandesLibres);
+    return res.status(200).json({
+      message: `Demandes enregistrées : total ${formaterFcfa(order.total)}${restantes ? ` (${restantes} encore à chiffrer)` : ''}.`,
+      order: reponse()
+    });
+  } catch (error) {
+    console.error("Erreur chiffrerDemandes:", error);
+    return res.status(500).json({ message: "Erreur lors du chiffrage des demandes libres." });
+  }
+}
+
 module.exports = {
   deciderRemise,
+  chiffrerDemandes,
   createAdminOrder,
   getAllOrders,
   updateAdminOrder,

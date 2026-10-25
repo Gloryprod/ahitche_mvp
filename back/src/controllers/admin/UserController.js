@@ -3,6 +3,7 @@ const Order = require("../../models/order")
 const { STATUTS } = require("../../models/order")
 const { echapperRegex } = require("../../utils/texte")
 const { livreurDuCompte, filtreCommandesLivreur, clientsDuLivreur } = require("../../services/perimetreService")
+const { demandesAChiffrer } = require("../../services/achatLibreService")
 
 // Champs d'un client renvoyés à l'équipe : jamais le mot de passe ni le jeton de réinitialisation
 const CHAMPS_CLIENT = 'username email telephone quartier adresse zone lienLocalisation formuleHabituelle role createdAt'
@@ -136,6 +137,10 @@ async function getOrders(req, res) {
         remise: order.remise,
         date: dateFormatee,
         formuleSlug: order.formuleSlug,
+        // Achat libre VIP : lignes au prix VIP dans productsSnapshot, demandes libres à chiffrer par l'admin
+        typeCommande: order.typeCommande || 'pack',
+        demandesLibres: order.demandesLibres || [],
+        demandesAChiffrer: demandesAChiffrer(order.demandesLibres),
         modePaiement: order.modePaiement,
         notes: order.notes,
         statut: order.statut,

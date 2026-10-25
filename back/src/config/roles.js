@@ -1,7 +1,8 @@
 // Rôles de l'équipe Ahitché et droits par section du back-office.
 // Référence : docs/conception-menu-admin.md (section 3, Rôles) et décision D-17.
 //  - admin          : tout (le porteur est l'admin principal)
-//  - gestionnaire   : commandes, stock, logistique, prestataires, compléments de la semaine ; ni marges ni finances (D-17).
+//  - gestionnaire   : commandes, stock, logistique, prestataires, compléments de la semaine, fiches produits ;
+//                     ni marges ni finances (D-17), ni codes ni prix VIP.
 //                     Un gestionnaire relié à une fiche livreur ne voit que les clients de ses livraisons.
 //  - comptable      : finances ; le reste en lecture seule
 //  - nutritionniste : nutrition, idées de repas ; les clients et le catalogue en lecture seule
@@ -10,6 +11,7 @@
 //  - auditeur       : lecture seule des finances et du stock, compte créé à la demande
 //  Idées de repas (D-18) : rédigées par les gestionnaires et le nutritionniste, publiées par l'admin
 //  Avis clients : rédigés par les clients dans leur espace, publiés (ou refusés) par l'admin
+//  Codes VIP, prix VIP et chiffrage des achats libres : admin seulement, coordinateur en lecture
 
 const ROLES = ['user', 'admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
 const EQUIPE = ['admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
@@ -24,6 +26,10 @@ const ACCES = {
   mesures:       { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: [] },
   // Compléments de la semaine (extras du catalogue : photo, description, prix de vente, affichage sur le site)
   complements:   { lecture: ['admin', 'gestionnaire', 'coordinateur'],              ecriture: ['admin', 'gestionnaire'] },
+  // Fiches produits (publicité de l'espace client : format, prix affiché, mention, photo), sans lien avec les commandes
+  fiches:        { lecture: ['admin', 'gestionnaire', 'coordinateur'],              ecriture: ['admin', 'gestionnaire'] },
+  // Codes VIP et comptes VIP ; les prix VIP se saisissent dans Produits (admin) et ne sont lus que par ces rôles
+  vip:           { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
   stock:         { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur', 'auditeur'], ecriture: ['admin', 'gestionnaire'] },
   prestataires:  { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
   logistique:    { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },

@@ -23,6 +23,7 @@ function formaterCommande(order, zonesParCode) {
     reference: order.reference,
     statut: order.statut,
     formule: order.formule,
+    typeCommande: order.typeCommande || 'pack',
     total: order.total,
     modePaiement: order.modePaiement,
     client: {
@@ -36,6 +37,8 @@ function formaterCommande(order, zonesParCode) {
     creneau: order.creneau,
     livreur: order.livreurId ? { _id: order.livreurId._id, nom: order.livreurId.nom, telephone: order.livreurId.telephone } : null,
     produits: (order.productsSnapshot || []).map(p => ({ nom: p.name, quantite: p.quantity, unite: p.unit })),
+    // Achat libre VIP : demandes hors catalogue à acheter et à livrer avec la commande (hors stock), sans prix
+    demandesLibres: (order.demandesLibres || []).filter(d => !d.retiree).map(d => ({ designation: d.designation, quantite: d.quantite })),
     paiement: order.paiement
   };
 }

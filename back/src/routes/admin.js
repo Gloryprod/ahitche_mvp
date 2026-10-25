@@ -19,6 +19,8 @@ const nutritionC = require('../controllers/NutritionController');
 const complementC = require('../controllers/admin/ComplementController');
 const mesureC = require('../controllers/admin/MesureController');
 const avisC = require('../controllers/AvisController');
+const ficheC = require('../controllers/FicheController');
+const vipC = require('../controllers/VipController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -44,6 +46,8 @@ router.use('/nutrition', acces(ACCES.nutrition));
 router.use('/parametres', acces(ACCES.parametres));
 router.use('/repas', acces(ACCES.repas));
 router.use('/avis', acces(ACCES.avis));
+router.use('/fiches', acces(ACCES.fiches));
+router.use('/vip', acces(ACCES.vip));
 
 // Users
 router.get('/users', userC.index);
@@ -54,6 +58,7 @@ router.post('/orders', orderC.createAdminOrder);
 router.put('/orders/:id', orderC.updateAdminOrder);
 router.patch('/orders/:id/status', orderC.updateOrderStatus);
 router.patch('/orders/:id/remise', orderC.deciderRemise); // Admin seulement (contrôlé dans le contrôleur)
+router.patch('/orders/:id/demandes', orderC.chiffrerDemandes); // Achat libre VIP : chiffrage ou retrait des demandes libres (écriture de la section vip, contrôlée dans le contrôleur)
 router.delete('/orders/:id', orderC.deleteAdminOrder);
 
 // Category
@@ -94,6 +99,25 @@ router.post('/complements/photo', upload.uploadPhotoProduit.single('photo'), com
 router.route('/complements/:id')
   .put(complementC.modifierComplement)
   .patch(complementC.modifierComplement);
+
+// Fiches produits (publicité du bandeau de l'espace client ; sans lien avec les commandes ni le stock)
+router.route('/fiches')
+  .get(ficheC.listerFiches)
+  .post(ficheC.creerFiche);
+router.get('/fiches/produits', ficheC.produitsPourFiches); // Produits vendus proposés dans le formulaire, sans prix
+router.post('/fiches/photo', upload.uploadPhotoFiche.single('photo'), ficheC.televerserPhoto);
+router.route('/fiches/:id')
+  .put(ficheC.modifierFiche)
+  .patch(ficheC.modifierFiche)
+  .delete(ficheC.supprimerFiche);
+
+// Codes VIP et comptes VIP (achats libres au prix VIP)
+router.route('/vip/codes')
+  .get(vipC.listerCodes)
+  .post(vipC.creerCode);
+router.patch('/vip/codes/:id', vipC.modifierCode); // { actif } : désactivation ou réactivation
+router.get('/vip/comptes', vipC.listerComptes);
+router.post('/vip/comptes/:id/retrait', vipC.retirerVip);
 
 // --- Formules / Packs ---
 router.get('/formulas/:packType', formulaC.getPackDetails);
