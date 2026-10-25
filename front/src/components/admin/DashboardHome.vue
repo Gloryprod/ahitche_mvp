@@ -7,6 +7,7 @@ import { classeStatut } from '@/config/commandes'
 import { useAuthStore } from '@/stores/auth'
 import { peutLire, peutEcrire } from '@/config/roles'
 import { FORMULES } from '@/config/formules'
+import { estAchatLibre } from '@/config/vip'
 import { useTauxChange } from '@/composables/useTauxChange'
 import { useToast } from 'vue-toastification'
 import type { Commande, ProductItem } from '@/type'
@@ -118,9 +119,12 @@ const cycleJours = (formuleSlug: string): number => {
   return formulaQueries.value[index]?.data?.formule?.cycleJours ?? CYCLES_PAR_DEFAUT[formuleSlug] ?? 30
 }
 
+// Achats libres VIP : ni formule ni cycle (formuleSlug « achat-libre »), donc hors relances et hors répartition par formule
+const commandesDePacks = computed(() => ordersList.value.filter(o => o && o.deletedAt == null && !estAchatLibre(o)))
+
 const upcomingRenewals = computed(() => {
   const now = new Date()
-  const commandesActives = ordersList.value.filter(o => o && o.deletedAt == null)
+  const commandesActives = commandesDePacks.value
 
   // Dernière commande de chaque client (la liste arrive de la plus récente à la plus ancienne) :
   // une relance n'a de sens que s'il n'a rien commandé depuis
@@ -214,8 +218,8 @@ const formulaDistribution = computed(() => {
   const sanitize = (str: string) => 
     str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim() : ""
 
-  // 1. Récupération de toutes les commandes valides
-  const validOrders = ordersList.value.filter(o => o && o.deletedAt == null)
+  // 1. Récupération de toutes les commandes valides de packs (les achats libres n'ont pas de formule)
+  const validOrders = commandesDePacks.value
   const totalOrders = validOrders.length || 1
 
   return formulasConfig.map(f => {

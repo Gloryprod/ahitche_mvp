@@ -85,6 +85,18 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/components/admin/complements/ComplementsManagement.vue')
       },
       {
+        path: 'fiches',
+        name: 'fiches-page',
+        meta: { roles: ACCES.fiches.lecture },
+        component: () => import('@/components/admin/fiches/FichesProduits.vue')
+      },
+      {
+        path: 'vip',
+        name: 'vip-page',
+        meta: { roles: ACCES.vip.lecture },
+        component: () => import('@/components/admin/vip/CodesVip.vue')
+      },
+      {
         path: 'avis',
         name: 'avis-page',
         meta: { roles: ACCES.avis.lecture },

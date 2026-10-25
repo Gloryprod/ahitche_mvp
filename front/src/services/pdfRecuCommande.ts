@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { finDernierTableau } from './pdfTableau'
 import { WHATSAPP_AFFICHAGE } from '@/config/contact';
+import { quantiteEtUnite, type DemandeLibre, type LigneAchatLibre } from '@/config/vip';
 
 export interface RecuData {
   commandeId: string;
@@ -13,6 +14,24 @@ export interface RecuData {
   clientPhone?: string;
   clientQuartier?: string;
   clientAdresse?: string;
+  // Achat libre VIP : une ligne par produit (prix VIP), puis les demandes libres (chiffrées ou retirées)
+  lignes?: LigneAchatLibre[];
+  demandesLibres?: DemandeLibre[];
+}
+
+// Les espaces insécables (séparateur de milliers à la française) ne passent pas dans la police du PDF
+const sansInsecable = (texte: string) => texte.replace(/[  ]/g, ' ');
+const fcfaPDF = (montant: number) => sansInsecable(`${montant.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} FCFA`);
+
+// Lignes du tableau d'un achat libre : produits au prix VIP, demandes libres chiffrées, demandes retirées sans montant
+function lignesAchatLibre(data: RecuData): string[][] {
+  const produits = (data.lignes ?? []).map(l => [l.nom, fcfaPDF(l.prixUnitaire), sansInsecable(quantiteEtUnite(l.quantite, l.unite)), fcfaPDF(l.total)]);
+  const demandes = (data.demandesLibres ?? []).map(d => {
+    const libelle = `Demande libre : ${d.designation}${d.quantite ? ` (${d.quantite})` : ''}`;
+    if (d.retiree) return [`${libelle} - retirée`, '-', '-', '-'];
+    return d.prix === null ? [libelle, 'à confirmer', '1', '-'] : [libelle, fcfaPDF(d.prix), '1', fcfaPDF(d.prix)];
+  });
+  return [...produits, ...demandes];
 }
 
 export const genererRecuPDF = (data: RecuData) => {
@@ -107,14 +126,16 @@ export const genererRecuPDF = (data: RecuData) => {
   autoTable(doc, {
     startY: 80,
     head: [['Description', 'Prix Unitaire', 'Qté', 'Total']],
-    body: [
-      [
-        `Formule : ${data.formule}`,
-        totalPropre,
-        '1',
-        totalPropre
-      ]
-    ],
+    body: data.lignes || data.demandesLibres
+      ? lignesAchatLibre(data)
+      : [
+          [
+            `Formule : ${data.formule}`,
+            totalPropre,
+            '1',
+            totalPropre
+          ]
+        ],
     headStyles: {
       fillColor: vertForet,
       textColor: [255, 255, 255],

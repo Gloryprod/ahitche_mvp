@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, computed, defineAsyncComponent } from 'vue'
 import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
 import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
@@ -12,6 +12,12 @@ import { useChangementStatut } from '@/composables/useChangementStatut'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
 import { estVendu } from '@/config/produits'
+import { estAchatLibre } from '@/config/vip'
+
+// Achat libre VIP : détail et chiffrage des demandes libres dans une fenêtre à part (chargée à l'ouverture),
+// jamais dans le formulaire d'un pack
+const DetailAchatLibre = defineAsyncComponent(() => import('@/components/admin/vip/DetailAchatLibre.vue'))
+const achatLibreOuvert = ref<Commande | null>(null)
 
 const authStore = useAuthStore()
 const ecriture = computed(() => peutEcrire(authStore.role.value, 'commandes'))
@@ -125,12 +131,17 @@ const openCreateMode = () => {
 }
 
 const openDetailMode = (cmd: Commande) => {
+  if (estAchatLibre(cmd)) {
+    achatLibreOuvert.value = cmd
+    return
+  }
   formMode.value = 'detail'
   selectedCommande.value = cmd
   isModalOpen.value = true
 }
 
 const openEditMode = (cmd: Commande) => {
+  if (estAchatLibre(cmd)) return // Son prix vient des prix VIP et du chiffrage : jamais recalculé comme un pack
   formMode.value = 'edit'
   selectedCommande.value = cmd
   isModalOpen.value = true
@@ -187,6 +198,12 @@ const showNotification = (text: string, type: string) => {
 const handleOrderSuccess = () => {
   queryClient.invalidateQueries({ queryKey: ['orders'] })
   showNotification("Opération effectuée avec succès", "success")
+}
+
+// Demandes libres chiffrées ou retirées : la liste (total, badge « à chiffrer ») est rechargée
+const handleAchatLibreModifie = (message: string) => {
+  queryClient.invalidateQueries({ queryKey: ['orders'] })
+  showNotification(message, 'success')
 }
 </script>
 
@@ -260,7 +277,13 @@ const handleOrderSuccess = () => {
               <td class="py-3.5 px-2 text-noir font-bold">{{ cmd.clientName }}</td>
               <td class="py-3.5 px-2 text-gris tracking-wide">{{ cmd.whatsapp }}</td>
               <td class="py-3.5 px-2">
-                <span class="bg-gray-100 text-gris px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200/60 uppercase">
+                <!-- Achat libre VIP : badge « VIP », et « à chiffrer » tant que des demandes libres attendent leur prix -->
+                <span v-if="estAchatLibre(cmd)" class="inline-flex flex-wrap items-center gap-1">
+                  <span class="bg-creme2 text-noir px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap">Achat libre</span>
+                  <span class="bg-or text-noir px-1.5 py-0.5 rounded text-[10px] font-extrabold">VIP</span>
+                  <span v-if="(cmd.demandesAChiffrer ?? 0) > 0" class="bg-white border border-or-deep text-noir px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap">à chiffrer ({{ cmd.demandesAChiffrer }})</span>
+                </span>
+                <span v-else class="bg-creme2 text-gris px-2 py-0.5 rounded text-[10px] font-bold border border-creme2 uppercase">
                     {{ cmd.formule }}
                 </span>
               </td>
@@ -296,7 +319,7 @@ const handleOrderSuccess = () => {
                     <Eye class="w-3.5 h-3.5" />
                   </button>
                   
-                  <button v-if="ecriture" @click="openEditMode(cmd)" title="Modifier" class="cursor-pointer p-1.5 text-gris hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors" aria-label="Modifier">
+                  <button v-if="ecriture && !estAchatLibre(cmd)" @click="openEditMode(cmd)" title="Modifier" class="cursor-pointer p-1.5 text-gris hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors" aria-label="Modifier">
                     <Edit2 class="w-3.5 h-3.5" />
                   </button>
                   
@@ -326,6 +349,13 @@ const handleOrderSuccess = () => {
         :allProducts="prodList || []"
         @close="isModalOpen = false" 
         @success="handleOrderSuccess" 
+    />
+
+    <DetailAchatLibre
+        v-if="achatLibreOuvert"
+        :commande="achatLibreOuvert"
+        @fermer="achatLibreOuvert = null"
+        @modifiee="handleAchatLibreModifie"
     />
   </div>
 </template>

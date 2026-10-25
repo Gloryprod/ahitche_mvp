@@ -21,6 +21,8 @@ interface User {
   formuleHabituelle: string;
   zone?: string | null; // Code de la zone de livraison (null : « Autre quartier »)
   lienLocalisation?: string;
+  // Statut VIP (achats libres au prix VIP), renvoyé par /api/auth/session ; absent juste après la connexion
+  vip?: { actif: boolean; depuis: string | null; retireLe: string | null };
 }
 
 // Les variables restent en mémoire globale (très sécurisé)
