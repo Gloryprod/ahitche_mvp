@@ -233,12 +233,15 @@ async function televerserPhoto(req, res) {
 // ------------------------------------------------------------------
 
 // GET /api/auth/fiches (compte connecté) -> { fiches: [{ id, nom, format, prix, mention, photo }] }
-// Fiches publiées, non supprimées, dont le produit est actif et vendu. Jamais le prix du catalogue ni aucune donnée interne.
+// Fiches publiées, non supprimées, dont le produit est actif, vendu et disponible : un produit « indisponible » sort du
+// bandeau et y revient seul quand il redevient disponible (choix du porteur du 25/10/2026). Jamais le prix du catalogue
+// ni aucune donnée interne.
 async function fichesPubliees(req, res) {
   try {
     const fiches = await FicheProduit.find({ publiee: true, deletedAt: null }).select('productId format prix mention photo.url ordre').lean();
-    const produits = new Map((await Product.find({ _id: { $in: fiches.map(f => f.productId) }, deletedAt: null, type: { $in: TYPES_VENDUS } })
-      .select('name').lean()).map(p => [String(p._id), p]));
+    const produits = new Map((await Product.find({
+      _id: { $in: fiches.map(f => f.productId) }, deletedAt: null, type: { $in: TYPES_VENDUS }, statut: { $ne: 'indisponible' }
+    }).select('name').lean()).map(p => [String(p._id), p]));
     const liste = fiches
       .filter(f => produits.has(String(f.productId)))
       .map(f => ({ id: f._id, nom: produits.get(String(f.productId)).name, format: f.format, prix: f.prix, mention: f.mention || '', photo: f.photo?.url || '', ordre: f.ordre ?? null }))
