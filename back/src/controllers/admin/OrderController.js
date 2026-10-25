@@ -11,8 +11,10 @@ const { TRANSITIONS, genererCompositionSiAbsente } = require('../../services/com
 const { MODES_PAIEMENT_ACCEPTES, calculerPrixCommande } = require('../../services/prixCommandeService');
 const { journaliser } = require('../../services/journalService');
 const { ACCES } = require('../../config/roles');
+const { livreurDuCompte, clientsDuLivreur, filtreCommandesLivreur } = require('../../services/perimetreService');
 const {
-  MAX_DEMANDES, MAX_PRIX, nombre, nettoyer, demandesAChiffrer, demandesChiffrees, totalAchatLibre
+  MAX_DEMANDES, nettoyer, demandesAChiffrer, demandesChiffrees, totalAchatLibre, lirePrixDemande, prixVide,
+  lireAchatLibre, preparerLignes, enregistrerAchatLibre, catalogueVip
 } = require('../../services/achatLibreService');
 
 const formaterFcfa = (n) => `${Math.round(n).toLocaleString('fr-FR')} FCFA`;
@@ -303,7 +305,7 @@ async function deleteAdminOrder(req, res) {
     const deletedOrder = await Order.findByIdAndUpdate(
       id,
       { deletedAt: new Date() },
-      { new: true }
+      { returnDocument: 'after' }
     );
     
     if (!deletedOrder) {
@@ -398,11 +400,11 @@ async function chiffrerDemandes(req, res) {
         decisions.push({ demande, retiree: true, prix: null, motif });
       } else {
         if (r.retiree !== undefined && r.retiree !== false) return res.status(400).json({ message: "Retrait : oui ou non." });
-        const prix = nombre(r.prix);
-        if (!(prix >= 0 && prix <= MAX_PRIX)) {
+        const { prix, erreur } = lirePrixDemande(r.prix);
+        if (erreur) {
           return res.status(400).json({ message: `Indiquez le prix de « ${demande.designation} » en FCFA (0 ou plus).` });
         }
-        decisions.push({ demande, retiree: false, prix: Math.round(prix), motif: '' });
+        decisions.push({ demande, retiree: false, prix, motif: '' });
       }
     }
 
@@ -439,9 +441,173 @@ async function chiffrerDemandes(req, res) {
   }
 }
 
+// PATCH /api/admin/orders/:id/paiement  { modePaiement: 'Mobile Money' | 'Espèces' } : écriture de la section Commandes.
+// Achat libre seulement (un pack se modifie dans son formulaire), avant le paiement : livrée, payée, annulée ou
+// supprimée, la commande ne change plus. Un gestionnaire livreur ne modifie que les commandes de son périmètre.
+async function changerModePaiement(req, res) {
+  try {
+    const modePaiement = req.body?.modePaiement;
+    if (!MODES_PAIEMENT_ACCEPTES.includes(modePaiement)) {
+      return res.status(400).json({ message: "Mode de paiement invalide (Mobile Money ou Espèces)." });
+    }
+    const order = mongoose.isValidObjectId(req.params.id) ? await Order.findById(req.params.id) : null;
+    if (!order) return res.status(404).json({ message: "Commande introuvable." });
+    if (!estAchatLibre(order)) {
+      return res.status(400).json({ message: "Pour un pack, le mode de paiement se change dans le formulaire de la commande." });
+    }
+    if (order.deletedAt || ['Livrée', 'Annulée'].includes(order.statut) || order.paiement?.statut === 'Payé') {
+      return res.status(400).json({ message: "Commande livrée, payée, annulée ou supprimée : son mode de paiement ne se modifie plus." });
+    }
+    const livreurId = await livreurDuCompte(req);
+    if (livreurId && !(await Order.exists({ _id: order._id, ...filtreCommandesLivreur(livreurId) }))) {
+      return res.status(403).json({ message: "Cette commande ne fait pas partie de vos livraisons." });
+    }
+
+    const reponse = { id: order._id, reference: order.reference, modePaiement };
+    if (order.modePaiement === modePaiement) return res.status(200).json({ message: "Aucune modification.", order: reponse });
+
+    const avant = order.modePaiement;
+    order.modePaiement = modePaiement;
+    await order.save();
+    await journaliser(req, {
+      action: 'Modification', entite: 'Commande', entiteId: order._id,
+      resume: `Achat libre ${order.reference} : mode de paiement ${avant} → ${modePaiement}`,
+      avant: { modePaiement: avant }, apres: { modePaiement }
+    });
+    return res.status(200).json({ message: `${order.reference} : paiement en ${modePaiement}.`, order: reponse });
+  } catch (error) {
+    console.error("Erreur changerModePaiement:", error);
+    return res.status(500).json({ message: "Erreur lors du changement du mode de paiement." });
+  }
+}
+
+// ------------------------------------------------------------------
+// Achat libre VIP saisi par l'équipe au nom d'un client VIP (cahier, partie C) : admin et gestionnaires (écriture de
+// la section Commandes, routes/admin.js). Mêmes contrôles et même calcul que la commande du client ; seul l'admin
+// chiffre des demandes libres dès la saisie. Un gestionnaire relié à une fiche livreur ne voit et ne sert que les
+// clients de son périmètre (services/perimetreService.js).
+// ------------------------------------------------------------------
+
+// Clients VIP actifs ; pour un gestionnaire livreur, seulement ceux de ses livraisons et des commandes à planifier
+async function filtreClientsVip(req) {
+  const filtre = { role: 'user', 'vip.actif': true };
+  const livreurId = await livreurDuCompte(req);
+  if (livreurId) filtre._id = { $in: await clientsDuLivreur(livreurId) };
+  return filtre;
+}
+
+// GET /api/admin/commandes/achat-libre/clients -> { clients: [{ _id, nom, telephone, quartier, zone, zoneNom }] }
+async function clientsAchatLibre(req, res) {
+  try {
+    const clients = await User.find(await filtreClientsVip(req)).select('username telephone quartier zone').sort({ username: 1 }).lean();
+    const codes = [...new Set(clients.map(c => c.zone).filter(Boolean))];
+    const zones = new Map((codes.length ? await Zone.find({ code: { $in: codes } }).select('code nom').lean() : []).map(z => [z.code, z.nom]));
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({
+      clients: clients.map(c => ({
+        _id: c._id, nom: c.username, telephone: c.telephone || '', quartier: c.quartier || '',
+        zone: c.zone || null, zoneNom: zones.get(c.zone) || ''
+      }))
+    });
+  } catch (error) {
+    console.error("Erreur clientsAchatLibre:", error);
+    return res.status(500).json({ message: "Erreur lors du chargement des clients VIP." });
+  }
+}
+
+// GET /api/admin/commandes/achat-libre/catalogue -> { produits: [...] }, même forme que GET /api/auth/vip/catalogue :
+// prix VIP seulement, jamais le prix du catalogue ni le coefficient
+async function catalogueAchatLibre(req, res) {
+  try {
+    const produits = await catalogueVip();
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ produits });
+  } catch (error) {
+    console.error("Erreur catalogueAchatLibre:", error);
+    return res.status(500).json({ message: "Erreur lors du chargement des produits." });
+  }
+}
+
+// POST /api/admin/commandes/achat-libre
+//   { client, lignes: [{ productId, quantite }], demandesLibres: [{ designation, quantite, prix? }], notes, modePaiement? }
+// Prix VIP des lignes fixés par le serveur ; prix d'une demande libre accepté de l'admin seulement (vide = à chiffrer) ;
+// total = lignes + demandes chiffrées ; référence CMD-xxx, « En attente » ; création journalisée avec son auteur.
+async function creerAchatLibre(req, res) {
+  try {
+    const corps = req.body || {};
+    if (!mongoose.isValidObjectId(corps.client)) return res.status(400).json({ message: "Choisissez le client VIP." });
+    if (!prixVide(corps.modePaiement) && !MODES_PAIEMENT_ACCEPTES.includes(corps.modePaiement)) {
+      return res.status(400).json({ message: "Mode de paiement invalide (Mobile Money ou Espèces)." });
+    }
+
+    const lu = lireAchatLibre(corps);
+    if (lu.erreur) return res.status(400).json({ message: lu.erreur });
+
+    // Prix des demandes libres : l'admin seulement ; un prix laissé vide garde la demande « à chiffrer »
+    const prixRecus = (corps.demandesLibres || []).map(d => d.prix);
+    if (prixRecus.some(p => !prixVide(p)) && !ACCES.vip.ecriture.includes(req.user.role)) {
+      return res.status(403).json({ message: "Seul l'admin fixe le prix d'une demande libre : laissez le prix vide, l'admin la chiffrera ensuite." });
+    }
+    const demandes = [];
+    for (const [i, demande] of lu.demandes.entries()) {
+      if (prixVide(prixRecus[i])) { demandes.push({ ...demande, prix: null }); continue; }
+      const { prix, erreur } = lirePrixDemande(prixRecus[i]);
+      if (erreur) return res.status(400).json({ message: `Prix de « ${demande.designation} » : FCFA, 0 ou plus (ou vide pour le chiffrer plus tard).` });
+      demandes.push({ ...demande, prix });
+    }
+
+    // Client : dans le périmètre d'un gestionnaire livreur, compte client, statut VIP actif
+    const livreurId = await livreurDuCompte(req);
+    if (livreurId && !(await clientsDuLivreur(livreurId)).some(id => String(id) === String(corps.client))) {
+      return res.status(403).json({ message: "Ce client ne fait pas partie de vos livraisons." });
+    }
+    const client = await User.findById(corps.client).select('username role vip').lean();
+    if (!client) return res.status(404).json({ message: "Client introuvable." });
+    if (client.role !== 'user') return res.status(400).json({ message: "Ce compte n'est pas un compte client." });
+    if (client.vip?.actif !== true) {
+      return res.status(400).json({ message: "Ce client n'a pas le statut VIP : l'achat libre lui est fermé (proposez-lui un pack)." });
+    }
+
+    const prepa = await preparerLignes(lu.lignes);
+    if (prepa.erreur) return res.status(400).json({ message: prepa.erreur });
+
+    const { commande, lignes } = await enregistrerAchatLibre({
+      userId: client._id, snapshots: prepa.snapshots, demandes, notes: lu.notes, par: req.user.id,
+      modePaiement: prixVide(corps.modePaiement) ? undefined : corps.modePaiement
+    });
+    const nbDemandes = commande.demandesLibres.length;
+    const aChiffrer = demandesAChiffrer(commande.demandesLibres);
+    await journaliser(req, {
+      action: 'Création', entite: 'Commande', entiteId: commande._id,
+      resume: `Achat libre ${commande.reference} saisi pour ${client.username} : ${lignes.length} ligne(s), ${nbDemandes} demande(s) libre(s)${aChiffrer ? ` dont ${aChiffrer} à chiffrer` : ''}, total ${formaterFcfa(commande.total)}`,
+      apres: { client: String(client._id), lignes: lignes.length, demandesLibres: nbDemandes, aChiffrer, total: commande.total }
+    });
+
+    return res.status(201).json({
+      message: `Achat libre ${commande.reference} enregistré pour ${client.username}${aChiffrer ? ` : ${aChiffrer > 1 ? `${aChiffrer} demandes libres` : '1 demande libre'} à chiffrer par l'admin` : ''}.`,
+      order: {
+        id: commande._id, reference: commande.reference, typeCommande: commande.typeCommande,
+        formule: commande.formule, formuleSlug: commande.formuleSlug, statut: commande.statut,
+        total: commande.total, modePaiement: commande.modePaiement,
+        client: { _id: client._id, nom: client.username },
+        lignes: lignes.map(l => ({ nom: l.name, quantite: l.quantity, unite: l.unit, prixUnitaire: l.unitPrice, total: l.totalPrice, isExtra: l.isExtra })),
+        demandesLibres: commande.demandesLibres.map(versEquipe),
+        demandesAChiffrer: aChiffrer
+      }
+    });
+  } catch (error) {
+    console.error("Erreur creerAchatLibre:", error);
+    return res.status(500).json({ message: "Erreur lors de l'enregistrement de l'achat libre." });
+  }
+}
+
 module.exports = {
   deciderRemise,
   chiffrerDemandes,
+  changerModePaiement,
+  clientsAchatLibre,
+  catalogueAchatLibre,
+  creerAchatLibre,
   createAdminOrder,
   getAllOrders,
   updateAdminOrder,

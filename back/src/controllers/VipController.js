@@ -1,11 +1,10 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const User = require('../models/user');
-const Product = require('../models/product');
 const CodeVip = require('../models/codeVip');
 const { TYPES_CODE_VIP } = require('../models/codeVip');
 const { journaliser } = require('../services/journalService');
-const { FILTRE_PROPOSES, nettoyer, nombre, versCatalogue } = require('../services/achatLibreService');
+const { nettoyer, nombre, catalogueVip: listerCatalogueVip } = require('../services/achatLibreService');
 
 // Codes VIP et comptes VIP (docs-internes/vip/CAHIER-DES-CHARGES.md, partie B).
 // Espace client : saisie d'un code (limite de tentatives dans routes/auth.js), catalogue au prix VIP.
@@ -100,9 +99,9 @@ async function utiliserCode(req, res) {
 async function catalogueVip(req, res) {
   try {
     if (!(await compteClient(req, res, { vip: true }))) return;
-    const produits = await Product.find(FILTRE_PROPOSES).select('reference name unit type prixVip').sort({ reference: 1, name: 1 }).lean();
+    const produits = await listerCatalogueVip(); // Même liste que le formulaire de l'équipe (achatLibreService)
     res.set('Cache-Control', 'no-store');
-    return res.status(200).json({ produits: produits.map(versCatalogue) });
+    return res.status(200).json({ produits });
   } catch (error) {
     console.error("Erreur catalogueVip:", error);
     return res.status(500).json({ message: "Erreur lors du chargement des produits." });

@@ -54,11 +54,20 @@ router.get('/users', userC.index);
 
 // Commandes
 router.get('/commandes', userC.getOrders)
+// Achat libre VIP saisi par l'équipe au nom d'un client VIP : réservé aux rôles qui écrivent dans les Commandes (admin,
+// gestionnaires), y compris les deux listes du formulaire. Chemins fixes, à garder avant toute route /commandes/:id.
+const saisieCommandes = (req, res, next) => (ACCES.commandes.ecriture.includes(req.user.role)
+  ? next()
+  : res.status(403).json({ message: 'Votre rôle ne permet pas de saisir une commande.' }));
+router.get('/commandes/achat-libre/clients', saisieCommandes, orderC.clientsAchatLibre); // Clients VIP du périmètre
+router.get('/commandes/achat-libre/catalogue', saisieCommandes, orderC.catalogueAchatLibre); // Prix VIP, jamais priceUnit
+router.post('/commandes/achat-libre', saisieCommandes, orderC.creerAchatLibre);
 router.post('/orders', orderC.createAdminOrder);
 router.put('/orders/:id', orderC.updateAdminOrder);
 router.patch('/orders/:id/status', orderC.updateOrderStatus);
 router.patch('/orders/:id/remise', orderC.deciderRemise); // Admin seulement (contrôlé dans le contrôleur)
 router.patch('/orders/:id/demandes', orderC.chiffrerDemandes); // Achat libre VIP : chiffrage ou retrait des demandes libres (écriture de la section vip, contrôlée dans le contrôleur)
+router.patch('/orders/:id/paiement', orderC.changerModePaiement); // Achat libre VIP : Mobile Money ou Espèces, avant le paiement (écriture des Commandes)
 router.delete('/orders/:id', orderC.deleteAdminOrder);
 
 // Category

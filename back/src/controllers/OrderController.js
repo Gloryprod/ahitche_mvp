@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const Order = require('../models/order');
 const Formule = require('../models/formules');
 const User = require('../models/user');
@@ -6,7 +5,7 @@ const OrderProductSnapshot = require('../models/orderProductSnapshot');
 const { genererReferenceCommande } = require('../services/orderReferenceService');
 const { ANNULABLES_PAR_CLIENT } = require('../services/commandeService');
 const { prixDeVente } = require('../services/formuleService');
-const { SLUG_ACHAT_LIBRE, NOM_ACHAT_LIBRE, lireAchatLibre, preparerLignes, totalAchatLibre } = require('../services/achatLibreService');
+const { lireAchatLibre, preparerLignes, enregistrerAchatLibre } = require('../services/achatLibreService');
 
 const CHAMPS_CLIENT = 'reference formule formuleSlug typeCommande total modePaiement statut creneau dateLivraison paiement.statut createdAt demandesLibres';
 
@@ -113,10 +112,6 @@ async function saveOrder(req, res){
 
 }
 
-// Deux commandes au même instant peuvent recevoir la même référence : l'index unique refuse la seconde,
-// qui reprend alors la référence suivante (3 essais)
-const doublonDeReference = (error) => error?.code === 11000 && /reference/.test(String(error.message || ''));
-
 // POST /api/auth/vip/commande  { lignes: [{ productId, quantite }], demandesLibres: [{ designation, quantite }], notes }
 // Comptes VIP seulement. Le serveur vérifie chaque produit et fixe le total (prix VIP) ; les demandes libres
 // restent sans prix jusqu'au chiffrage par l'admin. Ensuite, même parcours qu'un pack (WhatsApp, livraison, paiement).
@@ -133,44 +128,13 @@ async function saveAchatLibre(req, res) {
         const prepa = await preparerLignes(lu.lignes);
         if (prepa.erreur) return res.status(400).json({ message: prepa.erreur });
 
-        const orderId = new mongoose.Types.ObjectId();
-        const lignes = prepa.snapshots.length
-            ? await OrderProductSnapshot.insertMany(prepa.snapshots.map(s => ({ ...s, orderId })))
-            : [];
-        const demandesLibres = lu.demandes.map(d => ({ ...d, prix: null, retiree: false, motif: '' }));
-
-        let commande = null;
-        try {
-            for (let essai = 1; !commande; essai++) {
-                const nouvelle = new Order({
-                    _id: orderId,
-                    userId: req.user.id,
-                    reference: await genererReferenceCommande(),
-                    formule: NOM_ACHAT_LIBRE,
-                    formuleSlug: SLUG_ACHAT_LIBRE,
-                    typeCommande: 'achat-libre',
-                    total: totalAchatLibre(lignes, demandesLibres),
-                    prixFormule: null,
-                    montantExtras: 0,
-                    notes: lu.notes,
-                    productsSnapshot: lignes.map(l => l._id),
-                    demandesLibres,
-                    statut: 'En attente',
-                    historique: [{ statut: 'En attente', date: new Date(), par: req.user.id }]
-                });
-                try {
-                    commande = await nouvelle.save();
-                } catch (error) {
-                    if (!doublonDeReference(error) || essai >= 3) throw error;
-                }
-            }
-        } catch (error) {
-            await OrderProductSnapshot.deleteMany({ orderId }); // Pas de lignes orphelines
-            throw error;
-        }
+        // Le client ne fixe jamais de prix : ses demandes libres restent « à chiffrer »
+        const { commande, lignes } = await enregistrerAchatLibre({
+            userId: req.user.id, snapshots: prepa.snapshots, demandes: lu.demandes, notes: lu.notes, par: req.user.id
+        });
 
         return res.status(201).json({
-            message: demandesLibres.length
+            message: commande.demandesLibres.length
                 ? "Commande enregistrée ! Nous vous confirmons le prix de vos demandes libres sur WhatsApp."
                 : "Commande enregistrée avec succès !",
             commande: versClient(commande.toObject(), lignes.map(l => l.toObject()))
