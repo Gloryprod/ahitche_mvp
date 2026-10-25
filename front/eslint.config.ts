@@ -22,6 +22,13 @@ export default defineConfigWithVueTs(
   ...pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
 
+  // Kit d'interface (shadcn-vue, Inspira UI) : composants copiés tels quels, nommés en un mot (Button, Marquee…)
+  {
+    name: 'app/kit-interface',
+    files: ['src/components/kit/**/*.vue'],
+    rules: { 'vue/multi-word-component-names': 'off' },
+  },
+
   {
     ...pluginPlaywright.configs['flat/recommended'],
     files: ['e2e/**/*.{test,spec}.{js,ts,jsx,tsx}'],
