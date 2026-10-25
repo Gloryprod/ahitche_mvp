@@ -34,7 +34,7 @@ node src/scripts/createFormules.js  # upsert des formules (prix, « Bientôt » 
 node src/scripts/migrerDonnees.js   # migration idempotente (téléphone, fournisseurs, zones, statuts, taux, admin principal)
 STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <role> [--livreur "<fiche livreur>"]  # compte de l'équipe
 STAFF_PASSWORD=… node src/scripts/importerDonnees.js ../docs-internes/imports [--appliquer] [--attendu <json>]  # import 01 à 11 (simulation sans --appliquer)
-node src/scripts/decisionsMiseEnService.js ../docs-internes/imports [--appliquer]  # décisions du porteur après l'import (prix admin, anciens lots et règles, commandes d'essai, compte admin générique)
+node src/scripts/decisionsMiseEnService.js ../docs-internes/imports [--appliquer] [--garder-compte-generique]  # décisions du porteur après l'import (prix admin, anciens lots et règles, commandes d'essai, compte admin générique supprimé sauf --garder-compte-generique, choix du 25/10 pour la production)
 node src/scripts/controlerDonnees.js [--attendu <json>]  # contrôles B.4, lecture seule
 MONGO_URI=<lecture seule> node src/scripts/inventaireBase.js  # inventaire d'une base (nombres seulement, aucune donnée personnelle)
 MONGO_URI=<lecture seule> node src/scripts/sauvegarderBase.js [dossier]  # sauvegarde complète (défaut : ../docs-internes/sauvegardes)
