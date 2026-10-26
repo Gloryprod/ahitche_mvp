@@ -1,12 +1,17 @@
 const mongoose = require('mongoose');
 const Product = require('../models/product');
 const { TYPES_VENDUS, FAMILLES } = require('../models/product');
+const Order = require('../models/order');
+const OrderProductSnapshot = require('../models/orderProductSnapshot');
+const { genererReferenceCommande } = require('./orderReferenceService');
 
-// Achats libres VIP (docs-internes/vip/CAHIER-DES-CHARGES.md, partie B) : un compte VIP commande des produits du
+// Achats libres VIP (docs-internes/vip/CAHIER-DES-CHARGES.md, parties B et C) : un compte VIP commande des produits du
 // catalogue au prix VIP, et des « demandes libres » sans prix que l'admin chiffre ensuite. Le serveur fixe le total :
 //   total = Σ (prix VIP × quantité) des lignes, arrondi au franc + Σ prix des demandes chiffrées (non retirées)
 // Le prix du catalogue (priceUnit) n'est jamais utilisé ni renvoyé au client. Même parcours qu'un pack : référence
 // CMD-xxx, statuts, paiement à la livraison, sortie de stock FIFO des lignes à la livraison.
+// L'équipe peut aussi saisir un achat libre au nom d'un client VIP (mêmes contrôles, même calcul) ; seul l'admin
+// chiffre alors des demandes dès la saisie.
 
 const SLUG_ACHAT_LIBRE = 'achat-libre';
 const NOM_ACHAT_LIBRE = 'Achat libre VIP';
@@ -36,7 +41,8 @@ const nettoyer = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() :
 const quantiteValide = (q, pas) => q >= pas && q <= MAX_QUANTITE && Number.isInteger(q / pas);
 
 /**
- * Lit et valide la commande envoyée par le client, sans toucher à la base.
+ * Lit et valide la commande envoyée par le client (ou saisie par l'équipe), sans toucher à la base. Un prix envoyé avec
+ * une demande libre est ignoré ici : seule la saisie de l'admin le lit (lirePrixDemande).
  * @returns {{ erreur } | { lignes: [{ productId, quantite }], demandes: [{ designation, quantite }], notes }}
  */
 function lireAchatLibre(body) {
@@ -88,7 +94,7 @@ async function preparerLignes(lignes) {
   const snapshots = [];
   for (const { productId, quantite } of lignes) {
     const produit = produits.get(productId);
-    if (!produit) return { erreur: 'Un produit n\'est plus proposé en achat libre : actualisez la liste.' };
+    if (!produit) return { erreur: "Un produit n'est plus proposé : nous l'avons retiré de la liste. Vérifiez la commande, puis envoyez-la à nouveau." };
     const pas = pasDeQuantite(produit.unit);
     if (!quantiteValide(quantite, pas)) {
       return {
@@ -117,14 +123,81 @@ function totalAchatLibre(snapshots, demandes) {
   return Math.round(lignes) + demandesChiffrees(demandes).reduce((s, d) => s + d.prix, 0);
 }
 
+// Prix d'une demande libre fixé par l'admin (chiffrage ou saisie) : FCFA de 0 à MAX_PRIX, arrondi au franc
+function lirePrixDemande(valeur) {
+  const prix = nombre(valeur);
+  return prix >= 0 && prix <= MAX_PRIX ? { prix: Math.round(prix) } : { erreur: true };
+}
+// Champ prix laissé vide : la demande reste « à chiffrer »
+const prixVide = (valeur) => valeur === undefined || valeur === null || valeur === '';
+
 // Produit du catalogue VIP, tel que renvoyé au client : jamais le prix du catalogue
 const versCatalogue = (p) => ({
   productId: p._id, reference: p.reference, nom: p.name, unite: p.unit, famille: FAMILLES[p.type],
   prixVip: p.prixVip, pas: pasDeQuantite(p.unit), maximum: MAX_QUANTITE
 });
 
+// Catalogue VIP (espace client et formulaire de l'équipe) : produits de base (P) puis variables (V), au prix VIP
+async function catalogueVip() {
+  const produits = await Product.find(FILTRE_PROPOSES).select('reference name unit type prixVip').sort({ reference: 1, name: 1 }).lean();
+  return produits.map(versCatalogue);
+}
+
+// Deux commandes au même instant peuvent recevoir la même référence : l'index unique refuse la seconde,
+// qui reprend alors la référence suivante (3 essais)
+const doublonDeReference = (error) => error?.code === 11000 && /reference/.test(String(error.message || ''));
+
+/**
+ * Enregistre un achat libre déjà vérifié (lignes préparées par preparerLignes) : référence CMD-xxx fixée par le serveur,
+ * lignes au prix VIP dans productsSnapshot, demandes libres (prix vide = à chiffrer), total serveur, « En attente ».
+ * Les lignes sont effacées si la commande ne peut pas être enregistrée.
+ * @param {object} p
+ * @param {string} p.userId - client de la commande
+ * @param {Array} p.snapshots - lignes préparées (sans orderId)
+ * @param {Array} p.demandes - [{ designation, quantite, prix? }] ; prix seulement s'il a été fixé par l'admin
+ * @param {string} p.notes
+ * @param {string} p.par - auteur, consigné dans l'historique des statuts (le client, ou le membre de l'équipe)
+ * @param {string} [p.modePaiement] - Mobile Money par défaut
+ * @returns {Promise<{ commande, lignes }>}
+ */
+async function enregistrerAchatLibre({ userId, snapshots, demandes, notes, par, modePaiement }) {
+  const orderId = new mongoose.Types.ObjectId();
+  const lignes = snapshots.length ? await OrderProductSnapshot.insertMany(snapshots.map(s => ({ ...s, orderId }))) : [];
+  const demandesLibres = demandes.map(d => ({ designation: d.designation, quantite: d.quantite, prix: d.prix ?? null, retiree: false, motif: '' }));
+  try {
+    for (let essai = 1; ; essai++) {
+      const commande = new Order({
+        _id: orderId,
+        userId,
+        reference: await genererReferenceCommande(),
+        formule: NOM_ACHAT_LIBRE,
+        formuleSlug: SLUG_ACHAT_LIBRE,
+        typeCommande: 'achat-libre',
+        total: totalAchatLibre(lignes, demandesLibres),
+        prixFormule: null,
+        montantExtras: 0,
+        ...(modePaiement ? { modePaiement } : {}),
+        notes,
+        productsSnapshot: lignes.map(l => l._id),
+        demandesLibres,
+        statut: 'En attente',
+        historique: [{ statut: 'En attente', date: new Date(), par }]
+      });
+      try {
+        return { commande: await commande.save(), lignes };
+      } catch (error) {
+        if (!doublonDeReference(error) || essai >= 3) throw error;
+      }
+    }
+  } catch (error) {
+    await OrderProductSnapshot.deleteMany({ orderId }); // Pas de lignes orphelines
+    throw error;
+  }
+}
+
 module.exports = {
   SLUG_ACHAT_LIBRE, NOM_ACHAT_LIBRE, MAX_LIGNES, MAX_DEMANDES, MAX_QUANTITE, MAX_PRIX, FILTRE_PROPOSES,
   pasDeQuantite, nombre, nettoyer, lireAchatLibre, preparerLignes,
-  demandesAChiffrer, demandesChiffrees, totalAchatLibre, versCatalogue
+  demandesAChiffrer, demandesChiffrees, totalAchatLibre, lirePrixDemande, prixVide, versCatalogue, catalogueVip,
+  enregistrerAchatLibre
 };

@@ -4,7 +4,8 @@ import { ShoppingBasket } from 'lucide-vue-next'
 import { photoOptimisee } from '@/services/images'
 
 // Carte d'une fiche produit : la même dans le bandeau de l'espace client et dans le back-office (aperçu fidèle).
-// Le prix est publicitaire, saisi dans la fiche : aucun lien avec les commandes, le stock ni les prix VIP.
+// Le montant est la valeur du produit dans le pack, saisie dans la fiche : aucun lien avec les commandes, le stock ni
+// les prix VIP.
 // Le créneau par défaut reçoit les informations et les boutons du back-office.
 const props = defineProps<{
   nom: string
@@ -18,7 +19,8 @@ const props = defineProps<{
 const LARGEUR = 160
 const HAUTEUR = 120
 const source = computed(() => (props.photo ? photoOptimisee(props.photo, LARGEUR, HAUTEUR) : ''))
-const prixAffiche = computed(() => `${props.prix.toLocaleString('fr-FR')} F`)
+// Le montant d'une fiche est la valeur du produit dans le pack (décision du porteur), pas un prix de vente
+const prixAffiche = computed(() => `${props.prix.toLocaleString('fr-FR')} FCFA`)
 </script>
 
 <template>
@@ -40,7 +42,10 @@ const prixAffiche = computed(() => `${props.prix.toLocaleString('fr-FR')} F`)
     <div class="p-3 flex flex-col gap-1 flex-1">
       <h3 class="text-sm font-bold text-noir leading-snug">{{ nom }}</h3>
       <p class="text-xs text-gris leading-snug">{{ format }}</p>
-      <p class="mt-auto pt-1.5 font-display text-lg font-bold text-foret leading-none">{{ prixAffiche }}</p>
+      <p class="mt-auto pt-1.5 leading-tight">
+        <span class="block text-[11px] text-gris">Valeur dans le pack :</span>
+        <span class="block font-display text-lg font-bold text-foret leading-none">{{ prixAffiche }}</span>
+      </p>
       <p v-if="mention" class="text-[11px] font-semibold text-savane leading-snug">{{ mention }}</p>
       <slot />
     </div>

@@ -5,7 +5,7 @@ import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
-import { classeStatut } from '@/config/commandes'
+import { classeStatut, MODES_PAIEMENT } from '@/config/commandes'
 import {
   MOTIF_RETRAIT, STATUTS_CHIFFRABLES, etatDemande, formaterFrancs, quantiteEtUnite, type DemandeLibre,
 } from '@/config/vip'
@@ -13,7 +13,8 @@ import type { Commande } from '@/type'
 
 // Détail d'un achat libre VIP (écran Commandes) : lignes au prix VIP et demandes libres. L'admin chiffre chaque demande
 // (prix en FCFA) ou la retire avec un motif ; le serveur recalcule le total et journalise. Jamais le formulaire d'un pack.
-// Les autres rôles voient le détail sans pouvoir le modifier.
+// Les rôles qui écrivent dans les Commandes changent aussi le mode de paiement avant la livraison ; les autres voient le
+// détail sans pouvoir le modifier.
 
 const props = defineProps<{ commande: Commande }>()
 const emit = defineEmits<{ fermer: []; modifiee: [message: string] }>()
@@ -25,6 +26,36 @@ const chiffrable = computed(() =>
   STATUTS_CHIFFRABLES.includes(props.commande.statut) && props.commande.paiement?.statut !== 'Payé' && !props.commande.deletedAt
 )
 const modifiable = computed(() => peutChiffrer.value && chiffrable.value)
+
+// Mode de paiement (Mobile Money ou Espèces) : rôles qui écrivent dans les Commandes, tant que l'achat libre n'est ni
+// payé, ni livré, ni annulé (règle du serveur, PATCH /api/admin/orders/:id/paiement). Enregistré dès qu'il change.
+const paiementModifiable = computed(() =>
+  peutEcrire(auth.role.value, 'commandes') && !['Livrée', 'Annulée'].includes(props.commande.statut)
+  && props.commande.paiement?.statut !== 'Payé' && !props.commande.deletedAt
+)
+const modePaiement = ref<string>(props.commande.modePaiement)
+const choixPaiement = ref<string>(props.commande.modePaiement)
+const changementPaiement = ref(false)
+const messagePaiement = ref('')
+const erreurPaiement = ref('')
+async function changerPaiement() {
+  if (choixPaiement.value === modePaiement.value || changementPaiement.value) return
+  changementPaiement.value = true
+  messagePaiement.value = ''
+  erreurPaiement.value = ''
+  try {
+    const { data } = await api.patch(`/api/admin/orders/${props.commande.id}/paiement`, { modePaiement: choixPaiement.value })
+    modePaiement.value = data.order.modePaiement
+    choixPaiement.value = data.order.modePaiement
+    messagePaiement.value = data.message
+    emit('modifiee', data.message)
+  } catch (err) {
+    choixPaiement.value = modePaiement.value // Refusé : le choix revient au mode enregistré
+    erreurPaiement.value = messageErreur(err, 'Changement du mode de paiement impossible.')
+  } finally {
+    changementPaiement.value = false
+  }
+}
 
 const lignes = computed(() => props.commande.productsSnapshot ?? [])
 const sousTotal = computed(() => Math.round(lignes.value.reduce((s, l) => s + (l.totalPrice ?? 0), 0)))
@@ -143,7 +174,19 @@ const champ = 'mt-1 w-full min-h-11 px-3 py-2 rounded-xl border border-creme2 bg
       <dl class="grid grid-cols-2 gap-3 text-xs">
         <div><dt>Client</dt><dd class="text-noir font-bold">{{ commande.clientName }}</dd></div>
         <div><dt>WhatsApp</dt><dd class="text-noir">{{ commande.whatsapp || '—' }}</dd></div>
-        <div><dt>Paiement à la livraison</dt><dd class="text-noir">{{ commande.modePaiement }}<template v-if="commande.paiement?.statut"> · {{ commande.paiement.statut }}</template></dd></div>
+        <div v-if="!paiementModifiable"><dt>Paiement à la livraison</dt><dd class="text-noir">{{ modePaiement }}<template v-if="commande.paiement?.statut"> · {{ commande.paiement.statut }}</template></dd></div>
+        <div v-else class="col-span-2">
+          <fieldset>
+            <legend class="mb-1">Paiement à la livraison<template v-if="commande.paiement?.statut"> · {{ commande.paiement.statut }}</template></legend>
+            <div class="flex flex-wrap gap-2">
+              <label v-for="m in MODES_PAIEMENT" :key="m" class="inline-flex items-center gap-2 min-h-11 px-4 rounded-xl border cursor-pointer text-sm font-semibold" :class="choixPaiement === m ? 'border-foret text-foret bg-foret/5' : 'border-creme2 text-gris'">
+                <input v-model="choixPaiement" type="radio" name="paiement-achat-libre" :value="m" :disabled="changementPaiement" class="w-4 h-4 accent-foret" @change="changerPaiement" /> {{ m }}
+              </label>
+            </div>
+          </fieldset>
+          <p v-if="messagePaiement" role="status" class="mt-1.5 text-xs font-semibold text-foret">{{ messagePaiement }}</p>
+          <p v-if="erreurPaiement" role="alert" class="mt-1.5 text-xs font-semibold text-red-700">{{ erreurPaiement }}</p>
+        </div>
         <div v-if="commande.notes" class="col-span-2"><dt>Note du client</dt><dd class="text-noir">{{ commande.notes }}</dd></div>
       </dl>
 

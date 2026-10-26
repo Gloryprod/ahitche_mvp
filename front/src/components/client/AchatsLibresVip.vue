@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, nextTick, type ComponentPublicInstance } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import axios from 'axios'
-import { Crown, KeyRound, Minus, Plus, Trash2, ArrowRight } from 'lucide-vue-next'
+import { Crown, KeyRound, ArrowRight, ChevronDown } from 'lucide-vue-next'
 import { useToast } from 'vue-toastification'
 import api from '@/stores/api'
 import { useAuthStore } from '@/stores/auth'
 import { messageErreur } from '@/services/erreurs'
-import { lienWhatsApp, LIVRAISON_ANNONCE, PAIEMENT_ANNONCE } from '@/config/contact'
+import { lienWhatsApp, PAIEMENT_ANNONCE } from '@/config/contact'
 import { messageAchatLibre, messageAchatLibreSecours, type InfosLivraison } from '@/services/messagesCommande'
-import { MAX_LIGNES, MAX_DEMANDES, DESIGNATION, QUANTITE_DEMANDE_MAX, NOTE_MAX, formaterFrancs, formaterQuantite } from '@/config/vip'
+import { MAX_LIGNES, MAX_DEMANDES, NOTE_MAX, formaterFcfa } from '@/config/vip'
+import { usePanierAchatLibre } from '@/composables/usePanierAchatLibre'
+import ListeProduitsVip from '@/components/vip/ListeProduitsVip.vue'
+import SaisieDemandesLibres from '@/components/vip/SaisieDemandesLibres.vue'
 
 // Bloc VIP de l'espace client :
 //  - compte sans statut VIP : saisie d'un code VIP (le serveur limite les essais et répond toujours de la même façon) ;
@@ -33,7 +36,15 @@ onMounted(async () => {
   sessionRelue.value = true
 })
 
-// --- Code VIP ---
+// --- Code VIP : une ligne discrète, « Vous avez un code VIP ? », qui déplie le champ (focus placé dans le champ) ---
+const codeOuvert = ref(false)
+const champCode = ref<HTMLInputElement | null>(null)
+async function basculerCode() {
+  codeOuvert.value = !codeOuvert.value
+  if (!codeOuvert.value) return
+  await nextTick()
+  champCode.value?.focus()
+}
 const code = ref('')
 const verification = ref(false)
 const erreurCode = ref('')
@@ -69,114 +80,49 @@ async function validerCode() {
   }
 }
 
-// --- Catalogue au prix VIP ---
-interface ProduitVip {
-  productId: string
-  reference: string | null
-  nom: string
-  unite: string
-  famille: 'P' | 'V'
-  prixVip: number
-  pas: number // 0,5 pour kg et L, 1 sinon
-  maximum: number
-}
-const produits = ref<ProduitVip[]>([])
+// --- Catalogue au prix VIP et panier (quantités, demandes libres, total : usePanierAchatLibre) ---
+const panier = usePanierAchatLibre()
+const { produits, produitsBase, produitsVariables, quantites, demandes, lignes, panierVide, resume } = panier
+const totalIndicatif = panier.totalProduits // Demandes libres sans prix : chiffrées ensuite par Ahitché
 const chargement = ref(false)
 const erreurCatalogue = ref('')
-const quantites = reactive<Record<string, number>>({})
-
-const sections = computed(() => [
-  { cle: 'base', titre: 'Produits de base', produits: produits.value.filter(p => p.famille === 'P') },
-  { cle: 'autre', titre: 'Autre', produits: produits.value.filter(p => p.famille === 'V') },
-])
+// Produits du panier qui ne sont plus proposés (catalogue relu après un refus du serveur) : signalés au client
+const produitsRetires = ref<string[]>([])
+// Statut VIP retiré pendant la visite (réponse 403) : expliqué quand le bloc repasse au formulaire de code
+const statutRetire = ref(false)
+function signalerStatutRetire() {
+  statutRetire.value = true
+  void authStore.checkSession()
+}
 
 async function chargerCatalogue() {
   chargement.value = true
   erreurCatalogue.value = ''
   try {
-    produits.value = (await api.get('/api/auth/vip/catalogue')).data.produits ?? []
-    // Un produit qui n'est plus proposé quitte le panier
-    for (const id of Object.keys(quantites)) if (!produits.value.some(p => p.productId === id)) delete quantites[id]
+    produitsRetires.value = panier.definirProduits((await api.get('/api/auth/vip/catalogue')).data.produits ?? [])
   } catch (err) {
     erreurCatalogue.value = messageErreur(err, "Les produits n'ont pas pu être chargés.")
-    if (axios.isAxiosError(err) && err.response?.status === 403) void authStore.checkSession() // Statut retiré
+    if (axios.isAxiosError(err) && err.response?.status === 403) signalerStatutRetire()
   } finally {
     chargement.value = false
   }
 }
 watch(estVip, (vip) => { if (vip) void chargerCatalogue() }, { immediate: true })
 
-// --- Quantités : multiples du pas (0,5 kg ou L ; 1 sinon), du pas au maximum ---
-const quantite = (p: ProduitVip) => quantites[p.productId] ?? 0
-function fixer(p: ProduitVip, valeur: number) {
-  const q = !Number.isFinite(valeur) || valeur <= 0 ? 0 : Math.min(p.maximum, Math.max(p.pas, Math.round(valeur / p.pas) * p.pas))
-  if (q) quantites[p.productId] = q
-  else delete quantites[p.productId]
-}
-const ajuster = (p: ProduitVip, sens: 1 | -1) => fixer(p, quantite(p) + sens * p.pas)
-function saisir(p: ProduitVip, event: Event) {
-  const champ = event.target as HTMLInputElement
-  const texte = champ.value.trim().replace(',', '.')
-  fixer(p, texte === '' ? 0 : Number(texte))
-  champ.value = quantite(p) ? formaterQuantite(quantite(p)) : '' // Valeur retenue (pas, maximum)
-}
-
-// --- Demandes libres (sans prix : chiffrées ensuite par Ahitché) ---
-interface Demande { id: number; designation: string; quantite: string }
-const demandes = ref<Demande[]>([])
-const nouvelle = reactive({ designation: '', quantite: '' })
-const erreurDemande = ref('')
-// Champ placé dans la boucle des sections : référence par fonction (une référence simple y deviendrait un tableau)
-let champDesignation: HTMLInputElement | null = null
-const garderChampDesignation = (el: Element | ComponentPublicInstance | null) => {
-  champDesignation = el instanceof HTMLInputElement ? el : null
-}
-let prochainId = 1
-const nettoyer = (texte: string) => texte.replace(/\s+/g, ' ').trim()
-
-function ajouterDemande() {
-  const designation = nettoyer(nouvelle.designation)
-  if (demandes.value.length >= MAX_DEMANDES) {
-    erreurDemande.value = `${MAX_DEMANDES} demandes au plus par commande.`
-    return
-  }
-  if (designation.length < DESIGNATION.min) {
-    erreurDemande.value = 'Décrivez le produit souhaité.'
-    champDesignation?.focus()
-    return
-  }
-  demandes.value.push({ id: prochainId++, designation, quantite: nettoyer(nouvelle.quantite) })
-  nouvelle.designation = ''
-  nouvelle.quantite = ''
-  erreurDemande.value = ''
-  champDesignation?.focus()
-}
-const retirerDemande = (id: number) => { demandes.value = demandes.value.filter(d => d.id !== id) }
-
-// --- Total indicatif et commande ---
+// --- Commande ---
 const note = ref('')
-const lignes = computed(() => produits.value.filter(p => quantite(p) > 0).map(p => ({ productId: p.productId, quantite: quantite(p) })))
-const totalIndicatif = computed(() => Math.round(produits.value.reduce((s, p) => s + p.prixVip * quantite(p), 0)))
-const panierVide = computed(() => !lignes.value.length && !demandes.value.length)
-const resume = computed(() => [
-  lignes.value.length ? `${lignes.value.length} produit${lignes.value.length > 1 ? 's' : ''}` : '',
-  demandes.value.length ? `${demandes.value.length} demande${demandes.value.length > 1 ? 's' : ''} libre${demandes.value.length > 1 ? 's' : ''}` : '',
-].filter(Boolean).join(' · '))
-
 const envoi = ref(false)
 const erreurCommande = ref('')
 
 function viderPanier() {
-  for (const id of Object.keys(quantites)) delete quantites[id]
-  demandes.value = []
+  panier.vider()
   note.value = ''
-  nouvelle.designation = ''
-  nouvelle.quantite = ''
 }
 
 async function commander() {
   if (envoi.value) return // Double clic : une seule commande
   erreurCommande.value = ''
+  produitsRetires.value = []
   if (panierVide.value) {
     erreurCommande.value = 'Choisissez au moins un produit ou ajoutez une demande.'
     return
@@ -191,7 +137,7 @@ async function commander() {
     notes: note.value.trim(),
   }
   // Copie du panier pour le message de secours (le panier est vidé après l'enregistrement)
-  const panier = produits.value.filter(p => quantite(p) > 0).map(p => ({ nom: p.nom, quantite: quantite(p), unite: p.unite }))
+  const choisis = panier.choisis.value
   const total = totalIndicatif.value
 
   // Onglet WhatsApp ouvert pendant le clic : ouvert après l'appel au serveur, il serait bloqué sur téléphone
@@ -204,7 +150,7 @@ async function commander() {
     const { data } = await api.post('/api/auth/vip/commande', corps)
     const { reference, total: totalServeur } = data.commande
     const aChiffrer = corps.demandesLibres.length
-    toast.success(`Commande ${reference} enregistrée. ${aChiffrer ? 'Nous vous confirmons le prix de vos demandes libres sur WhatsApp.' : 'Finalisez-la sur WhatsApp.'}`)
+    toast.success(`Commande ${reference} enregistrée (${formaterFcfa(totalServeur)}). Envoyez le message WhatsApp pour la finaliser.${aChiffrer ? ' Nous vous y enverrons le prix de vos demandes libres.' : ''}`)
     lien = lienWhatsApp(messageAchatLibre({ reference, total: totalServeur, demandesAChiffrer: aChiffrer }, props.livraison))
     viderPanier()
   } catch (err) {
@@ -212,12 +158,12 @@ async function commander() {
     if (statut !== undefined && statut < 500) {
       // Refus du serveur (quantité, produit plus proposé, limite…) : le panier reste là pour être corrigé
       erreurCommande.value = messageErreur(err, "Votre commande n'a pas pu être enregistrée.")
-      if (statut === 403) void authStore.checkSession()
-      else if (statut === 400) void chargerCatalogue()
+      if (statut === 403) signalerStatutRetire()
+      else if (statut === 400) void chargerCatalogue() // Un produit plus proposé quitte le panier, avec une note
     } else {
       // Réseau ou serveur indisponible : la commande reste possible sur WhatsApp, panier recopié
       toast.error("Votre commande n'a pas pu être enregistrée. Vous pouvez la finaliser directement sur WhatsApp.")
-      lien = lienWhatsApp(messageAchatLibreSecours(panier, corps.demandesLibres, total, props.livraison))
+      lien = lienWhatsApp(messageAchatLibreSecours(choisis, corps.demandesLibres, total, props.livraison))
     }
   } finally {
     envoi.value = false
@@ -233,7 +179,6 @@ async function commander() {
 }
 
 const champ = 'mt-1 w-full min-h-11 px-4 py-2.5 border border-creme2 rounded-xl text-sm font-normal normal-case tracking-normal text-noir bg-white'
-const boutonQuantite = 'cursor-pointer w-11 h-11 inline-flex items-center justify-center rounded-xl border border-creme2 text-foret hover:bg-creme disabled:opacity-40 disabled:cursor-default'
 </script>
 
 <template>
@@ -245,19 +190,25 @@ const boutonQuantite = 'cursor-pointer w-11 h-11 inline-flex items-center justif
     </div>
 
     <!-- Compte sans statut VIP : saisie d'un code -->
-    <div v-else-if="!estVip" class="p-6 space-y-4">
-      <div class="flex items-center gap-3">
-        <div class="p-2 bg-creme rounded-xl border border-creme2"><KeyRound class="w-5 h-5 text-foret" aria-hidden="true" /></div>
-        <div>
-          <h2 id="titre-vip" class="font-display font-bold text-xl">Code VIP</h2>
-          <p class="text-xs text-gris">Vous avez reçu un code ? Commandez au détail, au prix VIP.</p>
-        </div>
-      </div>
+    <div v-else-if="!estVip" class="px-5 py-2 space-y-3">
+      <p v-if="statutRetire" role="status" class="mt-2 text-xs p-3 rounded-xl bg-creme text-noir">Votre compte n'a plus le statut VIP. Pour toute question, écrivez-nous sur WhatsApp.</p>
+      <h2 id="titre-vip" class="text-sm font-semibold">
+        <button
+          type="button" :aria-expanded="codeOuvert" aria-controls="zone-code-vip" @click="basculerCode"
+          class="cursor-pointer w-full min-h-11 flex items-center gap-2 text-left text-foret"
+        >
+          <KeyRound class="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span class="flex-1">Vous avez un code VIP ?</span>
+          <ChevronDown :class="['w-4 h-4 shrink-0 transition-transform', codeOuvert ? 'rotate-180' : '']" aria-hidden="true" />
+        </button>
+      </h2>
+      <div v-if="codeOuvert" id="zone-code-vip" class="pb-3 space-y-3">
+      <p class="text-xs text-gris">Avec un code VIP, vous commandez au détail, au prix VIP.</p>
       <form class="flex flex-col sm:flex-row sm:items-end gap-3" novalidate @submit.prevent="validerCode">
         <div class="flex-1">
           <label for="code-vip" class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Code VIP</label>
           <input
-            id="code-vip" v-model="code" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false"
+            id="code-vip" ref="champCode" v-model="code" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false"
             placeholder="Ex. AHI-VIP-7K2Q4M" :aria-invalid="!!erreurCode" :aria-describedby="erreurCode ? 'message-code' : undefined"
             class="w-full min-h-11 px-4 py-2.5 border border-creme2 rounded-xl text-sm font-mono uppercase text-noir placeholder:normal-case placeholder:font-body"
           />
@@ -267,6 +218,7 @@ const boutonQuantite = 'cursor-pointer w-11 h-11 inline-flex items-center justif
         </button>
       </form>
       <p v-if="erreurCode" id="message-code" role="alert" class="text-xs font-semibold text-red-700">{{ erreurCode }}</p>
+      </div>
     </div>
 
     <!-- Compte VIP : achats libres -->
@@ -293,66 +245,33 @@ const boutonQuantite = 'cursor-pointer w-11 h-11 inline-flex items-center justif
           Aucun produit n'est proposé au prix VIP pour le moment. Vous pouvez quand même faire une demande libre ci-dessous.
         </p>
 
-        <fieldset v-for="section in sections" :key="section.cle" class="space-y-1">
-          <legend class="text-xs font-bold uppercase tracking-wider text-gris mb-1">{{ section.titre }}</legend>
-          <p v-if="section.cle === 'autre' && section.produits.length" class="text-xs text-gris">Produits variables :</p>
-          <!-- Une colonne sur téléphone, deux sur grand écran -->
-          <ul v-if="section.produits.length" class="grid grid-cols-1 lg:grid-cols-2 lg:gap-x-10">
-            <li v-for="p in section.produits" :key="p.productId" class="flex items-center justify-between gap-3 py-2 border-b border-creme2">
-              <div class="min-w-0">
-                <p class="text-sm font-semibold text-noir leading-snug">{{ p.nom }}</p>
-                <p class="text-xs text-gris">{{ formaterFrancs(p.prixVip) }} / {{ p.unite }}</p>
-              </div>
-              <div class="flex items-center gap-1 shrink-0">
-                <button type="button" :class="boutonQuantite" :disabled="!quantite(p)" :aria-label="`${p.nom} : diminuer la quantité`" @click="ajuster(p, -1)">
-                  <Minus class="w-4 h-4" aria-hidden="true" />
-                </button>
-                <input
-                  type="text" inputmode="decimal" autocomplete="off" placeholder="0"
-                  :value="quantite(p) ? formaterQuantite(quantite(p)) : ''"
-                  :aria-label="`Quantité de ${p.nom}, en ${p.unite}`"
-                  :class="['w-12 h-11 rounded-xl border text-center text-sm font-bold', quantite(p) ? 'border-foret text-foret bg-foret/5' : 'border-creme2 text-noir']"
-                  @change="saisir(p, $event)"
-                  @keydown.enter.prevent="saisir(p, $event)"
-                />
-                <button type="button" :class="boutonQuantite" :disabled="quantite(p) >= p.maximum" :aria-label="`${p.nom} : augmenter la quantité`" @click="ajuster(p, 1)">
-                  <Plus class="w-4 h-4" aria-hidden="true" />
-                </button>
-              </div>
-            </li>
-          </ul>
+        <fieldset v-if="produitsBase.length" class="space-y-1">
+          <legend class="text-xs font-bold uppercase tracking-wider text-gris mb-1">Produits de base</legend>
+          <ListeProduitsVip :produits="produitsBase" :quantites="quantites" @fixer="panier.fixer" />
+        </fieldset>
 
+        <fieldset class="space-y-1">
+          <legend class="text-xs font-bold uppercase tracking-wider text-gris mb-1">Autre</legend>
+          <template v-if="produitsVariables.length">
+            <p class="text-xs text-gris">Produits variables :</p>
+            <ListeProduitsVip :produits="produitsVariables" :quantites="quantites" @fixer="panier.fixer" />
+          </template>
           <!-- Demandes libres : un produit qui n'est pas dans la liste -->
-          <div v-if="section.cle === 'autre'" class="pt-3 space-y-3">
+          <div class="pt-3 space-y-3">
             <div>
               <p class="text-sm font-semibold text-noir">Un produit qui n'est pas dans la liste ?</p>
-              <p class="text-xs text-gris">Décrivez-le : nous vous confirmons son prix sur WhatsApp ({{ MAX_DEMANDES }} demandes au plus).</p>
+              <p class="text-xs text-gris">Décrivez-le : nous vous envoyons son prix sur WhatsApp. Il n'est ajouté à votre commande qu'avec votre accord ({{ MAX_DEMANDES }} demandes au plus).</p>
+              <p class="text-xs text-noir">N'indiquez ici aucune information de santé (maladie, allergie, traitement) ni de religion.</p>
             </div>
-            <ul v-if="demandes.length" class="space-y-2" aria-label="Vos demandes libres">
-              <li v-for="d in demandes" :key="d.id" class="flex items-center justify-between gap-2 pl-3 rounded-xl bg-creme">
-                <span class="min-w-0 py-2 text-sm text-noir break-words">{{ d.designation }}<span v-if="d.quantite" class="text-gris"> · {{ d.quantite }}</span></span>
-                <button type="button" class="cursor-pointer shrink-0 w-11 h-11 inline-flex items-center justify-center rounded-xl text-red-700 hover:bg-red-50" :aria-label="`Retirer la demande : ${d.designation}`" @click="retirerDemande(d.id)">
-                  <Trash2 class="w-4 h-4" aria-hidden="true" />
-                </button>
-              </li>
-            </ul>
-            <div v-if="demandes.length < MAX_DEMANDES" class="grid grid-cols-1 sm:grid-cols-[1fr_9rem_auto] gap-2 sm:items-end">
-              <label class="block text-xs font-bold uppercase tracking-wider text-gris">Produit souhaité
-                <input :ref="garderChampDesignation" v-model="nouvelle.designation" :maxlength="DESIGNATION.max" placeholder="Ex. Poisson fumé" :class="champ" @keydown.enter.prevent="ajouterDemande" />
-              </label>
-              <label class="block text-xs font-bold uppercase tracking-wider text-gris">Quantité
-                <input v-model="nouvelle.quantite" :maxlength="QUANTITE_DEMANDE_MAX" placeholder="Ex. 2 tas" :class="champ" @keydown.enter.prevent="ajouterDemande" />
-              </label>
-              <button type="button" class="cursor-pointer min-h-11 px-4 rounded-xl border border-foret/30 text-foret text-sm font-bold hover:bg-foret/5" @click="ajouterDemande">Ajouter</button>
-            </div>
-            <p v-if="erreurDemande" role="alert" class="text-xs font-semibold text-red-700">{{ erreurDemande }}</p>
+            <SaisieDemandesLibres :demandes="demandes" :ajouter="panier.ajouterDemande" :retirer="panier.retirerDemande" />
           </div>
         </fieldset>
 
         <label class="block text-xs font-bold uppercase tracking-wider text-gris">Note pour Ahitché (facultatif)
-          <textarea v-model="note" rows="2" :maxlength="NOTE_MAX" placeholder="Ex. livrer le riz en sac de 5 kg si possible" :class="[champ, 'resize-none']"></textarea>
+          <textarea v-model="note" rows="2" :maxlength="NOTE_MAX" placeholder="Ex. livrer le riz en sac de 5 kg si possible" aria-describedby="rappel-note" :class="[champ, 'resize-none']"></textarea>
         </label>
-        <p class="text-xs text-gris">{{ LIVRAISON_ANNONCE }}, sans frais ni minimum de commande. Paiement à la livraison : {{ PAIEMENT_ANNONCE }}.</p>
+        <p id="rappel-note" class="text-xs text-noir -mt-3">N'indiquez ici aucune information de santé (maladie, allergie, traitement) ni de religion.</p>
+        <p class="text-xs text-gris">Livraison à jour fixe dans nos zones de Cotonou et d'Abomey-Calavi, sans frais de livraison ni minimum de commande ; nous vous confirmons le jour sur WhatsApp. Paiement à la livraison : {{ PAIEMENT_ANNONCE }}.</p>
       </template>
 
       <!-- Total toujours visible en bas de l'écran pendant le choix -->
@@ -363,9 +282,9 @@ const boutonQuantite = 'cursor-pointer w-11 h-11 inline-flex items-center justif
               <p class="text-xs text-gris">Votre panier est vide.</p>
             </template>
             <template v-else>
-              <p class="text-xs text-gris">Total indicatif<span class="hidden sm:inline"> · {{ resume }}</span></p>
-              <p class="font-display text-xl font-bold text-foret leading-tight">{{ formaterFrancs(totalIndicatif) }}</p>
-              <p v-if="demandes.length" class="text-[11px] text-gris leading-snug">+ demandes libres : le prix final est confirmé par Ahitché.</p>
+              <p class="text-xs text-gris">Total des produits<span class="hidden sm:inline"> · {{ resume }}</span></p>
+              <p class="font-display text-xl font-bold text-foret leading-tight">{{ formaterFcfa(totalIndicatif) }}</p>
+              <p v-if="demandes.length" class="text-xs text-noir leading-snug">Demandes libres en plus : prix envoyé sur WhatsApp, à accepter avant la livraison.</p>
             </template>
           </div>
           <button
@@ -378,6 +297,7 @@ const boutonQuantite = 'cursor-pointer w-11 h-11 inline-flex items-center justif
           </button>
         </div>
         <p v-if="erreurCommande" role="alert" class="mt-2 text-xs font-semibold text-red-700">{{ erreurCommande }}</p>
+        <p v-if="produitsRetires.length" role="status" class="mt-1 text-xs text-noir">Retiré de votre panier, car plus proposé : {{ produitsRetires.join(', ') }}.</p>
       </div>
     </div>
   </section>
