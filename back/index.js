@@ -67,6 +67,13 @@ if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 // Erreurs non gérées par les routes (téléversement, CORS…) : message en français, jamais de page HTML ni de détail technique
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
+  // Corps de requête refusé par express.json (body-parser) : trop gros, illisible, compression inconnue ou corrompue
+  if (err.type === 'entity.too.large') return res.status(413).json({ message: 'Requête trop volumineuse.' });
+  if (err.type === 'encoding.unsupported' || err.type === 'charset.unsupported') return res.status(415).json({ message: 'Format de requête non pris en charge.' });
+  if (['entity.parse.failed', 'entity.verify.failed', 'request.size.invalid', 'request.aborted'].includes(err.type)
+    || (err.status === 400 && !err.http_code) || err.code === 'Z_DATA_ERROR' || err.code === 'Z_BUF_ERROR') {
+    return res.status(400).json({ message: 'Requête illisible.' });
+  }
   if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ message: 'Fichier trop lourd.' });
   if (err.name === 'MulterError') return res.status(400).json({ message: 'Fichier refusé : ' + err.message });
   if (/CORS/.test(err.message || '')) return res.status(403).json({ message: 'Origine non autorisée.' });
