@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, nextTick, type ComponentPublicInstance } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import axios from 'axios'
-import { Crown, KeyRound, Minus, Plus, Trash2, ArrowRight } from 'lucide-vue-next'
+import { Crown, KeyRound, ArrowRight } from 'lucide-vue-next'
 import { useToast } from 'vue-toastification'
 import api from '@/stores/api'
 import { useAuthStore } from '@/stores/auth'
 import { messageErreur } from '@/services/erreurs'
 import { lienWhatsApp, LIVRAISON_ANNONCE, PAIEMENT_ANNONCE } from '@/config/contact'
 import { messageAchatLibre, messageAchatLibreSecours, type InfosLivraison } from '@/services/messagesCommande'
-import { MAX_LIGNES, MAX_DEMANDES, DESIGNATION, QUANTITE_DEMANDE_MAX, NOTE_MAX, formaterFrancs, formaterQuantite } from '@/config/vip'
+import { MAX_LIGNES, MAX_DEMANDES, NOTE_MAX, formaterFrancs } from '@/config/vip'
+import { usePanierAchatLibre } from '@/composables/usePanierAchatLibre'
+import ListeProduitsVip from '@/components/vip/ListeProduitsVip.vue'
+import SaisieDemandesLibres from '@/components/vip/SaisieDemandesLibres.vue'
 
 // Bloc VIP de l'espace client :
 //  - compte sans statut VIP : saisie d'un code VIP (le serveur limite les essais et répond toujours de la même façon) ;
@@ -69,34 +72,18 @@ async function validerCode() {
   }
 }
 
-// --- Catalogue au prix VIP ---
-interface ProduitVip {
-  productId: string
-  reference: string | null
-  nom: string
-  unite: string
-  famille: 'P' | 'V'
-  prixVip: number
-  pas: number // 0,5 pour kg et L, 1 sinon
-  maximum: number
-}
-const produits = ref<ProduitVip[]>([])
+// --- Catalogue au prix VIP et panier (quantités, demandes libres, total : usePanierAchatLibre) ---
+const panier = usePanierAchatLibre()
+const { produits, produitsBase, produitsVariables, quantites, demandes, lignes, panierVide, resume } = panier
+const totalIndicatif = panier.totalProduits // Demandes libres sans prix : chiffrées ensuite par Ahitché
 const chargement = ref(false)
 const erreurCatalogue = ref('')
-const quantites = reactive<Record<string, number>>({})
-
-const sections = computed(() => [
-  { cle: 'base', titre: 'Produits de base', produits: produits.value.filter(p => p.famille === 'P') },
-  { cle: 'autre', titre: 'Autre', produits: produits.value.filter(p => p.famille === 'V') },
-])
 
 async function chargerCatalogue() {
   chargement.value = true
   erreurCatalogue.value = ''
   try {
-    produits.value = (await api.get('/api/auth/vip/catalogue')).data.produits ?? []
-    // Un produit qui n'est plus proposé quitte le panier
-    for (const id of Object.keys(quantites)) if (!produits.value.some(p => p.productId === id)) delete quantites[id]
+    panier.definirProduits((await api.get('/api/auth/vip/catalogue')).data.produits ?? [])
   } catch (err) {
     erreurCatalogue.value = messageErreur(err, "Les produits n'ont pas pu être chargés.")
     if (axios.isAxiosError(err) && err.response?.status === 403) void authStore.checkSession() // Statut retiré
@@ -106,72 +93,14 @@ async function chargerCatalogue() {
 }
 watch(estVip, (vip) => { if (vip) void chargerCatalogue() }, { immediate: true })
 
-// --- Quantités : multiples du pas (0,5 kg ou L ; 1 sinon), du pas au maximum ---
-const quantite = (p: ProduitVip) => quantites[p.productId] ?? 0
-function fixer(p: ProduitVip, valeur: number) {
-  const q = !Number.isFinite(valeur) || valeur <= 0 ? 0 : Math.min(p.maximum, Math.max(p.pas, Math.round(valeur / p.pas) * p.pas))
-  if (q) quantites[p.productId] = q
-  else delete quantites[p.productId]
-}
-const ajuster = (p: ProduitVip, sens: 1 | -1) => fixer(p, quantite(p) + sens * p.pas)
-function saisir(p: ProduitVip, event: Event) {
-  const champ = event.target as HTMLInputElement
-  const texte = champ.value.trim().replace(',', '.')
-  fixer(p, texte === '' ? 0 : Number(texte))
-  champ.value = quantite(p) ? formaterQuantite(quantite(p)) : '' // Valeur retenue (pas, maximum)
-}
-
-// --- Demandes libres (sans prix : chiffrées ensuite par Ahitché) ---
-interface Demande { id: number; designation: string; quantite: string }
-const demandes = ref<Demande[]>([])
-const nouvelle = reactive({ designation: '', quantite: '' })
-const erreurDemande = ref('')
-// Champ placé dans la boucle des sections : référence par fonction (une référence simple y deviendrait un tableau)
-let champDesignation: HTMLInputElement | null = null
-const garderChampDesignation = (el: Element | ComponentPublicInstance | null) => {
-  champDesignation = el instanceof HTMLInputElement ? el : null
-}
-let prochainId = 1
-const nettoyer = (texte: string) => texte.replace(/\s+/g, ' ').trim()
-
-function ajouterDemande() {
-  const designation = nettoyer(nouvelle.designation)
-  if (demandes.value.length >= MAX_DEMANDES) {
-    erreurDemande.value = `${MAX_DEMANDES} demandes au plus par commande.`
-    return
-  }
-  if (designation.length < DESIGNATION.min) {
-    erreurDemande.value = 'Décrivez le produit souhaité.'
-    champDesignation?.focus()
-    return
-  }
-  demandes.value.push({ id: prochainId++, designation, quantite: nettoyer(nouvelle.quantite) })
-  nouvelle.designation = ''
-  nouvelle.quantite = ''
-  erreurDemande.value = ''
-  champDesignation?.focus()
-}
-const retirerDemande = (id: number) => { demandes.value = demandes.value.filter(d => d.id !== id) }
-
-// --- Total indicatif et commande ---
+// --- Commande ---
 const note = ref('')
-const lignes = computed(() => produits.value.filter(p => quantite(p) > 0).map(p => ({ productId: p.productId, quantite: quantite(p) })))
-const totalIndicatif = computed(() => Math.round(produits.value.reduce((s, p) => s + p.prixVip * quantite(p), 0)))
-const panierVide = computed(() => !lignes.value.length && !demandes.value.length)
-const resume = computed(() => [
-  lignes.value.length ? `${lignes.value.length} produit${lignes.value.length > 1 ? 's' : ''}` : '',
-  demandes.value.length ? `${demandes.value.length} demande${demandes.value.length > 1 ? 's' : ''} libre${demandes.value.length > 1 ? 's' : ''}` : '',
-].filter(Boolean).join(' · '))
-
 const envoi = ref(false)
 const erreurCommande = ref('')
 
 function viderPanier() {
-  for (const id of Object.keys(quantites)) delete quantites[id]
-  demandes.value = []
+  panier.vider()
   note.value = ''
-  nouvelle.designation = ''
-  nouvelle.quantite = ''
 }
 
 async function commander() {
@@ -191,7 +120,7 @@ async function commander() {
     notes: note.value.trim(),
   }
   // Copie du panier pour le message de secours (le panier est vidé après l'enregistrement)
-  const panier = produits.value.filter(p => quantite(p) > 0).map(p => ({ nom: p.nom, quantite: quantite(p), unite: p.unite }))
+  const choisis = panier.choisis.value
   const total = totalIndicatif.value
 
   // Onglet WhatsApp ouvert pendant le clic : ouvert après l'appel au serveur, il serait bloqué sur téléphone
@@ -217,7 +146,7 @@ async function commander() {
     } else {
       // Réseau ou serveur indisponible : la commande reste possible sur WhatsApp, panier recopié
       toast.error("Votre commande n'a pas pu être enregistrée. Vous pouvez la finaliser directement sur WhatsApp.")
-      lien = lienWhatsApp(messageAchatLibreSecours(panier, corps.demandesLibres, total, props.livraison))
+      lien = lienWhatsApp(messageAchatLibreSecours(choisis, corps.demandesLibres, total, props.livraison))
     }
   } finally {
     envoi.value = false
@@ -233,7 +162,6 @@ async function commander() {
 }
 
 const champ = 'mt-1 w-full min-h-11 px-4 py-2.5 border border-creme2 rounded-xl text-sm font-normal normal-case tracking-normal text-noir bg-white'
-const boutonQuantite = 'cursor-pointer w-11 h-11 inline-flex items-center justify-center rounded-xl border border-creme2 text-foret hover:bg-creme disabled:opacity-40 disabled:cursor-default'
 </script>
 
 <template>
@@ -293,59 +221,24 @@ const boutonQuantite = 'cursor-pointer w-11 h-11 inline-flex items-center justif
           Aucun produit n'est proposé au prix VIP pour le moment. Vous pouvez quand même faire une demande libre ci-dessous.
         </p>
 
-        <fieldset v-for="section in sections" :key="section.cle" class="space-y-1">
-          <legend class="text-xs font-bold uppercase tracking-wider text-gris mb-1">{{ section.titre }}</legend>
-          <p v-if="section.cle === 'autre' && section.produits.length" class="text-xs text-gris">Produits variables :</p>
-          <!-- Une colonne sur téléphone, deux sur grand écran -->
-          <ul v-if="section.produits.length" class="grid grid-cols-1 lg:grid-cols-2 lg:gap-x-10">
-            <li v-for="p in section.produits" :key="p.productId" class="flex items-center justify-between gap-3 py-2 border-b border-creme2">
-              <div class="min-w-0">
-                <p class="text-sm font-semibold text-noir leading-snug">{{ p.nom }}</p>
-                <p class="text-xs text-gris">{{ formaterFrancs(p.prixVip) }} / {{ p.unite }}</p>
-              </div>
-              <div class="flex items-center gap-1 shrink-0">
-                <button type="button" :class="boutonQuantite" :disabled="!quantite(p)" :aria-label="`${p.nom} : diminuer la quantité`" @click="ajuster(p, -1)">
-                  <Minus class="w-4 h-4" aria-hidden="true" />
-                </button>
-                <input
-                  type="text" inputmode="decimal" autocomplete="off" placeholder="0"
-                  :value="quantite(p) ? formaterQuantite(quantite(p)) : ''"
-                  :aria-label="`Quantité de ${p.nom}, en ${p.unite}`"
-                  :class="['w-12 h-11 rounded-xl border text-center text-sm font-bold', quantite(p) ? 'border-foret text-foret bg-foret/5' : 'border-creme2 text-noir']"
-                  @change="saisir(p, $event)"
-                  @keydown.enter.prevent="saisir(p, $event)"
-                />
-                <button type="button" :class="boutonQuantite" :disabled="quantite(p) >= p.maximum" :aria-label="`${p.nom} : augmenter la quantité`" @click="ajuster(p, 1)">
-                  <Plus class="w-4 h-4" aria-hidden="true" />
-                </button>
-              </div>
-            </li>
-          </ul>
+        <fieldset v-if="produitsBase.length" class="space-y-1">
+          <legend class="text-xs font-bold uppercase tracking-wider text-gris mb-1">Produits de base</legend>
+          <ListeProduitsVip :produits="produitsBase" :quantites="quantites" @fixer="panier.fixer" />
+        </fieldset>
 
+        <fieldset class="space-y-1">
+          <legend class="text-xs font-bold uppercase tracking-wider text-gris mb-1">Autre</legend>
+          <template v-if="produitsVariables.length">
+            <p class="text-xs text-gris">Produits variables :</p>
+            <ListeProduitsVip :produits="produitsVariables" :quantites="quantites" @fixer="panier.fixer" />
+          </template>
           <!-- Demandes libres : un produit qui n'est pas dans la liste -->
-          <div v-if="section.cle === 'autre'" class="pt-3 space-y-3">
+          <div class="pt-3 space-y-3">
             <div>
               <p class="text-sm font-semibold text-noir">Un produit qui n'est pas dans la liste ?</p>
               <p class="text-xs text-gris">Décrivez-le : nous vous confirmons son prix sur WhatsApp ({{ MAX_DEMANDES }} demandes au plus).</p>
             </div>
-            <ul v-if="demandes.length" class="space-y-2" aria-label="Vos demandes libres">
-              <li v-for="d in demandes" :key="d.id" class="flex items-center justify-between gap-2 pl-3 rounded-xl bg-creme">
-                <span class="min-w-0 py-2 text-sm text-noir break-words">{{ d.designation }}<span v-if="d.quantite" class="text-gris"> · {{ d.quantite }}</span></span>
-                <button type="button" class="cursor-pointer shrink-0 w-11 h-11 inline-flex items-center justify-center rounded-xl text-red-700 hover:bg-red-50" :aria-label="`Retirer la demande : ${d.designation}`" @click="retirerDemande(d.id)">
-                  <Trash2 class="w-4 h-4" aria-hidden="true" />
-                </button>
-              </li>
-            </ul>
-            <div v-if="demandes.length < MAX_DEMANDES" class="grid grid-cols-1 sm:grid-cols-[1fr_9rem_auto] gap-2 sm:items-end">
-              <label class="block text-xs font-bold uppercase tracking-wider text-gris">Produit souhaité
-                <input :ref="garderChampDesignation" v-model="nouvelle.designation" :maxlength="DESIGNATION.max" placeholder="Ex. Poisson fumé" :class="champ" @keydown.enter.prevent="ajouterDemande" />
-              </label>
-              <label class="block text-xs font-bold uppercase tracking-wider text-gris">Quantité
-                <input v-model="nouvelle.quantite" :maxlength="QUANTITE_DEMANDE_MAX" placeholder="Ex. 2 tas" :class="champ" @keydown.enter.prevent="ajouterDemande" />
-              </label>
-              <button type="button" class="cursor-pointer min-h-11 px-4 rounded-xl border border-foret/30 text-foret text-sm font-bold hover:bg-foret/5" @click="ajouterDemande">Ajouter</button>
-            </div>
-            <p v-if="erreurDemande" role="alert" class="text-xs font-semibold text-red-700">{{ erreurDemande }}</p>
+            <SaisieDemandesLibres :demandes="demandes" :ajouter="panier.ajouterDemande" :retirer="panier.retirerDemande" />
           </div>
         </fieldset>
 

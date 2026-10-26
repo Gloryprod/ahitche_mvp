@@ -32,6 +32,22 @@ export interface DemandeLibre {
   motif?: string // Motif du retrait : renvoyé à l'équipe seulement
 }
 
+// Produit du catalogue VIP (GET /api/auth/vip/catalogue et /api/admin/commandes/achat-libre/catalogue) : prix VIP
+// seulement, jamais le prix du catalogue
+export interface ProduitVip {
+  productId: string
+  reference: string | null
+  nom: string
+  unite: string
+  famille: 'P' | 'V'
+  prixVip: number
+  pas: number // 0,5 pour kg et L, 1 sinon
+  maximum: number
+}
+
+// Prix d'une demande libre fixé à la saisie par l'admin : FCFA, 0 ou plus (le serveur fait foi)
+export const MAX_PRIX_DEMANDE = 10000000
+
 // Ligne d'un achat libre telle que le client la voit (prix VIP)
 export interface LigneAchatLibre {
   nom: string

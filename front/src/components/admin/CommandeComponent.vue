@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed, defineAsyncComponent } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, computed, defineAsyncComponent, nextTick } from 'vue'
 import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
 import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import CommandeForm from '@/components/admin/CommandeForm.vue'
 import type { Client, Commande, Product } from '@/type'
-import { Eye, Edit2, Trash2, Search, CheckCircle } from 'lucide-vue-next'
+import { Eye, Edit2, Trash2, Search, CheckCircle, ChevronDown } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
 import { STATUTS, TRANSITIONS, classeStatut, type StatutCommande } from '@/config/commandes'
 import { useChangementStatut } from '@/composables/useChangementStatut'
@@ -18,6 +18,26 @@ import { estAchatLibre } from '@/config/vip'
 // jamais dans le formulaire d'un pack
 const DetailAchatLibre = defineAsyncComponent(() => import('@/components/admin/vip/DetailAchatLibre.vue'))
 const achatLibreOuvert = ref<Commande | null>(null)
+// Saisie d'un achat libre au nom d'un client VIP (admin et gestionnaires), chargée à l'ouverture
+const FormulaireAchatLibreAdmin = defineAsyncComponent(() => import('@/components/admin/vip/FormulaireAchatLibreAdmin.vue'))
+const saisieAchatLibre = ref(false)
+
+// « Nouvelle commande » : choix entre un pack (formulaire existant) et un achat libre VIP
+const menuNouvelle = ref(false)
+const zoneMenuNouvelle = ref<HTMLElement | null>(null)
+const premierChoix = ref<HTMLButtonElement | null>(null)
+async function basculerMenuNouvelle() {
+  menuNouvelle.value = !menuNouvelle.value
+  if (menuNouvelle.value) {
+    await nextTick()
+    premierChoix.value?.focus()
+  }
+}
+const fermerMenuSiDehors = (e: PointerEvent) => {
+  if (menuNouvelle.value && !zoneMenuNouvelle.value?.contains(e.target as Node)) menuNouvelle.value = false
+}
+onMounted(() => document.addEventListener('pointerdown', fermerMenuSiDehors))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', fermerMenuSiDehors))
 
 const authStore = useAuthStore()
 const ecriture = computed(() => peutEcrire(authStore.role.value, 'commandes'))
@@ -201,6 +221,23 @@ const handleOrderSuccess = () => {
 }
 
 // Demandes libres chiffrées ou retirées : la liste (total, badge « à chiffrer ») est rechargée
+const nouvelleCommandePack = () => {
+  menuNouvelle.value = false
+  openCreateMode()
+}
+const nouvelAchatLibre = () => {
+  menuNouvelle.value = false
+  saisieAchatLibre.value = true
+}
+// Achat libre saisi : il apparaît en tête de la liste « Toutes » (la plus récente d'abord)
+const handleAchatLibreCree = (message: string) => {
+  saisieAchatLibre.value = false
+  statutActif.value = 'Toutes'
+  page.value = 1
+  queryClient.invalidateQueries({ queryKey: ['orders'] })
+  showNotification(message, 'success')
+}
+
 const handleAchatLibreModifie = (message: string) => {
   queryClient.invalidateQueries({ queryKey: ['orders'] })
   showNotification(message, 'success')
@@ -212,9 +249,24 @@ const handleAchatLibreModifie = (message: string) => {
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <h1 class="font-display font-bold text-xl text-noir">Commandes & Clients</h1>
 
-      <button v-if="ecriture" @click="openCreateMode" class="cursor-pointer px-4 py-2 bg-foret text-white text-xs font-bold rounded-lg hover:bg-opacity-95 transition-all shadow-sm flex items-center gap-1">
-        + Nouvelle commande
-      </button>
+      <div v-if="ecriture" ref="zoneMenuNouvelle" class="relative" @keydown.esc="menuNouvelle = false">
+        <button
+          type="button" :aria-expanded="menuNouvelle" aria-controls="menu-nouvelle-commande" @click="basculerMenuNouvelle"
+          class="cursor-pointer w-full sm:w-auto min-h-11 px-4 py-2 bg-foret text-white text-xs font-bold rounded-lg hover:bg-opacity-95 transition-all shadow-sm flex items-center justify-center gap-1"
+        >
+          + Nouvelle commande <ChevronDown class="w-4 h-4" aria-hidden="true" />
+        </button>
+        <div v-if="menuNouvelle" id="menu-nouvelle-commande" class="absolute left-0 right-0 sm:left-auto sm:w-72 mt-2 z-30 bg-white rounded-2xl border border-creme2 shadow-lg p-2 space-y-1">
+          <button ref="premierChoix" type="button" class="cursor-pointer w-full text-left min-h-11 p-3 rounded-xl hover:bg-creme focus-visible:bg-creme" @click="nouvelleCommandePack">
+            <span class="block text-sm font-bold text-noir">Pack</span>
+            <span class="block text-xs text-gris">Formule du mois : Essentiel, Équilibré, Confort</span>
+          </button>
+          <button type="button" class="cursor-pointer w-full text-left min-h-11 p-3 rounded-xl hover:bg-creme focus-visible:bg-creme" @click="nouvelAchatLibre">
+            <span class="flex items-center gap-1.5 text-sm font-bold text-noir">Achat libre <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-or text-noir">VIP</span></span>
+            <span class="block text-xs text-gris">Au détail, au prix VIP, pour un client VIP</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 bg-white p-4 rounded-2xl shadow-2xs">
@@ -349,6 +401,12 @@ const handleAchatLibreModifie = (message: string) => {
         :allProducts="prodList || []"
         @close="isModalOpen = false" 
         @success="handleOrderSuccess" 
+    />
+
+    <FormulaireAchatLibreAdmin
+        v-if="saisieAchatLibre"
+        @fermer="saisieAchatLibre = false"
+        @cree="handleAchatLibreCree"
     />
 
     <DetailAchatLibre
