@@ -17,6 +17,14 @@ const userSchema = new mongoose.Schema({
     adminPrincipal: { type: Boolean, default: false },
     // Gestionnaire qui livre (D-17) : fiche livreur reliée ; il ne voit alors que les clients de ses livraisons
     livreurId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner', default: null },
+    // Statut VIP (achats libres au prix VIP) : obtenu avec un code VIP, sans fin jusqu'au retrait par l'admin
+    vip: {
+        actif: { type: Boolean, default: false },
+        depuis: { type: Date, default: null },
+        codeId: { type: mongoose.Schema.Types.ObjectId, ref: 'CodeVip', default: null },
+        retireLe: { type: Date, default: null },
+        retirePar: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
+    },
     resetPasswordToken: {
         type: String,
         default: null

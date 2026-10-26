@@ -10,6 +10,7 @@ import { peutEcrire } from '@/config/roles'
 import { ETAPE_SUIVANTE, HORAIRES_CRENEAUX, classeStatut, type StatutCommande } from '@/config/commandes'
 import { useChangementStatut } from '@/composables/useChangementStatut'
 import { genererPreparationPDF, genererTourneePDF, messageTournee } from '@/services/pdfLogistique'
+import { estAchatLibre } from '@/config/vip'
 
 const authStore = useAuthStore()
 const ecriture = computed(() => peutEcrire(authStore.role.value, 'logistique'))
@@ -236,7 +237,14 @@ const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
                 <span :class="[classeStatut(c.statut), 'px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap']">{{ c.statut }}</span>
               </div>
               <p v-if="c.client.adresse" class="text-xs">{{ c.client.adresse }}</p>
-              <p class="text-xs"><strong>{{ c.formule }}</strong> · {{ formatFCFA(c.total) }} ({{ c.modePaiement }})</p>
+              <p class="text-xs"><strong>{{ c.formule }}</strong> <span v-if="estAchatLibre(c)" class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-or text-noir">VIP</span> · {{ formatFCFA(c.total) }} ({{ c.modePaiement }})</p>
+              <!-- Achat libre : produits hors catalogue, achetés à part (hors stock) et livrés avec la commande -->
+              <div v-if="c.demandesLibres?.length" class="text-xs rounded-xl bg-creme p-2.5">
+                <p class="font-bold text-noir">Demandes libres (hors stock)</p>
+                <ul class="list-disc pl-4">
+                  <li v-for="(d, i) in c.demandesLibres" :key="i">{{ d.designation }}<template v-if="d.quantite"> · {{ d.quantite }}</template></li>
+                </ul>
+              </div>
 
               <div class="flex flex-wrap gap-2 pt-1">
                 <a v-if="c.client.telephone" :href="`tel:${c.client.telephone}`" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-creme2 text-xs font-semibold"><Phone class="w-3.5 h-3.5" /> Appeler</a>
@@ -267,7 +275,13 @@ const formatFCFA = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
             <div>
               <p class="font-bold">{{ c.client.nom }} <span class="text-gris font-normal text-xs">· {{ c.reference }}</span></p>
               <p class="text-xs text-gris">{{ c.client.quartier || 'Adresse non renseignée' }}<span v-if="c.zone"> · {{ c.zone.nom }}, {{ c.zone.commune }}</span></p>
-              <p class="text-xs">{{ c.formule }} · {{ c.produits.length }} produit(s)</p>
+              <p class="text-xs">
+                {{ c.formule }} <span v-if="estAchatLibre(c)" class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-or text-noir">VIP</span>
+                · {{ c.produits.length }} produit(s)<template v-if="c.demandesLibres?.length"> · {{ c.demandesLibres.length }} demande(s) libre(s)</template>
+              </p>
+              <ul v-if="c.demandesLibres?.length" class="mt-1 text-xs list-disc pl-4">
+                <li v-for="(d, i) in c.demandesLibres" :key="i">{{ d.designation }}<template v-if="d.quantite"> · {{ d.quantite }}</template></li>
+              </ul>
             </div>
             <span :class="[classeStatut(c.statut), 'px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap']">{{ c.statut }}</span>
           </div>

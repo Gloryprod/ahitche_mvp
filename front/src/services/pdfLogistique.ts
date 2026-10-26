@@ -2,8 +2,10 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { finDernierTableau } from './pdfTableau'
 import type { CommandeTerrain } from '@/type'
+import { estAchatLibre } from '@/config/vip'
 
-// Documents de la section Logistique : fiche de préparation du jour et feuille de tournée d'un livreur
+// Documents de la section Logistique : fiche de préparation du jour et feuille de tournée d'un livreur.
+// Achat libre VIP : repéré comme tel, avec ses demandes libres (hors stock, à acheter à part), jamais leur prix.
 
 const COULEUR_FORET: [number, number, number] = [26, 92, 56] // #1A5C38
 const COULEUR_GRIS: [number, number, number] = [120, 120, 120]
@@ -13,6 +15,7 @@ const formatPrixPDF = (valeur: number) => valeur.toString().replace(/\B(?=(\d{3}
 const formatQuantite = (valeur: number) => Number.isInteger(valeur) ? String(valeur) : valeur.toFixed(2).replace('.', ',')
 const dateLisible = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 const lieu = (c: CommandeTerrain) => [c.client.quartier, c.zone ? c.zone.nom : 'Hors zone'].filter(Boolean).join(' · ')
+const texteDemande = (d: { designation: string; quantite: string }) => `${d.designation}${d.quantite ? ` (${d.quantite})` : ''}`
 
 function entete(doc: jsPDF, titre: string, sousTitre: string) {
   doc.setFont('Helvetica', 'bold')
@@ -53,6 +56,18 @@ export function genererPreparationPDF(jour: string, commandes: CommandeTerrain[]
     styles: { fontSize: 9 },
   })
 
+  // Achats libres VIP : demandes hors catalogue, à acheter à part (elles ne sortent pas du stock)
+  const demandes = commandes.flatMap(c => (c.demandesLibres ?? []).map(d => [c.reference, c.client.nom, d.designation, d.quantite || '-']))
+  if (demandes.length) {
+    autoTable(doc, {
+      startY: (finDernierTableau(doc) ?? 0) + 8,
+      head: [['Réf.', 'Client', 'Demande libre (hors stock)', 'Quantité']],
+      body: demandes,
+      headStyles: { fillColor: COULEUR_FORET },
+      styles: { fontSize: 9 },
+    })
+  }
+
   autoTable(doc, {
     startY: (finDernierTableau(doc) ?? 0) + 8,
     head: [['Réf.', 'Client', 'Formule', 'Créneau', 'Livreur', 'Produits']],
@@ -62,7 +77,10 @@ export function genererPreparationPDF(jour: string, commandes: CommandeTerrain[]
       c.formule,
       c.creneau?.periode || '-',
       c.livreur?.nom || '-',
-      c.produits.map(p => `${p.nom} : ${formatQuantite(p.quantite)} ${p.unite}`).join('\n') || 'Composition à définir'
+      [
+        ...c.produits.map(p => `${p.nom} : ${formatQuantite(p.quantite)} ${p.unite}`),
+        ...(c.demandesLibres ?? []).map(d => `Demande libre : ${texteDemande(d)}`),
+      ].join('\n') || 'Composition à définir'
     ]),
     headStyles: { fillColor: COULEUR_FORET },
     styles: { fontSize: 8, valign: 'top' },
@@ -82,7 +100,7 @@ export function genererTourneePDF(jour: string, livreur: { nom: string; telephon
     body: commandes.map((c, i) => [
       String(i + 1),
       c.creneau?.periode || '-',
-      c.reference,
+      estAchatLibre(c) ? `${c.reference}\nAchat libre VIP` : c.reference,
       `${c.client.nom}\n${c.client.telephone}`,
       `${lieu(c)}\n${c.client.adresse}`,
       `${formatPrixPDF(c.total)}\n${c.modePaiement}`
@@ -103,9 +121,10 @@ export function genererTourneePDF(jour: string, livreur: { nom: string; telephon
 export function messageTournee(jour: string, livreur: { nom: string }, commandes: CommandeTerrain[]) {
   let message = `Bonjour ${livreur.nom} 👋\nTournée Ahitché du ${dateLisible(jour)} (${commandes.length} livraison(s)) :\n`
   commandes.forEach((c, i) => {
-    message += `\n${i + 1}. *${c.reference}* (${c.creneau?.periode || '-'}) - ${c.client.nom}, ${c.client.telephone}\n`
+    message += `\n${i + 1}. *${c.reference}*${estAchatLibre(c) ? ' (achat libre VIP)' : ''} (${c.creneau?.periode || '-'}) - ${c.client.nom}, ${c.client.telephone}\n`
     message += `   📍 ${lieu(c)} - ${c.client.adresse}\n`
     if (c.client.lienLocalisation) message += `   🗺️ ${c.client.lienLocalisation}\n`
+    if (c.demandesLibres?.length) message += `   🛒 Demandes libres : ${c.demandesLibres.map(texteDemande).join(', ')}\n`
     message += `   💰 ${formatPrixPDF(c.total)} (${c.modePaiement})\n`
   })
   message += `\nAppelle chaque client 30 min avant d'arriver. Merci !`

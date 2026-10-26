@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { messageErreur } from '@/services/erreurs'
-import { ref, onMounted, computed, reactive } from 'vue';
+import { ref, onMounted, computed, reactive, defineAsyncComponent } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
@@ -14,8 +14,15 @@ import { genererRecuPDF } from '@/services/pdfRecuCommande';
 import { ANNULABLES_PAR_CLIENT, classeStatut, type StatutCommande } from '@/config/commandes';
 import SuiviAlimentaire from '@/components/client/SuiviAlimentaire.vue';
 import MonAvis from '@/components/client/MonAvis.vue';
+import LignesAchatLibre from '@/components/client/LignesAchatLibre.vue';
 import { useDeconnexion } from '@/composables/useDeconnexion';
 import { lienWhatsApp } from '@/config/contact';
+import { estAchatLibre, nombreAChiffrer, type DemandeLibre, type LigneAchatLibre } from '@/config/vip';
+import { texteLivraison, type InfosLivraison } from '@/services/messagesCommande';
+
+// Bandeau des fiches produits et bloc VIP : chargés à part, sans retarder le reste de l'espace client
+const BandeauFiches = defineAsyncComponent(() => import('@/components/client/BandeauFiches.vue'));
+const AchatsLibresVip = defineAsyncComponent(() => import('@/components/client/AchatsLibresVip.vue'));
 
 interface Commande {
   id: string;
@@ -27,6 +34,10 @@ interface Commande {
   statut: StatutCommande;
   facture_url?: string;
   createdAt: Date
+  // Achat libre VIP : lignes au prix VIP et demandes libres (chiffrées, à chiffrer ou retirées)
+  typeCommande?: 'pack' | 'achat-libre';
+  lignes?: LigneAchatLibre[];
+  demandesLibres?: DemandeLibre[];
 }
 
 interface Formule {
@@ -82,6 +93,18 @@ const nomZone = (code: string | null) => {
   return zone ? `${zone.nom}, ${zone.commune}` : '';
 };
 
+// Infos de livraison reprises dans les messages WhatsApp (pack et achat libre VIP)
+const infosLivraison = computed<InfosLivraison>(() => ({
+  quartier: clientInfos.value.quartier,
+  zone: nomZone(clientInfos.value.zone),
+  adresse: clientInfos.value.adresse,
+  lienLocalisation: clientInfos.value.lienLocalisation,
+  telephone: clientInfos.value.telephone,
+}));
+
+// Historique : détail d'un achat libre ouvert (tableau sur ordinateur)
+const detailOuvert = ref<string | null>(null);
+
 // Extraction de l'initiale du nom pour l'avatar
 const avatarInitiale = computed(() => {
   return authStore.user?.value?.username ? authStore.user.value.username.charAt(0).toUpperCase() : 'C';
@@ -120,6 +143,9 @@ const fetchDashboardData = async () => {
       date: new Date(cmd.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }),
       total: formaterFCFA(Number(cmd.total)),
       statut: cmd.statut,
+      typeCommande: cmd.typeCommande,
+      lignes: cmd.lignes,
+      demandesLibres: cmd.demandesLibres,
     }));
     chargementCommandes.value = false;
 
@@ -204,17 +230,8 @@ const genererLienWhatsApp = (commande?: { reference: string; total: number }) =>
   message += montant ? ` (${formaterFCFA(montant)}).\n` : `.\n`;
   message += commande ? `Référence de commande : *${commande.reference}*\n\n` : `\n`;
   
-  // Si les infos de livraison sont remplies, on les greffe proprement au message
-  if (clientInfos.value.quartier || clientInfos.value.telephone) {
-    message += `📍 *Infos de livraison :*\n`;
-    const zone = nomZone(clientInfos.value.zone);
-    message += `- *Quartier :* ${clientInfos.value.quartier || 'Non spécifié'}${zone ? ` (${zone})` : ''}\n`;
-    message += `- *Repères/Maison :* ${clientInfos.value.adresse || 'Non spécifié'}\n`;
-    if (clientInfos.value.lienLocalisation) message += `- *Localisation :* ${clientInfos.value.lienLocalisation}\n`;
-    message += `- *Contact de livraison :* ${clientInfos.value.telephone || 'Non spécifié'}`;
-  } else {
-    message += `⚠️ _Je n'ai pas encore renseigné mes détails de livraison, nous ferons le point ici._`;
-  }
+  // Infos de livraison (ou rappel qu'elles manquent), communes aux messages des packs et des achats libres
+  message += texteLivraison(infosLivraison.value);
 
   return lienWhatsApp(message);
 };
@@ -311,6 +328,7 @@ const telechargerRecu = (commande: Commande) => {
   try {
     genererRecuPDF({
       commandeId: commande._id,
+      reference: commande.reference,
       formule: commande.formule,
       date: commande.date,
       total: commande.total,
@@ -318,7 +336,9 @@ const telechargerRecu = (commande: Commande) => {
       clientEmail: authStore.user?.value?.email || '',
       clientPhone: clientInfos.value.telephone,
       clientQuartier: clientInfos.value.quartier,
-      clientAdresse: clientInfos.value.adresse
+      clientAdresse: clientInfos.value.adresse,
+      // Achat libre VIP : le reçu détaille ses lignes et ses demandes libres
+      ...(estAchatLibre(commande) ? { lignes: commande.lignes ?? [], demandesLibres: commande.demandesLibres ?? [] } : {})
     });
     toast.success("Reçu téléchargé avec succès !");
   } catch (error) {
@@ -599,6 +619,12 @@ onMounted(async () => {
         </div>        
       </div>
 
+      <!-- FICHES PRODUITS (bandeau publicitaire ; caché s'il n'y a aucune fiche) -->
+      <BandeauFiches />
+
+      <!-- CODE VIP, PUIS ACHATS LIBRES AU PRIX VIP -->
+      <AchatsLibresVip :livraison="infosLivraison" @commandee="fetchDashboardData" />
+
       <!-- HISTORIQUE DES COMMANDES RESPONSIVE -->
       <div class="bg-white rounded-2xl p-6 border border-creme2 shadow-sm transition-all duration-300 hover:shadow-md">
         <div class="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
@@ -632,13 +658,32 @@ onMounted(async () => {
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-50 text-sm font-medium">
-                <tr v-for="commande in commandes" :key="commande._id" class="hover:bg-gray-50/50 transition-colors group">
+                <template v-for="commande in commandes" :key="commande._id">
+                <tr class="hover:bg-creme/50 transition-colors group">
                   <td class="py-4 font-bold text-foret">
                     {{ commande.reference || `#CMD-${commande._id.substring(commande._id.length - 4).toUpperCase()}` }}
                   </td>
-                  <td class="py-4 text-gray-700">{{ commande.formule }}</td>
+                  <td class="py-4 text-noir">
+                    {{ commande.formule }}
+                    <!-- Achat libre VIP : produits et demandes libres dans une ligne dépliable -->
+                    <template v-if="estAchatLibre(commande)">
+                      <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-or text-noir align-middle">VIP</span>
+                      <button
+                        type="button"
+                        class="cursor-pointer block mt-1 py-1 text-xs font-semibold text-foret underline"
+                        :aria-expanded="detailOuvert === commande._id"
+                        :aria-controls="`detail-${commande._id}`"
+                        @click="detailOuvert = detailOuvert === commande._id ? null : commande._id"
+                      >
+                        {{ detailOuvert === commande._id ? 'Masquer le détail' : 'Voir le détail' }}
+                      </button>
+                    </template>
+                  </td>
                   <td class="py-4 text-gris font-normal">{{ commande.date }}</td>
-                  <td class="py-4 font-bold">{{ commande.total }}</td>
+                  <td class="py-4 font-bold">
+                    {{ commande.total }}
+                    <span v-if="nombreAChiffrer(commande.demandesLibres)" class="block text-[11px] font-normal text-gris">+ demandes libres (prix à confirmer)</span>
+                  </td>
                   <td class="py-4">
                     <span :class="['px-3 py-1 rounded-full text-xs font-bold tracking-wide inline-block whitespace-nowrap', classeStatut(commande.statut)]">
                       {{ commande.statut }}
@@ -666,6 +711,14 @@ onMounted(async () => {
                     </div>
                   </td>
                 </tr>
+                <tr v-if="estAchatLibre(commande) && detailOuvert === commande._id" :id="`detail-${commande._id}`">
+                  <td colspan="6" class="pb-4 pt-1">
+                    <div class="rounded-xl bg-creme/60 px-4 py-2">
+                      <LignesAchatLibre :lignes="commande.lignes" :demandes="commande.demandesLibres" />
+                    </div>
+                  </td>
+                </tr>
+                </template>
               </tbody>
             </table>
           </div>
@@ -686,13 +739,23 @@ onMounted(async () => {
               <div class="grid grid-cols-2 gap-2 border-t border-b border-gray-100/80 py-2.5 my-0.5 text-sm">
                 <div>
                   <span class="text-[11px] text-gris font-bold uppercase block">Formule</span>
-                  <span class="font-semibold text-gray-800">{{ commande.formule }}</span>
+                  <span class="font-semibold text-noir">{{ commande.formule }}</span>
+                  <span v-if="estAchatLibre(commande)" class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-or text-noir align-middle">VIP</span>
                 </div>
                 <div>
-                  <span class="text-[11px] text-gris font-bold uppercase block">Prix payé</span>
+                  <span class="text-[11px] text-gris font-bold uppercase block">Total</span>
                   <span class="font-bold text-noir">{{ commande.total }}</span>
+                  <span v-if="nombreAChiffrer(commande.demandesLibres)" class="block text-[11px] text-gris">+ demandes libres (prix à confirmer)</span>
                 </div>
               </div>
+
+              <!-- Achat libre VIP : produits et demandes libres -->
+              <details v-if="estAchatLibre(commande)" class="rounded-xl bg-white border border-creme2 px-3">
+                <summary class="cursor-pointer min-h-11 flex items-center text-sm font-semibold text-foret">Voir le détail</summary>
+                <div class="pb-2">
+                  <LignesAchatLibre :lignes="commande.lignes" :demandes="commande.demandesLibres" />
+                </div>
+              </details>
 
               <div class="flex items-center justify-between text-xs pt-1">
                 <span class="text-gris font-medium">{{ commande.date }}</span>

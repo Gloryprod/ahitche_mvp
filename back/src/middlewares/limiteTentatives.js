@@ -52,10 +52,15 @@ function limiteTentatives({ nom, minutes, maxParCompte, maxParIp, echecsSeulemen
       for (const [cle] of cles) enregistrer(cle, fenetreMs);
       return next();
     }
-    // Connexion : un échec compte, un succès efface le compteur du compte
+    // Connexion, code VIP : un échec compte, un succès efface le compteur du compte. L'essai est compté dès son
+    // arrivée (des requêtes envoyées en même temps ne passent pas toutes avant la fin de la première), puis
+    // décompté si la réponse est un succès.
+    for (const [cle] of cles) enregistrer(cle, fenetreMs);
     res.on('finish', () => {
-      if (res.statusCode >= 400 && res.statusCode !== 429) for (const [cle] of cles) enregistrer(cle, fenetreMs);
-      else if (res.statusCode < 400 && email) compteurs.delete(`${nom}:compte:${email}`);
+      if (res.statusCode >= 400) return;
+      const ip = compteurs.get(`${nom}:ip:${req.ip}`);
+      if (ip && ip.nombre > 0) ip.nombre--;
+      if (email) compteurs.delete(`${nom}:compte:${email}`);
     });
     next();
   };

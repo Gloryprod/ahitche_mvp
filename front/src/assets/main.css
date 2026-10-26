@@ -1,4 +1,10 @@
 @import "tailwindcss";
+/* Kit d'interface (shadcn-vue, Inspira UI) : animations d'entrée/sortie et variantes data-* de leurs composants */
+@import "tw-animate-css";
+@import "shadcn-vue/tailwind.css";
+
+/* Pas de thème sombre : les classes dark: des composants ne s'activent qu'avec une classe .dark, jamais posée */
+@custom-variant dark (&:is(.dark *));
 
 @theme {
   --color-foret: #1A5C38;
@@ -52,7 +58,6 @@ section[id] {
   scroll-margin-top: 5rem;
 }
 
-
 /* Apparition au défilement (directive v-apparition) : la classe n'est posée que si les animations sont autorisées */
 .apparition {
   opacity: 0;
@@ -85,3 +90,84 @@ section[id] {
 
 /* Zone qui défile horizontalement, atteinte au clavier : contour visible */
 [data-defilable]:focus-visible, ul[tabindex="0"]:focus-visible { outline: 2px solid var(--color-foret); outline-offset: 2px; border-radius: 0.75rem; }
+
+/* Kit d'interface (shadcn-vue, Inspira UI) : leurs noms de couleurs pointent vers la charte Ahitché.
+   Composants copiés dans src/components/kit/ ; on les utilise avec les classes de la charte (bg-foret, text-or…). */
+@theme inline {
+  /* Ni --font-sans ni --radius-* ici : ils changeraient tout le site (rounded-lg…). Les composants du kit gardent les rayons Tailwind. */
+  --font-heading: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+}
+
+:root {
+  --background: var(--color-creme);
+  --foreground: var(--color-noir);
+  --card: #ffffff;
+  --card-foreground: var(--color-noir);
+  --popover: #ffffff;
+  --popover-foreground: var(--color-noir);
+  --primary: var(--color-foret);
+  --primary-foreground: var(--color-creme);
+  --secondary: var(--color-creme2);
+  --secondary-foreground: var(--color-foret);
+  --muted: var(--color-creme2);
+  --muted-foreground: var(--color-gris);
+  --accent: var(--color-or);
+  --accent-foreground: var(--color-noir);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: color-mix(in srgb, var(--color-foret) 14%, var(--color-creme));
+  --input: color-mix(in srgb, var(--color-foret) 18%, var(--color-creme));
+  --ring: var(--color-savane);
+  --chart-1: var(--color-foret);
+  --chart-2: var(--color-or);
+  --chart-3: var(--color-savane);
+  --chart-4: var(--color-marine);
+  --chart-5: var(--color-gris-lt);
+  --radius: 0.75rem;
+  --sidebar: var(--color-creme);
+  --sidebar-foreground: var(--color-noir);
+  --sidebar-primary: var(--color-foret);
+  --sidebar-primary-foreground: var(--color-creme);
+  --sidebar-accent: var(--color-creme2);
+  --sidebar-accent-foreground: var(--color-foret);
+  --sidebar-border: color-mix(in srgb, var(--color-foret) 14%, var(--color-creme));
+  --sidebar-ring: var(--color-savane);
+}
+
+/* Bordures et contours par défaut des seuls composants du kit (attribut data-slot) : le reste du site ne change pas */
+@layer base {
+  [data-slot],
+  [data-slot] * {
+    @apply border-border outline-ring/50;
+  }
+}

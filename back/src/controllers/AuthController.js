@@ -126,7 +126,8 @@ async function session(req, res) {
     }
 
     try {
-        const user = await User.findById(decoded.id).select('-password -resetPasswordToken -resetPasswordExpires');
+        // Statut VIP : actif, depuis, retireLe seulement (le code et l'auteur du retrait restent internes)
+        const user = await User.findById(decoded.id).select('-password -resetPasswordToken -resetPasswordExpires -vip.codeId -vip.retirePar');
         if (!user) {
             res.clearCookie('token', OPTIONS_COOKIE);
             return sansSession();
@@ -143,7 +144,7 @@ async function session(req, res) {
 async function getUser(req, res) {
     try {
         // req.user.id vient du middleware verifyToken juste au-dessus
-        const user = await User.findById(req.user.id).select('-password'); // Exclut le mot de passe de la réponse
+        const user = await User.findById(req.user.id).select('-password -vip.codeId -vip.retirePar'); // Ni mot de passe ni détail interne du statut VIP
         if (!user) return res.status(404).json({ message: "Utilisateur non trouvé." });
         
         res.json({ user });

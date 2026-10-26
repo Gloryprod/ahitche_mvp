@@ -72,7 +72,7 @@ app.use((err, req, res, next) => {
   if (/CORS/.test(err.message || '')) return res.status(403).json({ message: 'Origine non autorisée.' });
   console.error('Erreur non gérée :', err.message || err.error?.message || JSON.stringify(err));
   // Échec du stockage des fichiers (Cloudinary) : le fichier n'a pas été enregistré
-  if (err.http_code || err.error?.http_code || /\/justificatifs|\/upload$/.test(req.path)) return res.status(502).json({ message: "Le fichier n'a pas pu être enregistré. Réessayez dans un instant." });
+  if (err.http_code || err.error?.http_code || /\/justificatifs|\/upload$|\/photo$/.test(req.path)) return res.status(502).json({ message: "Le fichier n'a pas pu être enregistré. Réessayez dans un instant." });
   return res.status(500).json({ message: 'Erreur serveur.' });
 });
 

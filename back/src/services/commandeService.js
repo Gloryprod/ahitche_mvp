@@ -28,8 +28,11 @@ function dateDuCreneau(jour) {
 /**
  * Commande passée par le client (sans détail des produits) : à la confirmation, on lui attribue
  * la composition actuelle de son pack pour la préparation et la sortie de stock.
+ * Un achat libre VIP n'est jamais un pack : ses lignes sont enregistrées dès la commande (ou il n'a que des
+ * demandes libres, qui ne sortent pas du stock).
  */
 async function genererCompositionSiAbsente(commande, session) {
+  if (commande.typeCommande === 'achat-libre') return false;
   if (commande.productsSnapshot?.length) return false;
 
   const composition = await calculerCompositionPack(typeDepuisSlug(commande.formuleSlug));

@@ -59,10 +59,11 @@ const uploadJustificatif = multer({
 
 // Photos des compléments (vitrine publique) : image seulement, 5 Mo maximum, ramenée à 1000 px au plus.
 // Le navigateur réduit déjà la photo avant l'envoi (connexions lentes) ; l'affichage passe par f_auto,q_auto.
+// Même réglage pour les photos des fiches produits (bandeau de l'espace client), dans le dossier « fiches ».
 const FORMATS_PHOTO = ['image/jpeg', 'image/png', 'image/webp'];
-const uploadPhotoProduit = multer({
+const uploadPhotoDans = (dossier) => multer({
   storage: stockageCloudinary(async () => ({
-    folder: 'complements',
+    folder: dossier,
     resource_type: 'image',
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
     transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
@@ -70,8 +71,11 @@ const uploadPhotoProduit = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, FORMATS_PHOTO.includes(file.mimetype))
 });
+const uploadPhotoProduit = uploadPhotoDans('complements');
+const uploadPhotoFiche = uploadPhotoDans('fiches');
 
 module.exports = upload;
 module.exports.uploadJustificatif = uploadJustificatif;
 module.exports.uploadPhotoProduit = uploadPhotoProduit;
+module.exports.uploadPhotoFiche = uploadPhotoFiche;
 module.exports.cloudinary = cloudinary;

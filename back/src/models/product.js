@@ -32,6 +32,9 @@ const ProductSchema = new mongoose.Schema({
   baseQuantity: { type: Number, default: null }, // Ancien champ (quantité Essentiel) : remplacé par quantites.essentiel
   unit: { type: String, required: true, trim: true }, // ex: "kg", "boîte", "unités"
   priceUnit: { type: Number, min: 0, default: null }, // P.U. FCFA du référentiel ; vide = à renseigner
+  // Prix des achats libres VIP (FCFA), fixé par l'admin ; vide = produit non proposé aux comptes VIP.
+  // Lu seulement par les rôles de la section « vip » (admin, coordinateur) et par les comptes VIP.
+  prixVip: { type: Number, min: 0, default: null },
   seuilAlerte: { type: Number, min: 0, default: null }, // Dans l'unité du produit ; vide = pas d'alerte (à renseigner)
   commentaire: { type: String, trim: true, default: '' },
   // Vitrine des compléments (extras) : section « Disponible cette semaine » de l'accueil

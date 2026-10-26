@@ -1,12 +1,15 @@
 // Décisions du porteur pour la mise en service (07/10/2026), à lancer APRÈS migrerDonnees, createFormules et l'import.
-// Usage : node src/scripts/decisionsMiseEnService.js <dossier des CSV> [--appliquer]
+// Usage : node src/scripts/decisionsMiseEnService.js <dossier des CSV> [--appliquer] [--garder-compte-generique]
 //   Sans --appliquer : simulation (transaction annulée) et rapport.
+//   --garder-compte-generique : admin@ahitche.bj n'est pas supprimé (choix du porteur du 25/10/2026) ; il reste admin,
+//   sans être admin principal.
 // 1. Prix fixés par l'admin remis à vide : le référentiel v4 s'applique (D-01).
 // 2. Lots absents de l'état de stock du 25/09 (fichier 09) archivés ; règles de composition hors référentiel
 //    (fichier 02) et inutilisées archivées. Suppression logique : tout reste en base pour l'historique.
 // 3. Commandes « En attente » créées avant l'ouverture : annulées (commandes d'essai) ; références manquantes ou en
 //    double remplacées par une référence unique, puis index unique sur la référence.
-// 4. Compte générique admin@ahitche.bj supprimé ; seul le porteur (admin principal du fichier 11) reste admin principal.
+// 4. Compte générique admin@ahitche.bj supprimé (sauf --garder-compte-generique) ; seul le porteur (admin principal du
+//    fichier 11) reste admin principal.
 // Chaque action est journalisée.
 const fs = require('fs');
 const path = require('path');
@@ -99,14 +102,16 @@ async function commandesEssai(req, admin, s) {
   }
 }
 
-async function compteGenerique(dossier, s) {
+async function compteGenerique(dossier, s, { garder = false } = {}) {
   const porteur = lire(dossier, '11_equipe.csv').find(l => normaliser(l.admin_principal) === 'oui');
   const compte = porteur && await User.findOne({ email: porteur.email.toLowerCase(), role: 'admin' }).session(s);
   if (!compte) throw new Error("Compte du porteur introuvable : lancer l'import (11_equipe.csv) avant ces décisions.");
   await User.updateMany({ _id: { $ne: compte._id }, adminPrincipal: true }, { $set: { adminPrincipal: false } }, { session: s });
   await User.updateOne({ _id: compte._id }, { $set: { adminPrincipal: true } }, { session: s });
   const generique = await User.findOne({ email: COMPTE_GENERIQUE }).session(s);
-  if (generique) {
+  if (generique && garder) {
+    rapport.push(`Compte générique ${COMPTE_GENERIQUE} : gardé (rôle ${generique.role}, pas admin principal)`);
+  } else if (generique) {
     await User.deleteOne({ _id: generique._id }, { session: s });
     await journaliser({ user: { id: compte._id, role: 'admin' } }, { action: 'Suppression', entite: 'Compte', entiteId: generique._id, resume: `Compte générique ${COMPTE_GENERIQUE} supprimé ; admin principal : le porteur` }, s);
     rapport.push(`Compte supprimé : ${COMPTE_GENERIQUE}`);
@@ -118,13 +123,14 @@ async function compteGenerique(dossier, s) {
 async function executer() {
   const dossier = process.argv.slice(2).find(a => !a.startsWith('--'));
   const appliquer = process.argv.includes('--appliquer');
-  if (!dossier) { console.error('Usage : node src/scripts/decisionsMiseEnService.js <dossier des CSV> [--appliquer]'); process.exit(1); }
+  const garderGenerique = process.argv.includes('--garder-compte-generique');
+  if (!dossier) { console.error('Usage : node src/scripts/decisionsMiseEnService.js <dossier des CSV> [--appliquer] [--garder-compte-generique]'); process.exit(1); }
   await mongoose.connect(process.env.MONGO_URI, { autoIndex: false });
   const session = await mongoose.startSession();
   let reussi = false;
   try {
     session.startTransaction();
-    const porteur = await compteGenerique(dossier, session);
+    const porteur = await compteGenerique(dossier, session, { garder: garderGenerique });
     const req = { user: { id: porteur._id, role: 'admin' } };
     await prixAdmin(req, session);
     await archiverLots(dossier, req, session);

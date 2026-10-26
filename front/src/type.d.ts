@@ -13,7 +13,11 @@ interface Commande {
   userId: string | null
   clientName: string
   whatsapp: string
-  formule: 'AHI ESSENTIEL' | 'AHI EQUILIBRE' | 'AHI CONFORT' | 'AHI RESERVE' | 'AHI FRAÎCHEUR'
+  formule: 'AHI ESSENTIEL' | 'AHI EQUILIBRE' | 'AHI CONFORT' | 'AHI RESERVE' | 'AHI FRAÎCHEUR' | 'Achat libre VIP'
+  // Achat libre VIP : lignes au prix VIP dans productsSnapshot, demandes libres chiffrées ensuite par l'admin
+  typeCommande?: 'pack' | 'achat-libre'
+  demandesLibres?: import('@/config/vip').DemandeLibre[]
+  demandesAChiffrer?: number
   total: number
   prixFormule: number | null
   montantExtras: number
@@ -66,6 +70,9 @@ export interface Product {
   quantites: Record<PackType, number | null> // Vide = absent du pack
   unit: string
   priceUnit: number | null // Vide = à renseigner
+  // Prix des achats libres VIP : envoyé seulement aux rôles de la section « vip » (admin, coordinateur) ;
+  // vide = produit non proposé aux comptes VIP
+  prixVip?: number | null
   seuilAlerte: number | null
   commentaire: string
 }
@@ -191,6 +198,7 @@ export interface CommandeTerrain {
   reference: string
   statut: import('@/config/commandes').StatutCommande
   formule: string
+  typeCommande?: 'pack' | 'achat-libre'
   total: number
   modePaiement: 'Mobile Money' | 'Espèces' | 'Acompte'
   client: { nom: string; telephone: string; quartier: string; adresse: string; lienLocalisation: string }
@@ -198,6 +206,8 @@ export interface CommandeTerrain {
   creneau: { date: string | null; periode: 'Matin' | 'Après-midi' | null }
   livreur: { _id: string; nom: string; telephone: string } | null
   produits: { nom: string; quantite: number; unite: string }[]
+  // Achat libre VIP : produits hors catalogue à acheter et livrer avec la commande (hors stock), sans prix
+  demandesLibres?: { designation: string; quantite: string }[]
 }
 
 export interface ZoneLivraison {

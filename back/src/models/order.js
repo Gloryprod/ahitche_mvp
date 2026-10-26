@@ -6,6 +6,9 @@ const STATUTS = ['En attente', 'Confirmée', 'En préparation', 'En livraison', 
 const PERIODES = ['Matin', 'Après-midi'];
 // D-06 : Mobile Money ou espèces à la livraison ; « Acompte » ne reste que pour l'historique
 const MODES_PAIEMENT = ['Mobile Money', 'Espèces', 'Acompte'];
+// Pack (par défaut, toutes les commandes existantes) ou achat libre VIP (services/achatLibreService.js) :
+// lignes au prix VIP dans productsSnapshot dès la commande, demandes libres chiffrées ensuite par l'admin
+const TYPES_COMMANDE = ['pack', 'achat-libre'];
 
 const orderSchema = new mongoose.Schema({
   userId: {
@@ -24,13 +27,24 @@ const orderSchema = new mongoose.Schema({
   },
   formuleSlug: {
     type: String,
-    required: true // Ex: "ahi-equilibre"
+    required: true // Ex: "ahi-equilibre" ; "achat-libre" pour un achat libre VIP
   },
+  typeCommande: { type: String, enum: TYPES_COMMANDE, default: 'pack' },
   total: {
     type: Number,
-    required: true // Ex: 22500 ; fixé par le serveur (prix de la formule + extras − remise validée)
+    required: true // Ex: 22500 ; fixé par le serveur (prix de la formule + extras − remise validée ;
+                   // achat libre : lignes au prix VIP + demandes chiffrées)
   },
-  prixFormule: { type: Number, default: null }, // Prix de la formule au moment de la commande
+  // Achat libre : produits hors catalogue demandés par le client, sans prix tant que l'admin ne les a pas chiffrés.
+  // Une demande retirée (motif) ne compte plus. Elles ne sortent jamais du stock.
+  demandesLibres: [{
+    designation: { type: String, required: true, trim: true, maxlength: 120 },
+    quantite: { type: String, trim: true, maxlength: 60, default: '' }, // En texte : « 2 sachets », « 1 tas »
+    prix: { type: Number, min: 0, default: null }, // FCFA ; vide = à chiffrer
+    retiree: { type: Boolean, default: false },
+    motif: { type: String, trim: true, maxlength: 300, default: '' } // Motif du retrait (interne)
+  }],
+  prixFormule: { type: Number, default: null }, // Prix de la formule au moment de la commande (vide pour un achat libre)
   montantExtras: { type: Number, default: 0 }, // Extras au prix du catalogue
   // Remise (décision D-10) : motif obligatoire ; appliquée au total seulement une fois validée par l'admin
   remise: {
@@ -112,3 +126,4 @@ module.exports = mongoose.model('Order', orderSchema);
 module.exports.STATUTS = STATUTS;
 module.exports.PERIODES = PERIODES;
 module.exports.MODES_PAIEMENT = MODES_PAIEMENT;
+module.exports.TYPES_COMMANDE = TYPES_COMMANDE;

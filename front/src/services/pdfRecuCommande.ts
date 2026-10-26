@@ -2,9 +2,11 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { finDernierTableau } from './pdfTableau'
 import { WHATSAPP_AFFICHAGE } from '@/config/contact';
+import { quantiteEtUnite, type DemandeLibre, type LigneAchatLibre } from '@/config/vip';
 
 export interface RecuData {
   commandeId: string;
+  reference?: string; // Référence CMD-xxx fixée par le serveur (ancienne forme tirée de l'identifiant si elle manque)
   formule: string;
   date: string;
   total: string;
@@ -13,9 +15,29 @@ export interface RecuData {
   clientPhone?: string;
   clientQuartier?: string;
   clientAdresse?: string;
+  // Achat libre VIP : une ligne par produit (prix VIP), puis les demandes libres (chiffrées ou retirées)
+  lignes?: LigneAchatLibre[];
+  demandesLibres?: DemandeLibre[];
+}
+
+// Les espaces insécables (séparateur de milliers à la française) ne passent pas dans la police du PDF
+const sansInsecable = (texte: string) => texte.replace(/[  ]/g, ' ');
+const fcfaPDF = (montant: number) => sansInsecable(`${montant.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} FCFA`);
+
+// Lignes du tableau d'un achat libre : produits au prix VIP, demandes libres chiffrées, demandes retirées sans montant
+function lignesAchatLibre(data: RecuData): string[][] {
+  const produits = (data.lignes ?? []).map(l => [l.nom, fcfaPDF(l.prixUnitaire), sansInsecable(quantiteEtUnite(l.quantite, l.unite)), fcfaPDF(l.total)]);
+  const demandes = (data.demandesLibres ?? []).map(d => {
+    const libelle = `Demande libre : ${d.designation}${d.quantite ? ` (${d.quantite})` : ''}`;
+    if (d.retiree) return [`${libelle} - retirée`, '-', '-', '-'];
+    return d.prix === null ? [libelle, 'à confirmer', '1', '-'] : [libelle, fcfaPDF(d.prix), '1', fcfaPDF(d.prix)];
+  });
+  return [...produits, ...demandes];
 }
 
 export const genererRecuPDF = (data: RecuData) => {
+  // Référence réelle de la commande ; les anciennes commandes sans référence gardent la forme tirée de l'identifiant
+  const reference = data.reference || `#CMD-${data.commandeId.substring(data.commandeId.length - 4).toUpperCase()}`;
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -38,7 +60,7 @@ export const genererRecuPDF = (data: RecuData) => {
   doc.setTextColor(...grisTexte);
   doc.text('Le marché suivi et organisé pour vous.', 14, 25);
   doc.text("Parce que votre santé n'a pas de prix.", 14, 30);
-  doc.text(`Cotonou, Bénin | WhatsApp: ${WHATSAPP_AFFICHAGE}`, 14, 35);
+  doc.text(`Cotonou, Bénin | WhatsApp : ${WHATSAPP_AFFICHAGE}`, 14, 35);
 
   // --- BADGE REÇU / STATUT ---
   doc.setFontSize(16);
@@ -49,7 +71,7 @@ export const genererRecuPDF = (data: RecuData) => {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(21, 128, 61); // Vert succès
-  doc.text('STATUS: LIVRÉ & PAYÉ', 196, 26, { align: 'right' });
+  doc.text('STATUT : LIVRÉE ET PAYÉE', 196, 26, { align: 'right' });
 
   // Ligne de séparation
   doc.setDrawColor(226, 232, 240);
@@ -70,10 +92,10 @@ export const genererRecuPDF = (data: RecuData) => {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...grisTexte);
   doc.setFontSize(9);
-  doc.text(`Email: ${data.clientEmail}`, 14, 55);
-  if (data.clientPhone) doc.text(`Tél: ${data.clientPhone}`, 14, 60);
-  if (data.clientQuartier) doc.text(`Quartier: ${data.clientQuartier}`, 14, 65);
-  if (data.clientAdresse) doc.text(`Adresse: ${data.clientAdresse}`, 14, 70);
+  doc.text(`E-mail : ${data.clientEmail}`, 14, 55);
+  if (data.clientPhone) doc.text(`Tél. : ${data.clientPhone}`, 14, 60);
+  if (data.clientQuartier) doc.text(`Quartier : ${data.clientQuartier}`, 14, 65);
+  if (data.clientAdresse) doc.text(`Adresse : ${data.clientAdresse}`, 14, 70);
 
   // Colonne Droite : Commande
   doc.setFontSize(10);
@@ -88,7 +110,7 @@ export const genererRecuPDF = (data: RecuData) => {
   doc.text('Réf. Commande :', 120, 50);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...noirTexte);
-  doc.text(`#CMD-${data.commandeId.substring(data.commandeId.length - 4).toUpperCase()}`, 160, 50);
+  doc.text(reference, 160, 50);
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...grisTexte);
@@ -106,15 +128,17 @@ export const genererRecuPDF = (data: RecuData) => {
   // --- TABLEAU DES ARTICLES ---
   autoTable(doc, {
     startY: 80,
-    head: [['Description', 'Prix Unitaire', 'Qté', 'Total']],
-    body: [
-      [
-        `Formule : ${data.formule}`,
-        totalPropre,
-        '1',
-        totalPropre
-      ]
-    ],
+    head: [['Désignation', 'Prix unitaire', 'Qté', 'Total']],
+    body: data.lignes || data.demandesLibres
+      ? lignesAchatLibre(data)
+      : [
+          [
+            `Formule : ${data.formule}`,
+            totalPropre,
+            '1',
+            totalPropre
+          ]
+        ],
     headStyles: {
       fillColor: vertForet,
       textColor: [255, 255, 255],
@@ -153,5 +177,5 @@ export const genererRecuPDF = (data: RecuData) => {
   doc.text('Merci pour votre confiance ! Pour toute question, contactez le service client Ahitché.', 105, 282, { align: 'center' });
 
   // Téléchargement direct du fichier
-  doc.save(`Recu_Ahitche_CMD-${data.commandeId.substring(data.commandeId.length - 4).toUpperCase()}.pdf`);
+  doc.save(`Recu_Ahitche_${reference.replace(/[^\w-]+/g, '')}.pdf`);
 };

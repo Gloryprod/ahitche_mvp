@@ -7,6 +7,8 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
 import type { Product, CompositionRule, Category, PackType, TypeProduit } from '@/type'
 import { FAMILLES_PRODUIT, estVendu, familleDe } from '@/config/produits'
+import { useAuthStore } from '@/stores/auth'
+import { peutLire, peutEcrire } from '@/config/roles'
 
 // Catalogue du référentiel packs v4, quatre familles : produits fixes (P, base des packs), produits variables
 // (V, extras), matières premières (MP) et fournitures (EMB). MP et EMB ne se vendent pas : ni quantités par pack,
@@ -39,9 +41,17 @@ const quantitesVides = (): Quantites => ({ essentiel: null, equilibre: null, con
 const formVide = () => ({
   _id: '', reference: '', name: '', category: '', compositionRule: '', type: 'base fixe' as Product['type'],
   statut: 'disponible' as Product['statut'], unit: 'kg', priceUnit: null as number | null, seuilAlerte: null as number | null,
-  commentaire: '', quantites: quantitesVides(),
+  commentaire: '', quantites: quantitesVides(), prixVip: null as number | '' | null,
 })
 const form = ref(formVide())
+
+// Prix VIP (achats libres des comptes VIP) : lu par l'admin et le coordinateur (le serveur ne l'envoie pas aux autres),
+// saisi par l'admin. Il n'est envoyé que s'il a été modifié : absent, le serveur le garde tel quel.
+const authStore = useAuthStore()
+const voirPrixVip = computed(() => peutLire(authStore.role.value, 'vip'))
+const saisirPrixVip = computed(() => peutEcrire(authStore.role.value, 'vip'))
+const prixVipModifie = ref(false)
+const prixVipAffiche = (p: Product) => (!estVendu(p.type) || p.prixVip === null || p.prixVip === undefined ? '—' : prix(p.prixVip))
 
 onMounted(async () => {
   try {
@@ -92,6 +102,7 @@ function montrerPanneau() {
 function openCreateMode() {
   isEditing.value = false
   form.value = formVide()
+  prixVipModifie.value = false
   montrerPanneau()
 }
 
@@ -101,8 +112,9 @@ function openEditMode(p: Product) {
     _id: p._id, reference: p.reference || '', name: p.name, category: p.category?._id || '',
     compositionRule: p.compositionRule?._id || '', type: p.type, statut: p.statut, unit: p.unit,
     priceUnit: p.priceUnit, seuilAlerte: p.seuilAlerte, commentaire: p.commentaire || '',
-    quantites: { ...quantitesVides(), ...p.quantites },
+    quantites: { ...quantitesVides(), ...p.quantites }, prixVip: p.prixVip ?? null,
   }
+  prixVipModifie.value = false
   montrerPanneau()
 }
 
@@ -122,12 +134,15 @@ const versNombre = (v: unknown) => (v === '' || v === null || v === undefined ? 
 
 async function handleSubmit() {
   isSubmitting.value = true
+  const { prixVip, ...produit } = form.value
   const charge = {
-    ...form.value,
+    ...produit,
     priceUnit: versNombre(form.value.priceUnit),
     seuilAlerte: versNombre(form.value.seuilAlerte),
     // Matière première ou fourniture : hors packs (le serveur vide aussi ces quantités)
     quantites: Object.fromEntries(PACKS.map(p => [p.cle, formVendu.value ? versNombre(form.value.quantites[p.cle]) : null])),
+    // Prix VIP : seulement si l'admin l'a modifié ; vide = retiré des achats libres (MP et EMB : toujours vide)
+    ...(saisirPrixVip.value && prixVipModifie.value ? { prixVip: formVendu.value ? versNombre(prixVip) : null } : {}),
   }
   try {
     if (isEditing.value) {
@@ -176,7 +191,7 @@ function showNotification(text: string, type: string) {
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-creme2">
       <div>
         <h1 class="font-display font-bold text-xl text-noir">Catalogue des produits</h1>
-        <p class="text-[11px] text-gris">Référentiel packs v4 · quantités par pack, dans l'unité du produit (« — » = absent du pack) · matières premières et fournitures : jamais vendues</p>
+        <p class="text-[11px] text-gris">Référentiel packs v4 · quantités par pack, dans l'unité du produit (« — » = absent du pack) · matières premières et fournitures : jamais vendues<template v-if="voirPrixVip"> · prix VIP vide (« — ») : produit non proposé en achat libre</template></p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <div class="relative w-full sm:w-56">
@@ -211,6 +226,7 @@ function showNotification(text: string, type: string) {
                   <th class="py-2 pr-2">Famille</th>
                   <th class="py-2 pr-2">Produit</th>
                   <th class="py-2 pr-2 text-right">P.U.</th>
+                  <th v-if="voirPrixVip" class="py-2 pr-2 text-right whitespace-nowrap">Prix VIP</th>
                   <th v-for="p in PACKS" :key="p.cle" class="py-2 px-1 text-right">{{ p.libelle }}</th>
                   <th class="py-2 px-1 text-right">Seuil</th>
                   <th class="py-2 text-right">Actions</th>
@@ -229,7 +245,8 @@ function showNotification(text: string, type: string) {
                       <span v-if="prod.statut === 'indisponible'" class="ml-1 px-1.5 rounded bg-red-50 text-red-800 font-bold">indisponible</span>
                     </span>
                   </td>
-                  <td class="py-2.5 pr-2 text-right font-mono" :class="prixManquant(prod) ? 'text-amber-800' : ''">{{ prixAffiche(prod) }}</td>
+                  <td class="py-2.5 pr-2 text-right font-mono whitespace-nowrap" :class="prixManquant(prod) ? 'text-amber-800' : ''">{{ prixAffiche(prod) }}</td>
+                  <td v-if="voirPrixVip" class="py-2.5 pr-2 text-right font-mono whitespace-nowrap" :title="prixVipAffiche(prod) === '—' ? 'Non proposé en achat libre' : undefined">{{ prixVipAffiche(prod) }}</td>
                   <template v-if="estVendu(prod.type)">
                     <td v-for="p in PACKS" :key="p.cle" class="py-2.5 px-1 text-right tabular-nums">{{ quantite(prod.quantites?.[p.cle]) }}</td>
                   </template>
@@ -294,6 +311,17 @@ function showNotification(text: string, type: string) {
             <label class="block text-[10px] font-bold uppercase text-gris">Seuil d'alerte
               <input id="produit-seuil" v-model="form.seuilAlerte" type="number" min="0" step="any" placeholder="à renseigner" class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case" />
             </label>
+            <label v-if="voirPrixVip" class="block text-[10px] font-bold uppercase text-gris">Prix VIP (FCFA)
+              <input
+                id="produit-prix-vip" v-model="form.prixVip" type="number" min="0" step="1" inputmode="numeric"
+                :disabled="!saisirPrixVip || !formVendu" :placeholder="formVendu ? 'non proposé' : 'jamais'"
+                aria-describedby="produit-aide-prix-vip" @input="prixVipModifie = true"
+                class="mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal normal-case disabled:opacity-60"
+              />
+            </label>
+            <p v-if="voirPrixVip" id="produit-aide-prix-vip" class="col-span-2 text-[11px] text-gris normal-case">
+              {{ formVendu ? 'Achats libres VIP : vide = produit non proposé aux comptes VIP.' : 'Matières premières et fournitures : jamais proposées en achat libre.' }}
+            </p>
           </div>
 
           <p v-if="!formVendu" class="p-3 rounded-xl bg-creme text-[11px] text-noir">Non vendu : hors packs, jamais affiché sur le site.</p>
