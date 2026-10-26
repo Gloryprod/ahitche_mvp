@@ -8,7 +8,8 @@ const Order = require('../../models/order');
 const Partner = require('../../models/partner');
 const ClotureMois = require('../../models/clotureMois');
 const { LotStockFifo, FOURNISSEUR_INTERNE } = require('../../models/stock');
-const { journaliser, tauxCourant, TAUX_CONVENTION } = require('../../services/journalService');
+const { journaliser, masquerPrixVip, tauxCourant, TAUX_CONVENTION } = require('../../services/journalService');
+const { ACCES } = require('../../config/roles');
 const { lireCsv, lireNombre, ecrireCsv } = require('../../utils/csv');
 const { ficheJustificatif, lienSigne, supprimerFichier, DUREE_LIEN_SECONDES } = require('../../services/justificatifService');
 const { moisProjet, bornesMois, MOIS_CONVENTION, etatPieces, appliquerValiditeAudit, estMoisClos } = require('../../services/financeService');
@@ -807,6 +808,8 @@ async function obtenirSynthese(req, res) {
 }
 
 // GET /api/admin/finances/journal?page
+// Prix VIP masqués pour les rôles hors de la section « vip » (comptable, auditeur) ; journal complet pour l'admin
+// et le coordinateur
 async function obtenirJournal(req, res) {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -815,7 +818,8 @@ async function obtenirJournal(req, res) {
       AuditLog.find().populate('utilisateur', 'username').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       AuditLog.countDocuments()
     ]);
-    return res.status(200).json({ entrees, total, hasMore: page * limit < total });
+    const voitPrixVip = ACCES.vip.lecture.includes(req.user.role);
+    return res.status(200).json({ entrees: voitPrixVip ? entrees : entrees.map(masquerPrixVip), total, hasMore: page * limit < total });
   } catch (error) {
     console.error("Erreur obtenirJournal:", error);
     return res.status(500).json({ message: "Erreur lors du chargement du journal." });

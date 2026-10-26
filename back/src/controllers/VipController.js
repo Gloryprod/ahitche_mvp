@@ -17,8 +17,9 @@ const CODE_REFUSE = "Ce code n'est pas valable ou a déjà servi. Vérifiez-le, 
 
 // Code saisi : sans espaces autour, en majuscules
 const normaliserCode = (v) => (typeof v === 'string' ? v.trim().toUpperCase() : '');
-// Dans le journal (lu aussi par la comptabilité et l'audit), un code n'apparaît jamais en entier
-const codeMasque = (code) => `…${String(code).slice(-2)}`;
+// Dans le journal (lu aussi par la comptabilité et l'audit), un code n'apparaît jamais en entier : les 2 derniers
+// caractères seulement, et aucun pour un code de moins de 10 caractères (trop facile à deviner)
+const codeMasque = (code) => (String(code).length < 10 ? '…' : `…${String(code).slice(-2)}`);
 const nomCode = (c) => `${codeMasque(c.code)}${c.libelle ? ` « ${c.libelle} »` : ''}`;
 
 function genererCode() {
