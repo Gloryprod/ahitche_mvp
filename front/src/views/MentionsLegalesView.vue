@@ -35,8 +35,11 @@ import { lienWhatsApp, WHATSAPP_AFFICHAGE, RESEAUX_SOCIAUX } from '@/config/cont
         <h2 class="text-lg font-bold text-noir mb-2">Données personnelles</h2>
         <p>
           Ahitché collecte les seules données nécessaires à votre service : nom, adresse e-mail, téléphone, quartier et
-          adresse de livraison, ainsi que l'historique de vos commandes. Elles servent à préparer et livrer vos commandes,
-          à vous recontacter pour leur renouvellement et à assurer votre suivi alimentaire. Elles ne sont ni vendues ni cédées.
+          adresse de livraison, historique de vos commandes (avec les notes et demandes que vous y ajoutez) et, si vous
+          saisissez un code VIP, votre statut VIP, le code utilisé et sa date. Elles servent à préparer et livrer vos
+          commandes, à vous donner accès aux achats au détail si vous êtes VIP, à vous recontacter pour leur renouvellement
+          et à assurer votre suivi alimentaire. Elles ne sont ni vendues ni cédées. N'indiquez dans vos notes et demandes
+          aucune information de santé ni de religion.
           Si vous donnez votre avis depuis votre espace client, le prénom et le quartier que vous indiquez, votre note et votre
           texte sont publiés sur le site avec votre accord, après validation par notre équipe.
         </p>

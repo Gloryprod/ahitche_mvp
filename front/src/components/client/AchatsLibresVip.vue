@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import axios from 'axios'
-import { Crown, KeyRound, ArrowRight } from 'lucide-vue-next'
+import { Crown, KeyRound, ArrowRight, ChevronDown } from 'lucide-vue-next'
 import { useToast } from 'vue-toastification'
 import api from '@/stores/api'
 import { useAuthStore } from '@/stores/auth'
 import { messageErreur } from '@/services/erreurs'
-import { lienWhatsApp, LIVRAISON_ANNONCE, PAIEMENT_ANNONCE } from '@/config/contact'
+import { lienWhatsApp, PAIEMENT_ANNONCE } from '@/config/contact'
 import { messageAchatLibre, messageAchatLibreSecours, type InfosLivraison } from '@/services/messagesCommande'
-import { MAX_LIGNES, MAX_DEMANDES, NOTE_MAX, formaterFrancs } from '@/config/vip'
+import { MAX_LIGNES, MAX_DEMANDES, NOTE_MAX, formaterFcfa } from '@/config/vip'
 import { usePanierAchatLibre } from '@/composables/usePanierAchatLibre'
 import ListeProduitsVip from '@/components/vip/ListeProduitsVip.vue'
 import SaisieDemandesLibres from '@/components/vip/SaisieDemandesLibres.vue'
@@ -36,7 +36,15 @@ onMounted(async () => {
   sessionRelue.value = true
 })
 
-// --- Code VIP ---
+// --- Code VIP : une ligne discrète, « Vous avez un code VIP ? », qui déplie le champ (focus placé dans le champ) ---
+const codeOuvert = ref(false)
+const champCode = ref<HTMLInputElement | null>(null)
+async function basculerCode() {
+  codeOuvert.value = !codeOuvert.value
+  if (!codeOuvert.value) return
+  await nextTick()
+  champCode.value?.focus()
+}
 const code = ref('')
 const verification = ref(false)
 const erreurCode = ref('')
@@ -78,15 +86,23 @@ const { produits, produitsBase, produitsVariables, quantites, demandes, lignes, 
 const totalIndicatif = panier.totalProduits // Demandes libres sans prix : chiffrées ensuite par Ahitché
 const chargement = ref(false)
 const erreurCatalogue = ref('')
+// Produits du panier qui ne sont plus proposés (catalogue relu après un refus du serveur) : signalés au client
+const produitsRetires = ref<string[]>([])
+// Statut VIP retiré pendant la visite (réponse 403) : expliqué quand le bloc repasse au formulaire de code
+const statutRetire = ref(false)
+function signalerStatutRetire() {
+  statutRetire.value = true
+  void authStore.checkSession()
+}
 
 async function chargerCatalogue() {
   chargement.value = true
   erreurCatalogue.value = ''
   try {
-    panier.definirProduits((await api.get('/api/auth/vip/catalogue')).data.produits ?? [])
+    produitsRetires.value = panier.definirProduits((await api.get('/api/auth/vip/catalogue')).data.produits ?? [])
   } catch (err) {
     erreurCatalogue.value = messageErreur(err, "Les produits n'ont pas pu être chargés.")
-    if (axios.isAxiosError(err) && err.response?.status === 403) void authStore.checkSession() // Statut retiré
+    if (axios.isAxiosError(err) && err.response?.status === 403) signalerStatutRetire()
   } finally {
     chargement.value = false
   }
@@ -106,6 +122,7 @@ function viderPanier() {
 async function commander() {
   if (envoi.value) return // Double clic : une seule commande
   erreurCommande.value = ''
+  produitsRetires.value = []
   if (panierVide.value) {
     erreurCommande.value = 'Choisissez au moins un produit ou ajoutez une demande.'
     return
@@ -133,7 +150,7 @@ async function commander() {
     const { data } = await api.post('/api/auth/vip/commande', corps)
     const { reference, total: totalServeur } = data.commande
     const aChiffrer = corps.demandesLibres.length
-    toast.success(`Commande ${reference} enregistrée. ${aChiffrer ? 'Nous vous confirmons le prix de vos demandes libres sur WhatsApp.' : 'Finalisez-la sur WhatsApp.'}`)
+    toast.success(`Commande ${reference} enregistrée (${formaterFcfa(totalServeur)}). Envoyez le message WhatsApp pour la finaliser.${aChiffrer ? ' Nous vous y enverrons le prix de vos demandes libres.' : ''}`)
     lien = lienWhatsApp(messageAchatLibre({ reference, total: totalServeur, demandesAChiffrer: aChiffrer }, props.livraison))
     viderPanier()
   } catch (err) {
@@ -141,8 +158,8 @@ async function commander() {
     if (statut !== undefined && statut < 500) {
       // Refus du serveur (quantité, produit plus proposé, limite…) : le panier reste là pour être corrigé
       erreurCommande.value = messageErreur(err, "Votre commande n'a pas pu être enregistrée.")
-      if (statut === 403) void authStore.checkSession()
-      else if (statut === 400) void chargerCatalogue()
+      if (statut === 403) signalerStatutRetire()
+      else if (statut === 400) void chargerCatalogue() // Un produit plus proposé quitte le panier, avec une note
     } else {
       // Réseau ou serveur indisponible : la commande reste possible sur WhatsApp, panier recopié
       toast.error("Votre commande n'a pas pu être enregistrée. Vous pouvez la finaliser directement sur WhatsApp.")
@@ -173,19 +190,25 @@ const champ = 'mt-1 w-full min-h-11 px-4 py-2.5 border border-creme2 rounded-xl 
     </div>
 
     <!-- Compte sans statut VIP : saisie d'un code -->
-    <div v-else-if="!estVip" class="p-6 space-y-4">
-      <div class="flex items-center gap-3">
-        <div class="p-2 bg-creme rounded-xl border border-creme2"><KeyRound class="w-5 h-5 text-foret" aria-hidden="true" /></div>
-        <div>
-          <h2 id="titre-vip" class="font-display font-bold text-xl">Code VIP</h2>
-          <p class="text-xs text-gris">Vous avez reçu un code ? Commandez au détail, au prix VIP.</p>
-        </div>
-      </div>
+    <div v-else-if="!estVip" class="px-5 py-2 space-y-3">
+      <p v-if="statutRetire" role="status" class="mt-2 text-xs p-3 rounded-xl bg-creme text-noir">Votre compte n'a plus le statut VIP. Pour toute question, écrivez-nous sur WhatsApp.</p>
+      <h2 id="titre-vip" class="text-sm font-semibold">
+        <button
+          type="button" :aria-expanded="codeOuvert" aria-controls="zone-code-vip" @click="basculerCode"
+          class="cursor-pointer w-full min-h-11 flex items-center gap-2 text-left text-foret"
+        >
+          <KeyRound class="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span class="flex-1">Vous avez un code VIP ?</span>
+          <ChevronDown :class="['w-4 h-4 shrink-0 transition-transform', codeOuvert ? 'rotate-180' : '']" aria-hidden="true" />
+        </button>
+      </h2>
+      <div v-if="codeOuvert" id="zone-code-vip" class="pb-3 space-y-3">
+      <p class="text-xs text-gris">Avec un code VIP, vous commandez au détail, au prix VIP.</p>
       <form class="flex flex-col sm:flex-row sm:items-end gap-3" novalidate @submit.prevent="validerCode">
         <div class="flex-1">
           <label for="code-vip" class="block text-xs font-bold uppercase tracking-wider text-gris mb-1.5">Code VIP</label>
           <input
-            id="code-vip" v-model="code" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false"
+            id="code-vip" ref="champCode" v-model="code" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false"
             placeholder="Ex. AHI-VIP-7K2Q4M" :aria-invalid="!!erreurCode" :aria-describedby="erreurCode ? 'message-code' : undefined"
             class="w-full min-h-11 px-4 py-2.5 border border-creme2 rounded-xl text-sm font-mono uppercase text-noir placeholder:normal-case placeholder:font-body"
           />
@@ -195,6 +218,7 @@ const champ = 'mt-1 w-full min-h-11 px-4 py-2.5 border border-creme2 rounded-xl 
         </button>
       </form>
       <p v-if="erreurCode" id="message-code" role="alert" class="text-xs font-semibold text-red-700">{{ erreurCode }}</p>
+      </div>
     </div>
 
     <!-- Compte VIP : achats libres -->
@@ -236,16 +260,18 @@ const champ = 'mt-1 w-full min-h-11 px-4 py-2.5 border border-creme2 rounded-xl 
           <div class="pt-3 space-y-3">
             <div>
               <p class="text-sm font-semibold text-noir">Un produit qui n'est pas dans la liste ?</p>
-              <p class="text-xs text-gris">Décrivez-le : nous vous confirmons son prix sur WhatsApp ({{ MAX_DEMANDES }} demandes au plus).</p>
+              <p class="text-xs text-gris">Décrivez-le : nous vous envoyons son prix sur WhatsApp. Il n'est ajouté à votre commande qu'avec votre accord ({{ MAX_DEMANDES }} demandes au plus).</p>
+              <p class="text-xs text-noir">N'indiquez ici aucune information de santé (maladie, allergie, traitement) ni de religion.</p>
             </div>
             <SaisieDemandesLibres :demandes="demandes" :ajouter="panier.ajouterDemande" :retirer="panier.retirerDemande" />
           </div>
         </fieldset>
 
         <label class="block text-xs font-bold uppercase tracking-wider text-gris">Note pour Ahitché (facultatif)
-          <textarea v-model="note" rows="2" :maxlength="NOTE_MAX" placeholder="Ex. livrer le riz en sac de 5 kg si possible" :class="[champ, 'resize-none']"></textarea>
+          <textarea v-model="note" rows="2" :maxlength="NOTE_MAX" placeholder="Ex. livrer le riz en sac de 5 kg si possible" aria-describedby="rappel-note" :class="[champ, 'resize-none']"></textarea>
         </label>
-        <p class="text-xs text-gris">{{ LIVRAISON_ANNONCE }}, sans frais ni minimum de commande. Paiement à la livraison : {{ PAIEMENT_ANNONCE }}.</p>
+        <p id="rappel-note" class="text-xs text-noir -mt-3">N'indiquez ici aucune information de santé (maladie, allergie, traitement) ni de religion.</p>
+        <p class="text-xs text-gris">Livraison à jour fixe dans nos zones de Cotonou et d'Abomey-Calavi, sans frais de livraison ni minimum de commande ; nous vous confirmons le jour sur WhatsApp. Paiement à la livraison : {{ PAIEMENT_ANNONCE }}.</p>
       </template>
 
       <!-- Total toujours visible en bas de l'écran pendant le choix -->
@@ -256,9 +282,9 @@ const champ = 'mt-1 w-full min-h-11 px-4 py-2.5 border border-creme2 rounded-xl 
               <p class="text-xs text-gris">Votre panier est vide.</p>
             </template>
             <template v-else>
-              <p class="text-xs text-gris">Total indicatif<span class="hidden sm:inline"> · {{ resume }}</span></p>
-              <p class="font-display text-xl font-bold text-foret leading-tight">{{ formaterFrancs(totalIndicatif) }}</p>
-              <p v-if="demandes.length" class="text-[11px] text-gris leading-snug">+ demandes libres : le prix final est confirmé par Ahitché.</p>
+              <p class="text-xs text-gris">Total des produits<span class="hidden sm:inline"> · {{ resume }}</span></p>
+              <p class="font-display text-xl font-bold text-foret leading-tight">{{ formaterFcfa(totalIndicatif) }}</p>
+              <p v-if="demandes.length" class="text-xs text-noir leading-snug">Demandes libres en plus : prix envoyé sur WhatsApp, à accepter avant la livraison.</p>
             </template>
           </div>
           <button
@@ -271,6 +297,7 @@ const champ = 'mt-1 w-full min-h-11 px-4 py-2.5 border border-creme2 rounded-xl 
           </button>
         </div>
         <p v-if="erreurCommande" role="alert" class="mt-2 text-xs font-semibold text-red-700">{{ erreurCommande }}</p>
+        <p v-if="produitsRetires.length" role="status" class="mt-1 text-xs text-noir">Retiré de votre panier, car plus proposé : {{ produitsRetires.join(', ') }}.</p>
       </div>
     </div>
   </section>

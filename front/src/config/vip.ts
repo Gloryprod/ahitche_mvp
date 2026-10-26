@@ -69,6 +69,9 @@ export const formaterFrancs = (montant: number) => `${montant.toLocaleString('fr
 export const formaterQuantite = (quantite: number) => quantite.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
 
 // « 1,5 kg », « 3 unités », « 2 × 500 g » : symboles invariables, mots au pluriel à partir de 2, unité chiffrée multipliée
+// Écrans des clients : l'unité monétaire s'écrit en entier (« 787,5 FCFA »)
+export const formaterFcfa = (montant: number) => `${montant.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} FCFA`
+
 const SYMBOLES = ['kg', 'g', 'l', 'cl', 'ml']
 export function quantiteEtUnite(quantite: number, unite: string): string {
   const q = formaterQuantite(quantite)

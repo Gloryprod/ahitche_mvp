@@ -13,7 +13,7 @@ const { nettoyer, nombre, catalogueVip: listerCatalogueVip } = require('../servi
 const CODE_VALIDE = /^[A-Z0-9][A-Z0-9-]{3,29}$/;
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // Sans 0/O, 1/I/L : lisible et facile à taper sur téléphone
 const PLAFOND_MAX = 10000;
-const CODE_REFUSE = 'Code invalide ou épuisé.'; // Même message dans tous les cas : on ne dit jamais si un code existe
+const CODE_REFUSE = "Ce code n'est pas valable ou a déjà servi. Vérifiez-le, ou écrivez-nous sur WhatsApp."; // Même message dans tous les cas : on ne dit jamais si un code existe
 
 // Code saisi : sans espaces autour, en majuscules
 const normaliserCode = (v) => (typeof v === 'string' ? v.trim().toUpperCase() : '');

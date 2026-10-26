@@ -34,7 +34,7 @@ const limiteAvis = limiteTentatives({
 const limiteCodeVip = limiteTentatives({
   nom: 'code-vip', minutes: 60, maxParCompte: 5, maxParIp: 30, echecsSeulement: true,
   compteDe: (req) => (req.user?.id ? String(req.user.id) : ''),
-  message: 'Trop de codes refusés.'
+  message: 'Trop de codes refusés : vérifiez votre code ou écrivez-nous sur WhatsApp.'
 });
 
 // Authentification

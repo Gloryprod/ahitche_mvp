@@ -328,6 +328,7 @@ const telechargerRecu = (commande: Commande) => {
   try {
     genererRecuPDF({
       commandeId: commande._id,
+      reference: commande.reference,
       formule: commande.formule,
       date: commande.date,
       total: commande.total,
@@ -681,7 +682,7 @@ onMounted(async () => {
                   <td class="py-4 text-gris font-normal">{{ commande.date }}</td>
                   <td class="py-4 font-bold">
                     {{ commande.total }}
-                    <span v-if="nombreAChiffrer(commande.demandesLibres)" class="block text-[11px] font-normal text-gris">+ demandes à chiffrer</span>
+                    <span v-if="nombreAChiffrer(commande.demandesLibres)" class="block text-[11px] font-normal text-gris">+ demandes libres (prix à confirmer)</span>
                   </td>
                   <td class="py-4">
                     <span :class="['px-3 py-1 rounded-full text-xs font-bold tracking-wide inline-block whitespace-nowrap', classeStatut(commande.statut)]">
@@ -742,9 +743,9 @@ onMounted(async () => {
                   <span v-if="estAchatLibre(commande)" class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-or text-noir align-middle">VIP</span>
                 </div>
                 <div>
-                  <span class="text-[11px] text-gris font-bold uppercase block">Prix payé</span>
+                  <span class="text-[11px] text-gris font-bold uppercase block">Total</span>
                   <span class="font-bold text-noir">{{ commande.total }}</span>
-                  <span v-if="nombreAChiffrer(commande.demandesLibres)" class="block text-[11px] text-gris">+ demandes à chiffrer</span>
+                  <span v-if="nombreAChiffrer(commande.demandesLibres)" class="block text-[11px] text-gris">+ demandes libres (prix à confirmer)</span>
                 </div>
               </div>
 

@@ -58,7 +58,7 @@ const nonPubliees = computed(() => (data.value ?? []).filter(f => !f.publiee))
 const produitsBase = computed(() => (produits.value ?? []).filter(p => p.famille === 'P'))
 const produitsVariables = computed(() => (produits.value ?? []).filter(p => p.famille === 'V'))
 const libelleProduit = (p: { reference: string | null; nom: string }) => [p.reference, p.nom].filter(Boolean).join(' · ')
-const fcfa = (n: number) => `${n.toLocaleString('fr-FR')} F`
+const fcfa = (n: number) => `${n.toLocaleString('fr-FR')} FCFA`
 
 // --- Formulaire (ajout et modification) ---
 const formulaireVide = () => ({
@@ -188,7 +188,7 @@ const boutonCarte = 'cursor-pointer inline-flex items-center justify-center gap-
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <h1 class="font-display font-bold text-xl text-noir">Fiches produits</h1>
-        <p class="text-xs mt-1">Le bandeau « À découvrir » de l'espace client. Le prix affiché se saisit ici : il ne change ni les commandes, ni le stock, ni les prix VIP.</p>
+        <p class="text-xs mt-1">Le bandeau « À découvrir » de l'espace client. La valeur dans le pack se saisit ici : elle ne change ni les commandes, ni le stock, ni les prix VIP.</p>
       </div>
       <button v-if="modifiable" type="button" @click="ouvrir()" class="cursor-pointer shrink-0 inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-xl bg-foret text-white font-bold text-xs hover:bg-savane">
         <Plus class="w-4 h-4" aria-hidden="true" /> Ajouter une fiche
@@ -241,7 +241,7 @@ const boutonCarte = 'cursor-pointer inline-flex items-center justify-center gap-
             <span v-else class="w-12 h-12 rounded-xl bg-foret/10 text-foret font-display font-bold flex items-center justify-center" aria-hidden="true">{{ f.produit.nom.charAt(0).toUpperCase() }}</span>
             <div class="flex-1 min-w-[8rem]">
               <p class="font-bold text-noir">{{ f.produit.nom }}</p>
-              <p class="text-xs">{{ f.format }} · {{ fcfa(f.prix) }}<template v-if="f.produit.supprime"> · produit supprimé</template></p>
+              <p class="text-xs">{{ f.format }} · valeur {{ fcfa(f.prix) }}<template v-if="f.produit.supprime"> · produit supprimé</template></p>
             </div>
             <div v-if="modifiable" class="flex flex-wrap gap-1.5">
               <button type="button" @click="basculerPublication(f)" :class="[boutonCarte, 'bg-foret/10 text-foret hover:bg-foret/20']" :aria-label="`Afficher ${nomFiche(f)} dans l'espace client`">
@@ -288,7 +288,7 @@ const boutonCarte = 'cursor-pointer inline-flex items-center justify-center gap-
             </label>
 
             <div class="grid grid-cols-2 gap-3">
-              <label class="block text-xs font-bold text-noir">Prix affiché (FCFA) *
+              <label class="block text-xs font-bold text-noir">Valeur dans le pack (FCFA) *
                 <input v-model="form.prix" required type="number" min="0" step="1" inputmode="numeric" :class="champ" placeholder="85" />
               </label>
               <label class="block text-xs font-bold text-noir">Ordre d'affichage
@@ -298,9 +298,10 @@ const boutonCarte = 'cursor-pointer inline-flex items-center justify-center gap-
             <p id="aide-ordre" class="text-xs -mt-2">Les plus petits nombres passent en premier ; sans ordre, la fiche suit les autres.</p>
 
             <label class="block text-xs font-bold text-noir">Mention
-              <input v-model="form.mention" :maxlength="MENTION_MAX" :class="champ" placeholder="Ex. Prix inclus dans tous les packs" />
+              <input v-model="form.mention" :maxlength="MENTION_MAX" :class="champ" placeholder="Ex. Inclus dans les packs Équilibré et Confort" aria-describedby="aide-mention" />
               <span class="block text-right font-normal text-gris">{{ form.mention.length }} / {{ MENTION_MAX }}</span>
             </label>
+            <p id="aide-mention" class="text-xs -mt-2">Un fait vérifiable (packs concernés, format) : pas de promesse de santé, de promotion ni de délai.</p>
 
             <!-- Photo (facultative) -->
             <div>

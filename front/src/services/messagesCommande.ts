@@ -31,11 +31,11 @@ export function messageAchatLibre(commande: { reference: string; total: number; 
   let message = `Bonjour Ahitché ! 👋\n\n`
   message += `Je viens de passer un *achat libre VIP*.\n`
   message += `Référence de commande : *${commande.reference}*\n`
-  message += `Total : *${fcfa(commande.total)}*`
-  message += commande.demandesAChiffrer
-    ? ` hors demandes libres.\nJ'ai ajouté ${commande.demandesAChiffrer} demande(s) libre(s) : merci de me confirmer leur prix.\n\n`
-    : `.\n\n`
-  return message + texteLivraison(infos)
+  // Commande faite seulement de demandes libres : pas de ligne « Total des produits » à 0
+  if (commande.total > 0) message += `Total des produits : *${fcfa(commande.total)}*\n`
+  const n = commande.demandesAChiffrer
+  if (n) message += `J'ai ajouté ${n > 1 ? `${n} demandes libres` : '1 demande libre'} : merci de m'envoyer ${n > 1 ? 'leur' : 'son'} prix avant la livraison.\n`
+  return `${message}\n${texteLivraison(infos)}`
 }
 
 // Achat libre non enregistré (réseau ou serveur indisponible) : le panier est recopié pour finir sur WhatsApp
@@ -48,9 +48,9 @@ export function messageAchatLibreSecours(
   let message = `Bonjour Ahitché ! 👋\n\nJe souhaite passer un *achat libre VIP* :\n`
   for (const p of panier) message += `- ${p.nom} : ${quantiteEtUnite(p.quantite, p.unite)}\n`
   if (demandes.length) {
-    message += `\nDemandes libres (prix à confirmer) :\n`
+    message += `\nDemandes libres (merci de m'envoyer leur prix avant la livraison) :\n`
     for (const d of demandes) message += `- ${d.designation}${d.quantite ? ` (${d.quantite})` : ''}\n`
   }
-  if (panier.length) message += `\nTotal indicatif : *${fcfa(totalIndicatif)}*${demandes.length ? ' hors demandes libres' : ''}\n`
+  if (panier.length) message += `\nTotal des produits : *${fcfa(totalIndicatif)}*\n`
   return `${message}\n${texteLivraison(infos)}`
 }

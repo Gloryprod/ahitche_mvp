@@ -24,10 +24,12 @@ export function usePanierAchatLibre() {
   const produitsBase = computed(() => produits.value.filter(p => p.famille === 'P'))
   const produitsVariables = computed(() => produits.value.filter(p => p.famille === 'V'))
 
-  // Liste reçue du serveur : un produit qui n'est plus proposé quitte le panier
-  function definirProduits(liste: ProduitVip[]) {
+  // Liste reçue du serveur : un produit qui n'est plus proposé quitte le panier ; renvoie les noms des produits retirés
+  function definirProduits(liste: ProduitVip[]): string[] {
+    const retires = produits.value.filter(p => quantites[p.productId] && !liste.some(n => n.productId === p.productId)).map(p => p.nom)
     produits.value = liste
     for (const id of Object.keys(quantites)) if (!liste.some(p => p.productId === id)) delete quantites[id]
+    return retires
   }
 
   const quantite = (p: ProduitVip) => quantites[p.productId] ?? 0

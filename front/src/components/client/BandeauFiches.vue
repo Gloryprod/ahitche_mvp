@@ -337,7 +337,7 @@ const bouton = 'cursor-pointer w-11 h-11 inline-flex items-center justify-center
     <div class="px-5 sm:px-6 flex items-center justify-between gap-3">
       <div class="min-w-0">
         <h2 id="titre-fiches" class="font-display font-bold text-xl">À découvrir</h2>
-        <p class="text-xs text-gris">Nos produits, leurs formats et leurs prix.</p>
+        <p class="text-xs text-gris">Les produits de nos packs, leur format et leur valeur.</p>
       </div>
       <div v-if="deborde" class="flex items-center gap-1.5 shrink-0">
         <button

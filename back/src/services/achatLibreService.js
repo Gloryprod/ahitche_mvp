@@ -94,7 +94,7 @@ async function preparerLignes(lignes) {
   const snapshots = [];
   for (const { productId, quantite } of lignes) {
     const produit = produits.get(productId);
-    if (!produit) return { erreur: 'Un produit n\'est plus proposé en achat libre : actualisez la liste.' };
+    if (!produit) return { erreur: "Un produit n'est plus proposé : nous l'avons retiré de la liste. Vérifiez la commande, puis envoyez-la à nouveau." };
     const pas = pasDeQuantite(produit.unit);
     if (!quantiteValide(quantite, pas)) {
       return {
