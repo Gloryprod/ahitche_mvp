@@ -670,7 +670,7 @@ onMounted(async () => {
                       <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-or text-noir align-middle">VIP</span>
                       <button
                         type="button"
-                        class="cursor-pointer block mt-1 py-1 text-xs font-semibold text-foret underline"
+                        class="cursor-pointer flex items-center min-h-11 text-xs font-semibold text-foret underline"
                         :aria-expanded="detailOuvert === commande._id"
                         :aria-controls="`detail-${commande._id}`"
                         @click="detailOuvert = detailOuvert === commande._id ? null : commande._id"

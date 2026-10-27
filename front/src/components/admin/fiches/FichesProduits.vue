@@ -179,7 +179,7 @@ async function supprimer(f: Fiche) {
 }
 
 const champ = 'mt-1 w-full min-h-11 px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal'
-const boutonCarte = 'cursor-pointer inline-flex items-center justify-center gap-1.5 min-h-10 min-w-10 px-2.5 rounded-xl text-xs font-bold transition-colors'
+const boutonCarte = 'cursor-pointer inline-flex items-center justify-center gap-1.5 min-h-11 min-w-11 px-2.5 rounded-xl text-xs font-bold transition-colors'
 </script>
 
 <template>
