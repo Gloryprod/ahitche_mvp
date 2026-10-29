@@ -97,6 +97,12 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/components/admin/vip/CodesVip.vue')
       },
       {
+        path: 'equipe',
+        name: 'equipe-page',
+        meta: { roles: ACCES.equipe.lecture },
+        component: () => import('@/components/admin/equipe/EquipeAcces.vue')
+      },
+      {
         path: 'avis',
         name: 'avis-page',
         meta: { roles: ACCES.avis.lecture },

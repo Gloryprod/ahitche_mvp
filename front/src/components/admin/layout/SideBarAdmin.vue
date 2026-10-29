@@ -18,7 +18,8 @@ import {
   Carrot,
   MessageSquareQuote,
   Megaphone,
-  Crown
+  Crown,
+  UserCog
 } from 'lucide-vue-next'
 import { computed, type Component } from 'vue';
 import { useDeconnexion } from '@/composables/useDeconnexion';
@@ -90,6 +91,7 @@ const tousLesGroupes: { title: string; items: MenuItem[] }[] = [
       { id: 'produits', name: 'Produits', icon: Settings, hasChevron: true, path: '/dashboard/admin/products', section: 'donneesBase' },
       { id: 'formules', name: 'Formules', icon: Settings, hasChevron: true, path: '/dashboard/admin/formulas', section: 'donneesBase' },
       { id: 'post', name: 'Contenus & Médias', icon: Settings, hasChevron: true, path: '/dashboard/admin/posts', section: 'contenus' },
+      { id: 'equipe', name: 'Équipe et accès', icon: UserCog, hasChevron: true, path: '/dashboard/admin/equipe', section: 'equipe' },
     ]
   }
 ]
