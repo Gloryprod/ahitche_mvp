@@ -30,6 +30,8 @@ const ACCES = {
   fiches:        { lecture: ['admin', 'gestionnaire', 'coordinateur'],              ecriture: ['admin', 'gestionnaire'] },
   // Codes VIP et comptes VIP ; les prix VIP se saisissent dans Produits (admin) et ne sont lus que par ces rôles
   vip:           { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
+  // Équipe et accès : comptes de l'équipe, mots de passe provisoires, désactivation (docs-internes/equipe/CONCEPT.md)
+  equipe:        { lecture: ['admin'],                                               ecriture: ['admin'] },
   stock:         { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur', 'auditeur'], ecriture: ['admin', 'gestionnaire'] },
   prestataires:  { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
   logistique:    { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },

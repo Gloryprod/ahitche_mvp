@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const emailService = require('../services/emailServices');
 const crypto = require('crypto');
-const { OPTIONS_COOKIE, ouvrirSession, actualiserSession } = require('../services/sessionService');
+const { OPTIONS_COOKIE, sessionValide, ouvrirSession, actualiserSession } = require('../services/sessionService');
 const { echapperRegex, normaliserEmail, EMAIL_VALIDE } = require('../utils/texte');
 
 // Longueur minimale d'un mot de passe (inscription et réinitialisation), même valeur dans le front
@@ -78,8 +78,15 @@ async function login(req, res) {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: "Identifiants incorrects." });
 
+        // Compte désactivé (écran « Équipe et accès ») : dit seulement après un mot de passe juste, pour ne rien
+        // révéler à qui essaie des adresses. Le refus compte comme un essai dans la limite de tentatives.
+        if (user.actif === false) {
+            return res.status(403).json({ message: "Ce compte est désactivé. Contactez l'administrateur." });
+        }
+
         // Jeton JWT dans un cookie HttpOnly : 1 jour, ou 1 h glissante pour l'équipe (sauf l'admin principal)
         const inactivite = ouvrirSession(res, user);
+        await User.updateOne({ _id: user._id }, { $set: { derniereConnexion: new Date() } });
 
         // On renvoie l'utilisateur au front, MAIS SANS LE TOKEN textuel.
         // Les champs profil sont nécessaires au dashboard pour pré-remplir la fiche client.
@@ -128,7 +135,8 @@ async function session(req, res) {
     try {
         // Statut VIP : actif, depuis, retireLe seulement (le code et l'auteur du retrait restent internes)
         const user = await User.findById(decoded.id).select('-password -resetPasswordToken -resetPasswordExpires -vip.codeId -vip.retirePar');
-        if (!user) {
+        // Compte supprimé ou désactivé, ou sessions coupées depuis (version de session) : plus de session
+        if (!sessionValide(decoded, user)) {
             res.clearCookie('token', OPTIONS_COOKIE);
             return sansSession();
         }
@@ -153,6 +161,18 @@ async function getUser(req, res) {
     }   
 }
 
+// Lien de réinitialisation (1 heure) envoyé par e-mail : mot de passe oublié, ou envoi par l'admin depuis l'écran
+// « Équipe et accès ». Seul le lien contient le jeton en clair ; la base n'en garde que l'empreinte.
+async function envoyerLienReinitialisation(user) {
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = hacherJeton(resetToken);
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 heure dans le futur
+    await user.save();
+
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    await emailService.sendForgotPasswordMail(user, `${baseUrl}/reset-password?token=${resetToken}`);
+}
+
 async function forgotPassword(req, res) {
     try {
     if (!sontDesChaines(req.body.email)) {
@@ -168,21 +188,9 @@ async function forgotPassword(req, res) {
       });
     }
 
-    // 2. Générer un jeton unique (hexadécimal de 32 octets)
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    
-    // 3. Sauvegarder le token et l'expiration (Valable 1 heure)
-    user.resetPasswordToken = hacherJeton(resetToken); // Seul le lien envoyé par e-mail contient le jeton en clair
-    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 heure dans le futur
-    await user.save();
+    await envoyerLienReinitialisation(user);
 
-    // 4. Créer le lien de réinitialisation qui pointe vers ton Frontend Vue
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
-
-    await emailService.sendForgotPasswordMail(user, resetUrl);
-
-    return res.status(200).json({ 
+    return res.status(200).json({
       message: "Si ce mail existe, un lien de réinitialisation vous a été envoyé. Veuillez vérifier votre boîte mail !" 
     });
 
@@ -225,6 +233,9 @@ async function resetPassword(req, res) {
         // 3. Nettoyer les jetons pour qu'ils ne soient plus réutilisables
         user.resetPasswordToken = null;
         user.resetPasswordExpires = null;
+        // Nouveau mot de passe : date consignée et sessions ouvertes coupées (version de session)
+        user.motDePasseModifieLe = new Date();
+        user.versionSession = (user.versionSession ?? 0) + 1;
 
         // 4. Sauvegarder les modifications
         await user.save();
@@ -239,4 +250,4 @@ async function resetPassword(req, res) {
     }
 }
 
-module.exports = { register, login, logout, session, getUser, forgotPassword, resetPassword };
+module.exports = { register, login, logout, session, getUser, forgotPassword, resetPassword, envoyerLienReinitialisation, MOT_DE_PASSE_MIN };
