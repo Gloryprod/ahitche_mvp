@@ -18,4 +18,15 @@ function normaliserEmail(email) {
 }
 const EMAIL_VALIDE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-module.exports = { echapperRegex, normaliser, normaliserEmail, EMAIL_VALIDE };
+// Nombre saisi par l'équipe : un nombre fini, ou un texte décimal (« 85 », « 1 500 », « 1,5 », « 0.5 », « -1 ») ;
+// NaN sinon (vide, tableau, objet, Infinity, et formes hexadécimales ou exponentielles comme « 0x10 » ou « 1e2 »,
+// que Number() accepterait sans prévenir). Les espaces des milliers sont ignorés.
+const DECIMAL = /^-?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/;
+function lireNombre(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
+  if (typeof v !== 'string') return NaN;
+  const t = v.replace(/\s/g, '');
+  return DECIMAL.test(t) ? Number(t.replace(',', '.')) : NaN;
+}
+
+module.exports = { echapperRegex, normaliser, normaliserEmail, EMAIL_VALIDE, lireNombre };

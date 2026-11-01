@@ -3,6 +3,7 @@ const FicheProduit = require('../models/ficheProduit');
 const Product = require('../models/product');
 const { TYPES_VENDUS, FAMILLES } = require('../models/product');
 const { journaliser } = require('../services/journalService');
+const { lireNombre } = require('../utils/texte');
 
 // Fiches produits (docs-internes/vip/CAHIER-DES-CHARGES.md, partie A) : publicité du bandeau de l'espace client.
 // Rattachées à un produit vendu du catalogue (base fixe ou extra), avec un format, un prix publicitaire saisi à la main,
@@ -21,12 +22,8 @@ const nettoyer = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() :
 const nomProduit = (p) => [p?.reference, p?.name].filter(Boolean).join(' · ') || 'produit supprimé';
 const fcfa = (n) => `${Math.round(n).toLocaleString('fr-FR')} FCFA`;
 
-// Nombre saisi : un nombre ou un texte numérique (« 1 500 », « 85 ») ; NaN sinon
-function nombre(v) {
-  if (typeof v !== 'number' && !(typeof v === 'string' && v.trim() !== '')) return NaN;
-  const n = Number(typeof v === 'string' ? v.replace(/\s/g, '').replace(',', '.') : v);
-  return Number.isFinite(n) ? n : NaN;
-}
+// Nombre saisi : un nombre ou un texte décimal (« 1 500 », « 85 ») ; NaN sinon (« 0x10 », « 1e2 »…)
+const nombre = lireNombre;
 
 // Photo : vide, ou l'adresse et l'identifiant renvoyés par POST /api/admin/fiches/photo (dossier « fiches »)
 function lirePhoto(v) {

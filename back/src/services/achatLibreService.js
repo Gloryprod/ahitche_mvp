@@ -4,6 +4,7 @@ const { TYPES_VENDUS, FAMILLES } = require('../models/product');
 const Order = require('../models/order');
 const OrderProductSnapshot = require('../models/orderProductSnapshot');
 const { genererReferenceCommande } = require('./orderReferenceService');
+const { lireNombre } = require('../utils/texte');
 
 // Achats libres VIP (docs-internes/vip/CAHIER-DES-CHARGES.md, parties B et C) : un compte VIP commande des produits du
 // catalogue au prix VIP, et des « demandes libres » sans prix que l'admin chiffre ensuite. Le serveur fixe le total :
@@ -27,14 +28,8 @@ const FILTRE_PROPOSES = { deletedAt: null, type: { $in: TYPES_VENDUS }, statut: 
 const UNITES_FRACTIONNABLES = ['kg', 'kgs', 'kilo', 'kilos', 'kilogramme', 'kilogrammes', 'l', 'litre', 'litres'];
 const pasDeQuantite = (unite) => (UNITES_FRACTIONNABLES.includes(String(unite || '').trim().toLowerCase()) ? 0.5 : 1);
 
-// Nombre saisi : un nombre fini, ou un texte décimal (« 2 », « 1,5 », « 0.5 », « -1 ») ; NaN sinon (absent, tableau,
-// objet, Infinity, et formes hexadécimales ou exponentielles écrites en texte comme « 0x10 » ou « 1e2 »)
-const DECIMAL = /^-?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/;
-const nombre = (v) => {
-  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
-  if (typeof v !== 'string' || !DECIMAL.test(v.trim())) return NaN;
-  return Number(v.trim().replace(',', '.'));
-};
+// Nombre saisi : un nombre fini, ou un texte décimal (« 2 », « 1,5 », « 0.5 », « -1 ») ; NaN sinon (utils/texte.js)
+const nombre = lireNombre;
 
 // Texte d'une saisie : espaces et retours à la ligne ramenés à un seul espace
 const nettoyer = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '');

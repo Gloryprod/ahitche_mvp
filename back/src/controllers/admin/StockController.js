@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { LotStockFifo, MouvementStock, FOURNISSEUR_INTERNE } = require('../../models/stock');
 const Product = require('../../models/product');
 const { trouverFournisseur } = require('../../services/fournisseurService');
-const { echapperRegex } = require('../../utils/texte');
+const { echapperRegex, lireNombre } = require('../../utils/texte');
 const { rattacherDepenseAchat, mettreAJourDepenseAchat, annulerDepenseAchat } = require('../../services/depenseStockService');
 const { consommerStockFIFO, genererNumeroLot, nomResponsable } = require('../../services/stockService');
 const { journaliser } = require('../../services/journalService');
@@ -14,7 +14,7 @@ const RAISONS_SAISIE = ['Perte', 'Péremption', 'Erreur de saisie'];
 // Nombre facultatif : vide → null ; invalide ou négatif → NaN (refusé par l'appelant)
 function nombreOuVide(v) {
   if (v === undefined || v === null || v === '') return null;
-  const n = Number(v);
+  const n = lireNombre(v);
   return Number.isFinite(n) && n >= 0 ? n : NaN;
 }
 const texte = (v, max = 300) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
