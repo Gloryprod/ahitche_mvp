@@ -325,8 +325,8 @@ const fenetre = 'fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center j
       </form>
     </div>
 
-    <!-- Mot de passe provisoire affiché une seule fois -->
-    <div v-if="provisoire.ouvert" :class="fenetre" @keydown.esc="fermerProvisoire">
+    <!-- Mot de passe provisoire affiché une seule fois : ni Échap ni clic à côté ne ferment la fenêtre, seul le bouton -->
+    <div v-if="provisoire.ouvert" :class="fenetre">
       <div role="dialog" aria-modal="true" aria-labelledby="titre-provisoire" aria-describedby="consigne-provisoire" class="w-full max-w-md bg-white rounded-2xl p-5 space-y-4 text-sm text-gris">
         <h2 id="titre-provisoire" class="font-display font-bold text-lg text-noir">Mot de passe de {{ provisoire.nom }}</h2>
         <p role="status" class="text-xs text-foret font-semibold">{{ provisoire.message }}</p>

@@ -172,7 +172,11 @@ async function modifierMembre(req, res) {
     const avant = versJournal(membre);
     const emailChange = champs.email !== membre.email;
     Object.assign(membre, champs);
-    if (emailChange) membre.versionSession = (membre.versionSession ?? 0) + 1;
+    if (emailChange) {
+      membre.versionSession = (membre.versionSession ?? 0) + 1;
+      membre.resetPasswordToken = null; // Un lien de réinitialisation envoyé à l'ancienne adresse ne sert plus
+      membre.resetPasswordExpires = null;
+    }
     const apres = versJournal(membre);
     const changements = Object.keys(apres).filter(cle => avant[cle] !== apres[cle]);
     if (!changements.length) {

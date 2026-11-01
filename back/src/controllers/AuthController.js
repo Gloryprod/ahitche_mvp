@@ -21,6 +21,17 @@ function hacherJeton(jeton) {
     return crypto.createHash('sha256').update(jeton).digest('hex');
 }
 
+// Champs jamais renvoyés au navigateur par /session et /me (mot de passe, jetons, détails internes du statut VIP)
+const CHAMPS_CACHES = '-password -resetPasswordToken -resetPasswordExpires -vip.codeId -vip.retirePar -__v';
+// Champs du suivi des accès : lus pour vérifier la session, retirés avant la réponse
+const CHAMPS_SESSION = ['actif', 'versionSession', 'derniereConnexion', 'motDePasseModifieLe'];
+
+function versAffichage(user) {
+    const objet = user.toObject();
+    for (const champ of CHAMPS_SESSION) delete objet[champ];
+    return objet;
+}
+
 // Vérifie que chaque valeur est une chaîne non vide.
 // Bloque les injections d'opérateurs MongoDB envoyées en JSON (ex : { "$ne": null }).
 function sontDesChaines(...valeurs) {
@@ -134,7 +145,7 @@ async function session(req, res) {
 
     try {
         // Statut VIP : actif, depuis, retireLe seulement (le code et l'auteur du retrait restent internes)
-        const user = await User.findById(decoded.id).select('-password -resetPasswordToken -resetPasswordExpires -vip.codeId -vip.retirePar');
+        const user = await User.findById(decoded.id).select(CHAMPS_CACHES);
         // Compte supprimé ou désactivé, ou sessions coupées depuis (version de session) : plus de session
         if (!sessionValide(decoded, user)) {
             res.clearCookie('token', OPTIONS_COOKIE);
@@ -142,7 +153,7 @@ async function session(req, res) {
         }
         // Session glissante prolongée, ou réémise si la politique du compte a changé (rôle, admin principal)
         const inactivite = actualiserSession(res, decoded, user);
-        return res.status(200).json({ user, inactivite });
+        return res.status(200).json({ user: versAffichage(user), inactivite });
     } catch (error) {
         console.error("Erreur session:", error);
         return res.status(500).json({ message: "Erreur serveur lors de la vérification de la session." });
@@ -152,10 +163,10 @@ async function session(req, res) {
 async function getUser(req, res) {
     try {
         // req.user.id vient du middleware verifyToken juste au-dessus
-        const user = await User.findById(req.user.id).select('-password -vip.codeId -vip.retirePar'); // Ni mot de passe ni détail interne du statut VIP
+        const user = await User.findById(req.user.id).select(CHAMPS_CACHES);
         if (!user) return res.status(404).json({ message: "Utilisateur non trouvé." });
-        
-        res.json({ user });
+
+        res.json({ user: versAffichage(user) });
     } catch (error) {
         res.status(500).json({ message: "Erreur serveur lors de la récupération du profil." });
     }   
