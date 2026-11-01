@@ -584,7 +584,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                 
                 <button 
                   @click="openWhatsApp(item.whatsapp, item.clientName, item.formule, item.daysRemaining)" 
-                  class="shrink-0 cursor-pointer px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg flex items-center gap-1 transition-all shadow-xs"
+                  class="shrink-0 cursor-pointer px-2.5 py-1.5 bg-foret hover:bg-savane text-white font-bold text-[10px] rounded-lg flex items-center gap-1 transition-all shadow-xs"
                   title="Relancer sur WhatsApp"
                 >
                   <MessageSquare class="w-3 h-3" /> Relancer
@@ -597,7 +597,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
           <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
             <div class="flex items-center justify-between border-b border-gray-100 pb-2">
               <h2 class="font-bold text-noir text-sm">Dernières commandes</h2>
-              <router-link to="/dashboard/admin/commandes" class="text-[10px] text-foret font-bold hover:underline">Voir tout →</router-link>
+              <router-link to="/dashboard/admin/commandes" class="inline-flex items-center min-h-11 sm:min-h-6 px-2 -mr-2 text-[10px] text-foret font-bold hover:underline">Voir tout →</router-link>
             </div>
 
             <table class="w-full text-left">

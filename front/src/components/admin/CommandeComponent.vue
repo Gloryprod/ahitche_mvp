@@ -297,7 +297,7 @@ const handleAchatLibreModifie = (message: string) => {
 
         <div class="relative w-full sm:w-64">
             <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris stroke-[2.5]" />
-            <input v-model="search" type="text" placeholder="Rechercher un client..." class="w-full pl-9 pr-4 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir placeholder-gray-400 focus:outline-none focus:border-foret focus:bg-white transition-all shadow-2xs" />
+            <input v-model="search" type="text" aria-label="Rechercher un client" placeholder="Rechercher un client..." class="w-full pl-9 pr-4 py-2 bg-[#f9f9fb] border border-gray-200 rounded-xl text-xs font-medium text-noir placeholder-gray-400 focus:outline-none focus:border-foret focus:bg-white transition-all shadow-2xs" />
         </div>
       </div>
 

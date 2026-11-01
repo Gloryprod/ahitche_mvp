@@ -27,11 +27,13 @@ const FILTRE_PROPOSES = { deletedAt: null, type: { $in: TYPES_VENDUS }, statut: 
 const UNITES_FRACTIONNABLES = ['kg', 'kgs', 'kilo', 'kilos', 'kilogramme', 'kilogrammes', 'l', 'litre', 'litres'];
 const pasDeQuantite = (unite) => (UNITES_FRACTIONNABLES.includes(String(unite || '').trim().toLowerCase()) ? 0.5 : 1);
 
-// Nombre saisi : un nombre ou un texte numérique fini ; NaN sinon (absent, tableau, objet, Infinity)
+// Nombre saisi : un nombre fini, ou un texte décimal (« 2 », « 1,5 », « 0.5 », « -1 ») ; NaN sinon (absent, tableau,
+// objet, Infinity, et formes hexadécimales ou exponentielles écrites en texte comme « 0x10 » ou « 1e2 »)
+const DECIMAL = /^-?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/;
 const nombre = (v) => {
-  if (typeof v !== 'number' && !(typeof v === 'string' && v.trim() !== '')) return NaN;
-  const n = Number(typeof v === 'string' ? v.replace(',', '.') : v);
-  return Number.isFinite(n) ? n : NaN;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
+  if (typeof v !== 'string' || !DECIMAL.test(v.trim())) return NaN;
+  return Number(v.trim().replace(',', '.'));
 };
 
 // Texte d'une saisie : espaces et retours à la ligne ramenés à un seul espace
