@@ -122,6 +122,10 @@ const orderSchema = new mongoose.Schema({
   timestamps: true // Génère automatiquement createdAt (qui servira de date) et updatedAt
 });
 
+// Compteurs du menu admin (GET /api/admin/compteurs) et onglets de statut de la liste des commandes :
+// filtre par statut sur les commandes non supprimées
+orderSchema.index({ statut: 1, deletedAt: 1 });
+
 module.exports = mongoose.model('Order', orderSchema);
 module.exports.STATUTS = STATUTS;
 module.exports.PERIODES = PERIODES;
