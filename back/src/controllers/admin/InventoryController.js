@@ -9,20 +9,16 @@ const { trouverFournisseur } = require('../../services/fournisseurService');
 const { depenseDeLaPiece } = require('../../services/depenseStockService');
 const { genererNumeroLot, nomResponsable } = require('../../services/stockService');
 const { journaliser } = require('../../services/journalService');
-const { echapperRegex } = require('../../utils/texte');
+const { echapperRegex, lireNombre } = require('../../utils/texte');
 const { lireDate } = require('../../utils/dates');
 
 const texte = (v, max = 300) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const arrondi2 = (n) => Math.round(n * 100) / 100;
 const arrondi3 = (n) => Math.round(n * 1000) / 1000;
 const formatFcfa = (n) => `${Number(n ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} FCFA`;
-// Nombre obligatoire : un nombre ou un texte numérique, fini ; NaN sinon (absent, illisible, tableau, objet,
-// Infinity ou 1e999, que JSON lit comme Infinity)
-const nombre = (v) => {
-  if (typeof v !== 'number' && !(typeof v === 'string' && v.trim() !== '')) return NaN;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : NaN;
-};
+// Nombre obligatoire : un nombre ou un texte décimal, fini ; NaN sinon (absent, illisible, tableau, objet,
+// « 0x10 », « 1e2 », Infinity ou 1e999, que JSON lit comme Infinity)
+const nombre = lireNombre;
 // Lignes d'une facture (bon et réception) : marge pour la limite de 60 s des transactions Atlas
 const MAX_LIGNES = 100;
 const ORDRE_FAMILLES = ['P', 'V', 'MP', 'EMB'];

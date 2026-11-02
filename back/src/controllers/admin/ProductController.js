@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Product = require('../../models/product');
 const { TYPES_PRODUIT, TYPES_VENDUS, STATUTS_PRODUIT, PACKS } = require('../../models/product');
 const { LotStockFifo } = require('../../models/stock');
-const { echapperRegex } = require('../../utils/texte');
+const { echapperRegex, lireNombre } = require('../../utils/texte');
 const { journaliser } = require('../../services/journalService');
 const { ACCES } = require('../../config/roles');
 
@@ -23,7 +23,7 @@ function differences(avant, apres) {
 // Nombre positif ou vide (null) : une cellule vide n'est jamais transformée en 0
 function nombreOuVide(valeur) {
   if (valeur === null || valeur === undefined || valeur === '') return { valeur: null };
-  const n = Number(String(valeur).replace(',', '.'));
+  const n = lireNombre(valeur);
   return Number.isFinite(n) && n >= 0 ? { valeur: n } : { erreur: true };
 }
 

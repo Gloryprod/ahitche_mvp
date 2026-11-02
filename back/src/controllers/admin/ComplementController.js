@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Product = require('../../models/product');
 const { journaliser } = require('../../services/journalService');
+const { lireNombre } = require('../../utils/texte');
 
 // Compléments de la semaine : les produits « extra » du catalogue, avec photo, description et affichage sur le site.
 // Un seul prix : celui du catalogue, que le serveur applique aussi aux extras des commandes.
@@ -21,7 +22,7 @@ function lireComplement(body, partiel = false) {
     if (!champs.name) return { erreur: 'Le nom du produit est obligatoire.' };
   }
   if (present('priceUnit')) {
-    const prix = Number(String(body.priceUnit ?? '').replace(/\s/g, '').replace(',', '.'));
+    const prix = lireNombre(body.priceUnit);
     if (!(Number.isFinite(prix) && prix > 0)) return { erreur: 'Indiquez un prix de vente en FCFA (supérieur à 0).' };
     champs.priceUnit = Math.round(prix);
   }
