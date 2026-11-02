@@ -145,7 +145,7 @@ const getPeriodText = computed(() => {
     
     <div class="bg-white p-4 rounded-2xl flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-gray-200 pb-4">
       <div>
-        <h1 class="font-display font-bold text-xl text-noir">Formules & Packs</h1>
+        <h1 class="font-display font-bold text-xl text-noir">Formules et prix</h1>
         <p class="text-gris text-[11px] mt-0.5">Vue d'ensemble et simulation des dots mensuelles et commandes libres</p>
       </div>
       

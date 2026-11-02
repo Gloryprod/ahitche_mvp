@@ -9,7 +9,7 @@ import { peutLire, peutEcrire } from '@/config/roles'
 import { genererSimulationPDF, fcfaPDF } from '@/services/pdfSimulateurs'
 
 // Simulateurs en lecture seule : coût et marge d'un pack, seuil de rentabilité (la prévision d'achats est dans le Stock).
-// Aucun prix n'est appliqué ici : le prix de vente se fixe dans « Formules ».
+// Aucun prix n'est appliqué ici : le prix de vente se fixe dans « Formules et prix ».
 // Les réglages (charges, objectifs, coefficient, marge cible) sont enregistrés côté serveur (onglet Paramètres).
 
 interface Referentiel { coutReel: number; prixConseille: number | null }
@@ -205,7 +205,7 @@ const etiquette = 'text-[10px] font-bold uppercase text-gris'
   <div class="space-y-4 animate-fadeIn text-sm text-noir">
     <div class="bg-white p-4 rounded-2xl space-y-2">
       <h1 class="font-display font-bold text-xl flex items-center gap-2"><Sliders class="w-5 h-5 text-foret" /> Simulateurs</h1>
-      <p class="text-xs text-gris flex items-start gap-1.5"><Info class="w-3.5 h-3.5 shrink-0 mt-0.5" /> Outils de calcul uniquement : aucun prix n'est modifié. Le prix de vente se fixe dans « Formules » ; les réglages, dans l'onglet « Paramètres ».</p>
+      <p class="text-xs text-gris flex items-start gap-1.5"><Info class="w-3.5 h-3.5 shrink-0 mt-0.5" /> Outils de calcul uniquement : aucun prix n'est modifié. Le prix de vente se fixe dans « Formules et prix » ; les réglages, dans l'onglet « Paramètres ».</p>
     </div>
 
     <!-- Frais communs -->

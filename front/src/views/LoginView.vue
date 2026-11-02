@@ -58,7 +58,7 @@
                     <p class="text-sm text-gris mt-1">Connectez-vous à votre compte pour accéder à vos commandes et préférences.</p>
                 </div>
 
-                <form @submit.prevent="handleLogin" class="flex flex-col gap-4">
+                <form @submit.prevent="handleLogin" @focusin.once="prechargerEspaces" class="flex flex-col gap-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Adresse Email</label>
                         <input 
@@ -113,7 +113,8 @@
 <script setup lang="ts">
 import { messageErreur } from '@/services/erreurs'
 import PanneauMarque from '@/components/ui/PanneauMarque.vue'
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { chargerEspaceAdmin, chargerEspaceClient, chargerTableauDeBord } from '@/router/routes';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
@@ -137,6 +138,33 @@ const pageDemandee = computed(() => {
 })
 const sessionExpiree = computed(() => route.query.session === 'expiree')
 const sessionInactivite = computed(() => route.query.session === 'inactivite')
+
+// Préchargement des espaces (admin : menu et tableau de bord ; client : son espace) pendant la saisie :
+// l'arrivée après connexion ne dépend plus du téléchargement de leur code. Au premier focus d'un champ ou
+// quand le navigateur est inactif ; jamais en mode « économie de données ». Un échec reste silencieux :
+// le routeur retentera le chargement à la navigation.
+let espacesPrecharges = false
+let attenteInactivite: number | undefined
+let attenteMinuteur: ReturnType<typeof setTimeout> | undefined
+
+function prechargerEspaces() {
+  if (espacesPrecharges) return
+  espacesPrecharges = true
+  const connexion = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+  if (connexion?.saveData) return
+  for (const charger of [chargerEspaceAdmin, chargerTableauDeBord, chargerEspaceClient]) {
+    charger().catch(() => { /* hors ligne ou fichier indisponible : rien à afficher */ })
+  }
+}
+
+onMounted(() => {
+  if ('requestIdleCallback' in window) attenteInactivite = window.requestIdleCallback(prechargerEspaces, { timeout: 4000 })
+  else attenteMinuteur = setTimeout(prechargerEspaces, 2000)
+})
+onBeforeUnmount(() => {
+  if (attenteInactivite !== undefined && 'cancelIdleCallback' in window) window.cancelIdleCallback(attenteInactivite)
+  clearTimeout(attenteMinuteur)
+})
 
 const handleLogin = async () => {
   isLoading.value = true

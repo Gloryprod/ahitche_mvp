@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import SideBarAdmin from '@/components/admin/layout/SideBarAdmin.vue';
+import BarreAdminMobile from '@/components/admin/layout/BarreAdminMobile.vue';
 import { RouterView, useRoute } from 'vue-router'
 import { Menu, X } from 'lucide-vue-next'
 
@@ -38,11 +39,13 @@ watch(() => route.path, () => {
       </button>
     </header>
 
-    <div class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-4 gap-6 items-start w-full flex-1">
-      
-      <div 
+    <!-- Sur téléphone, espace en bas pour que la barre de raccourcis ne cache rien -->
+    <div class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 pb-[calc(5rem_+_env(safe-area-inset-bottom))] md:pb-[calc(5.5rem_+_env(safe-area-inset-bottom))] lg:pb-8 grid grid-cols-1 lg:grid-cols-4 gap-6 items-start w-full flex-1">
+
+      <div
+        id="tiroir-menu-admin"
         :class="[
-          'lg:col-span-1 fixed inset-0 z-50 lg:z-auto lg:relative bg-black/40 lg:bg-transparent transition-opacity duration-300 lg:opacity-100 lg:pointer-events-auto',
+          'lg:col-span-1 fixed inset-0 z-50 lg:z-auto lg:sticky lg:top-8 bg-black/40 lg:bg-transparent transition-opacity duration-300 lg:opacity-100 lg:pointer-events-auto',
           isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none lg:block hidden'
         ]"
         @click.self="isMobileMenuOpen = false"
@@ -59,7 +62,7 @@ watch(() => route.path, () => {
             </button>
           </div>
           
-          <div class="overflow-y-auto lg:overflow-visible flex-1 p-4 lg:p-0">
+          <div class="overflow-y-auto lg:overflow-visible flex-1 p-2 lg:p-0">
             <SideBarAdmin />
           </div>
         </div>
@@ -74,6 +77,8 @@ watch(() => route.path, () => {
       </div>
 
     </div>
+
+    <BarreAdminMobile :menu-ouvert="isMobileMenuOpen" @ouvrir-menu="isMobileMenuOpen = true" />
   </div>
 </template>
 

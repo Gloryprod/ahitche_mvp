@@ -1,5 +1,5 @@
 // Trois actualités de l'accueil (faits vérifiés, sans date inventée). Les articles complets restent dans le blog
-// (/blog, gérés depuis le back-office « Contenus & Médias »).
+// (/blog, gérés depuis le back-office « Articles du blog »).
 import { LIVRAISON_ANNONCE, RESEAUX_SOCIAUX } from './contact'
 import { PRODUITS_INCLUS } from './formules'
 
