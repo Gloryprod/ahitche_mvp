@@ -21,6 +21,7 @@ const mesureC = require('../controllers/admin/MesureController');
 const avisC = require('../controllers/AvisController');
 const ficheC = require('../controllers/FicheController');
 const vipC = require('../controllers/VipController');
+const equipeC = require('../controllers/admin/EquipeController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -48,6 +49,7 @@ router.use('/repas', acces(ACCES.repas));
 router.use('/avis', acces(ACCES.avis));
 router.use('/fiches', acces(ACCES.fiches));
 router.use('/vip', acces(ACCES.vip));
+router.use('/equipe', acces(ACCES.equipe));
 
 // Users
 router.get('/users', userC.index);
@@ -127,6 +129,15 @@ router.route('/vip/codes')
 router.patch('/vip/codes/:id', vipC.modifierCode); // { actif } : désactivation ou réactivation
 router.get('/vip/comptes', vipC.listerComptes);
 router.post('/vip/comptes/:id/retrait', vipC.retirerVip);
+
+// Équipe et accès : comptes de l'équipe (admin seulement ; garde-fous de l'admin principal dans le contrôleur)
+router.route('/equipe')
+  .get(equipeC.listerEquipe)
+  .post(equipeC.creerMembre);
+router.put('/equipe/:id', equipeC.modifierMembre);
+router.post('/equipe/:id/mot-de-passe', equipeC.definirMotDePasse); // Provisoire, renvoyé une seule fois
+router.patch('/equipe/:id/statut', equipeC.changerStatut); // { actif }
+router.post('/equipe/:id/lien-reinitialisation', equipeC.envoyerLien);
 
 // --- Formules / Packs ---
 router.get('/formulas/:packType', formulaC.getPackDetails);

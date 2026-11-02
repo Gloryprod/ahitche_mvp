@@ -8,7 +8,7 @@ export const EQUIPE: Role[] = ['admin', 'gestionnaire', 'comptable', 'nutritionn
 export type Section =
   | 'tableauDeBord' | 'commandes' | 'clients' | 'stock' | 'prestataires' | 'logistique'
   | 'finances' | 'simulateurs' | 'nutrition' | 'repas' | 'avis' | 'donneesBase' | 'contenus' | 'complements' | 'mesures' | 'parametres'
-  | 'fiches' | 'vip'
+  | 'fiches' | 'vip' | 'equipe'
 
 export const ACCES: Record<Section, { lecture: Role[]; ecriture: Role[] }> = {
   tableauDeBord: { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: [] },
@@ -29,6 +29,8 @@ export const ACCES: Record<Section, { lecture: Role[]; ecriture: Role[] }> = {
   fiches:        { lecture: ['admin', 'gestionnaire', 'coordinateur'],              ecriture: ['admin', 'gestionnaire'] },
   // Codes VIP, comptes VIP, chiffrage des achats libres et colonne « Prix VIP » des Produits
   vip:           { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
+  // Équipe et accès : comptes de l'équipe, mots de passe provisoires, désactivation
+  equipe:        { lecture: ['admin'],                                               ecriture: ['admin'] },
   mesures:       { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: [] },
   parametres:    { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable', 'coordinateur'] },
 }

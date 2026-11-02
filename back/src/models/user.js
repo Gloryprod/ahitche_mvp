@@ -17,6 +17,14 @@ const userSchema = new mongoose.Schema({
     adminPrincipal: { type: Boolean, default: false },
     // Gestionnaire qui livre (D-17) : fiche livreur reliée ; il ne voit alors que les clients de ses livraisons
     livreurId: { type: mongoose.Schema.Types.ObjectId, ref: 'Partner', default: null },
+    // Écran « Équipe et accès » (docs-internes/equipe/CONCEPT.md) : un compte désactivé ne se connecte plus et ses
+    // sessions sont coupées ; rien n'est supprimé. Valeurs par défaut : aucun compte existant ne change.
+    actif: { type: Boolean, default: true },
+    derniereConnexion: { type: Date, default: null },
+    motDePasseModifieLe: { type: Date, default: null },
+    // Version de session, recopiée dans le jeton (services/sessionService.js) : +1 coupe toutes les sessions ouvertes
+    // (mot de passe ou e-mail changé, compte désactivé)
+    versionSession: { type: Number, default: 0, min: 0 },
     // Statut VIP (achats libres au prix VIP) : obtenu avec un code VIP, sans fin jusqu'au retrait par l'admin
     vip: {
         actif: { type: Boolean, default: false },

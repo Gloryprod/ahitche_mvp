@@ -45,10 +45,21 @@ function poserJeton(res, contenu) {
     res.cookie('token', token, { ...OPTIONS_COOKIE, maxAge: duree * 1000 }); // Le cookie expire avec le jeton
 }
 
+// Version de session (User.versionSession) recopiée dans le jeton (« v ») : quand le compte passe à la version
+// suivante (mot de passe ou e-mail changé, compte désactivé), tous les jetons déjà émis sont refusés.
+// Un jeton émis avant cette règle n'a pas de « v » : il vaut 0, comme un compte qui n'a jamais changé.
+const versionDe = (user) => user?.versionSession ?? 0;
+
+// Session encore valable pour ce compte (relu en base) : compte actif et même version
+function sessionValide(decoded, user) {
+    return !!user && user.actif !== false && (decoded.v ?? 0) === versionDe(user);
+}
+
 // Ouvre (ou rouvre) la session du compte ; renvoie la politique d'inactivité appliquée
 function ouvrirSession(res, user) {
     const inactivite = politiqueInactivite(user);
-    poserJeton(res, inactivite ? { id: String(user._id), inactivite } : { id: String(user._id) });
+    const contenu = { id: String(user._id), v: versionDe(user) };
+    poserJeton(res, inactivite ? { ...contenu, inactivite } : contenu);
     return inactivite;
 }
 
@@ -58,7 +69,7 @@ function prolongerSessionSiBesoin(res, decoded) {
     if (!decoded.inactivite) return;
     const age = Math.floor(Date.now() / 1000) - decoded.iat;
     if (age >= Math.min(5 * 60, (decoded.inactivite * 60) / 4)) {
-        poserJeton(res, { id: decoded.id, inactivite: decoded.inactivite });
+        poserJeton(res, { id: decoded.id, v: decoded.v ?? 0, inactivite: decoded.inactivite });
     }
 }
 
@@ -71,4 +82,4 @@ function actualiserSession(res, decoded, user) {
     return inactivite;
 }
 
-module.exports = { OPTIONS_COOKIE, politiqueInactivite, ouvrirSession, prolongerSessionSiBesoin, actualiserSession };
+module.exports = { OPTIONS_COOKIE, politiqueInactivite, sessionValide, ouvrirSession, prolongerSessionSiBesoin, actualiserSession };
