@@ -12,6 +12,7 @@
 //  Idées de repas (D-18) : rédigées par les gestionnaires et le nutritionniste, publiées par l'admin
 //  Avis clients : rédigés par les clients dans leur espace, publiés (ou refusés) par l'admin
 //  Codes VIP, prix VIP et chiffrage des achats libres : admin seulement, coordinateur en lecture
+//  Site public (infos pratiques, bandeau d'annonce…) : publié par l'admin seulement, coordinateur en lecture
 
 const ROLES = ['user', 'admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
 const EQUIPE = ['admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
@@ -32,6 +33,8 @@ const ACCES = {
   vip:           { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
   // Équipe et accès : comptes de l'équipe, mots de passe provisoires, désactivation (docs-internes/equipe/CONCEPT.md)
   equipe:        { lecture: ['admin'],                                               ecriture: ['admin'] },
+  // Site public : contenus du site modifiables sans code (docs-internes/admin/CONTRAT-site-public-A.md)
+  site:          { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
   stock:         { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur', 'auditeur'], ecriture: ['admin', 'gestionnaire'] },
   prestataires:  { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
   logistique:    { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
