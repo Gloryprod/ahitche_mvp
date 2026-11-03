@@ -1,5 +1,7 @@
 // Questions fréquentes de l'accueil : réponses fondées sur les règles validées (docs/conception-menu-admin.md).
-// Elles alimentent aussi les données structurées FAQPage (référencement local).
+// Elles alimentent aussi les données structurées FAQPage (référencement local). Liste calculée : elle suit les valeurs
+// publiées depuis l'admin (paiement, jours de livraison, horaires).
+import { computed } from 'vue'
 import { JOURS_LIVRAISON, PAIEMENT_ANNONCE, HORAIRES } from './contact'
 import { PRODUITS_INCLUS } from './formules'
 
@@ -9,14 +11,14 @@ export interface QuestionFaq {
   lien?: { texte: string; vers: string } // Lien interne facultatif sous la réponse
 }
 
-export const FAQ: QuestionFaq[] = [
+export const FAQ = computed<QuestionFaq[]>(() => [
   {
     question: 'Comment passer commande ?',
     reponse: 'Choisissez votre formule et touchez « Commander » : WhatsApp s\'ouvre avec un message prêt à envoyer. Nous confirmons avec vous la formule, l\'adresse et le créneau de livraison.',
   },
   {
     question: 'Quand et comment je paie ?',
-    reponse: `Vous payez à la livraison, une fois vos vivres reçus, par ${PAIEMENT_ANNONCE}. Rien n'est à régler à l'avance.`,
+    reponse: `Vous payez à la livraison, une fois vos vivres reçus, par ${PAIEMENT_ANNONCE.value}. Rien n'est à régler à l'avance.`,
   },
   {
     question: 'Où livrez-vous ?',
@@ -24,7 +26,7 @@ export const FAQ: QuestionFaq[] = [
   },
   {
     question: 'Quand suis-je livré ?',
-    reponse: `Nous livrons à jour fixe${JOURS_LIVRAISON ? `, ${JOURS_LIVRAISON}` : ''} : le jour et le créneau vous sont confirmés à la commande. Le livreur vous appelle avant d'arriver. Nous répondons sur WhatsApp : ${HORAIRES}.`,
+    reponse: `Nous livrons à jour fixe${JOURS_LIVRAISON.value ? `, ${JOURS_LIVRAISON.value}` : ''} : le jour et le créneau vous sont confirmés à la commande. Le livreur vous appelle avant d'arriver. Nous répondons sur WhatsApp : ${HORAIRES.value}.`,
   },
   {
     question: 'Que contient un pack ?',
@@ -43,4 +45,4 @@ export const FAQ: QuestionFaq[] = [
     reponse: 'Nous n\'utilisons vos coordonnées (nom, téléphone, adresse) que pour préparer et livrer vos commandes et assurer votre suivi. Elles ne sont ni vendues ni cédées.',
     lien: { texte: 'Mentions légales et données personnelles', vers: '/mentions-legales' },
   },
-]
+])

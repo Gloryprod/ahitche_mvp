@@ -11,12 +11,15 @@ import TemoignagesAndGarantie from '../components/sections/TemoignagesAndGaranti
 import FaqSection from '../components/sections/FaqSection.vue'
 import ActualitesSection from '../components/sections/ActualitesSection.vue'
 import ActionsFlottantes from '../components/layout/ActionsFlottantes.vue'
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { ajouterDonneesStructurees, donneesCommerce } from '@/services/referencement'
 
-// Fiche « commerce local » pour Google : zone desservie, horaires, formules et prix
+// Fiche « commerce local » pour Google : zone desservie, horaires, formules et prix ; remise à jour à l'arrivée des
+// valeurs publiées depuis l'admin (numéro, horaires, paiement, réseaux)
+const donnees = computed(donneesCommerce)
 let retirer: (() => void) | undefined
-onMounted(() => { retirer = ajouterDonneesStructurees('donnees-commerce', donneesCommerce()) })
+onMounted(() => { retirer = ajouterDonneesStructurees('donnees-commerce', donnees.value) })
+watch(donnees, d => { retirer = ajouterDonneesStructurees('donnees-commerce', d) })
 onUnmounted(() => retirer?.())
 </script>
 

@@ -75,10 +75,10 @@ import { lienWhatsApp, WHATSAPP_AFFICHAGE, RESEAUX_SOCIAUX } from '@/config/cont
       <section>
         <h2 class="text-lg font-bold text-noir mb-2">Liens externes</h2>
         <p>
-          Les commandes passent par WhatsApp, et Ahitché est présent sur
-          <template v-for="(reseau, i) in RESEAUX_SOCIAUX" :key="reseau.nom">
-            <a :href="reseau.url" target="_blank" rel="noopener noreferrer" class="font-semibold text-foret underline underline-offset-4">{{ reseau.nom }}</a>{{ i < RESEAUX_SOCIAUX.length - 1 ? ' et ' : '' }}
-          </template>.
+          Les commandes passent par WhatsApp<template v-if="RESEAUX_SOCIAUX.length">, et Ahitché est présent sur
+            <template v-for="(reseau, i) in RESEAUX_SOCIAUX" :key="reseau.nom">
+              <a :href="reseau.url" target="_blank" rel="noopener noreferrer" class="font-semibold text-foret underline underline-offset-4">{{ reseau.nom }}</a>{{ i < RESEAUX_SOCIAUX.length - 1 ? ' et ' : '' }}
+            </template></template>.
           Ces services appliquent leurs propres conditions d'utilisation et règles de confidentialité.
         </p>
       </section>
