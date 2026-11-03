@@ -409,7 +409,7 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
             <p class="text-xs font-bold text-foret uppercase tracking-wider">Réseaux sociaux</p>
             <ul class="text-noir">
               <li v-for="r in ([{ nom: 'Facebook', url: envoiInfos.facebook }, { nom: 'TikTok', url: envoiInfos.tiktok }])" :key="r.nom" class="break-all">
-                {{ r.nom }} : <a v-if="r.url" :href="r.url" target="_blank" rel="noopener noreferrer" class="text-savane font-semibold underline underline-offset-2">{{ r.url }}</a><span v-else class="text-gris">masqué</span>
+                {{ r.nom }} : <a v-if="r.url" :href="r.url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center min-h-11 text-savane font-semibold underline underline-offset-2">{{ r.url }}</a><span v-else class="text-gris">masqué</span>
               </li>
             </ul>
           </div>
