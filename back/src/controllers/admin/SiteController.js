@@ -2,10 +2,11 @@ const mongoose = require('mongoose');
 const ContenuSite = require('../../models/contenuSite');
 const { NB_VERSIONS } = require('../../models/contenuSite');
 const User = require('../../models/user');
-const { CLES, contenu, egal } = require('../../services/contenuSiteService');
+const { CLES, contenu, egal, SLUGS_VITRINE } = require('../../services/contenuSiteService');
+const { prixVitrine } = require('../../services/formuleService');
 const { journaliser } = require('../../services/journalService');
 
-// Écran « Site public » (docs-internes/admin/CONTRAT-site-public-A.md), section « site » : lecture admin et
+// Écran « Site public » (docs-internes/admin/CONTRAT-site-public-A.md et -B.md), section « site » : lecture admin et
 // coordinateur, écriture (publication, retour à une version) admin seulement, contrôlée par acces() dans routes/admin.js.
 // Chaque publication remplace les valeurs, s'ajoute en tête des versions (10 au plus) et est journalisée
 // (entité « Site public »). Validation propre à chaque contenu : services/contenuSiteService.js.
@@ -65,12 +66,16 @@ async function publier(req, cle, def, valeurs, versionRestauree = null) {
   return { doc };
 }
 
-// GET /api/admin/site -> { contenus: { infos: { valeurs, updatedAt, versions: [{ _id, publieLe, publiePar: { nom } }] } | null, bandeau: … } }
+// GET /api/admin/site -> { contenus: { infos: { valeurs, updatedAt, versions: [{ _id, publieLe, publiePar: { nom } }] } | null, bandeau: …, formules: … },
+//   prix: { [slug]: number | null } } (prix de vente de la vitrine, en lecture : il se modifie dans « Formules et prix »)
 async function listerContenus(req, res) {
   try {
-    const docs = await ContenuSite.find({ cle: { $in: CLES } }).select(SANS_VALEURS_DES_VERSIONS).lean();
+    const [docs, prix] = await Promise.all([
+      ContenuSite.find({ cle: { $in: CLES } }).select(SANS_VALEURS_DES_VERSIONS).lean(),
+      prixVitrine(SLUGS_VITRINE),
+    ]);
     const contenus = Object.fromEntries(CLES.map(cle => [cle, versEcran(docs.find(d => d.cle === cle))]));
-    return res.status(200).json({ contenus });
+    return res.status(200).json({ contenus, prix });
   } catch (error) {
     console.error("Erreur listerContenus:", error);
     return res.status(500).json({ message: "Erreur lors du chargement des contenus du site." });

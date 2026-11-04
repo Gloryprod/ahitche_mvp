@@ -19,6 +19,10 @@
       "destination": "https://api.ahitchebj.com/api/public/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "destination": "https://api.ahitchebj.com/api/public/llms.txt"
+    },
+    {
       "source": "/(blog|login|register|reset-password|mentions-legales)",
       "destination": "/app.html"
     },
