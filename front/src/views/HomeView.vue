@@ -15,7 +15,7 @@ import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { ajouterDonneesStructurees, donneesCommerce } from '@/services/referencement'
 
 // Fiche « commerce local » pour Google : zone desservie, horaires, formules et prix ; remise à jour à l'arrivée des
-// valeurs publiées depuis l'admin (numéro, horaires, paiement, réseaux)
+// valeurs publiées depuis l'admin (numéro, horaires, paiement, réseaux, textes et prix des formules)
 const donnees = computed(donneesCommerce)
 let retirer: (() => void) | undefined
 onMounted(() => { retirer = ajouterDonneesStructurees('donnees-commerce', donnees.value) })

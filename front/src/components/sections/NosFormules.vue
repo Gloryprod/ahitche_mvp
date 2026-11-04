@@ -19,7 +19,8 @@ onMounted(async () => {
   }
 })
 
-// Comparateur « taille du foyer » : conseille une formule et la met en avant
+// Comparateur « taille du foyer » : conseille une formule et la met en avant. Cartes, foyers et prix suivent les
+// valeurs publiées depuis l'admin (config/formules.ts : tableau réactif, valeurs du code par défaut)
 const foyer = ref<TailleFoyer | null>(null)
 const conseillee = computed(() => formules.find(f => f.foyer === foyer.value) ?? null)
 const libelleFoyer = computed(() => TAILLES_FOYER.find(t => t.valeur === foyer.value)?.libelle ?? '')

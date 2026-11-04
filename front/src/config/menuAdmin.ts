@@ -73,7 +73,7 @@ export const GROUPES_MENU: GroupeMenu[] = [
     id: 'vitrine',
     titre: 'Vitrine du site',
     entrees: [
-      { id: 'site', nom: 'Site public', icone: PanelsTopLeft, chemin: '/dashboard/admin/site', section: 'site', motsCles: ['whatsapp', 'horaires', 'bandeau', 'annonce', 'livraison', 'paiement', 'facebook', 'tiktok', 'réseaux', 'contact', 'infos pratiques'] },
+      { id: 'site', nom: 'Site public', icone: PanelsTopLeft, chemin: '/dashboard/admin/site', section: 'site', motsCles: ['whatsapp', 'horaires', 'bandeau', 'annonce', 'livraison', 'paiement', 'facebook', 'tiktok', 'réseaux', 'contact', 'infos pratiques', 'formules', 'prix', 'accroche'] },
       { id: 'formules', nom: 'Formules et prix', icone: Tags, chemin: '/dashboard/admin/formulas', section: 'donneesBase', motsCles: ['pack', 'formule', 'tarif', 'essentiel', 'équilibré', 'confort', 'cycle', 'bientôt'] },
       { id: 'complements', nom: 'Compléments de la semaine', icone: Carrot, chemin: '/dashboard/admin/complements', section: 'complements', motsCles: ['complément', 'extra', 'photo', 'cette semaine', 'disponible'] },
       { id: 'fiches', nom: 'Fiches produits', icone: Megaphone, chemin: '/dashboard/admin/fiches', section: 'fiches', motsCles: ['fiche', 'photo', 'publicité', 'espace client'] },
