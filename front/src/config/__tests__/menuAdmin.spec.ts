@@ -25,6 +25,17 @@ describe('menu du back-office', () => {
     expect(noms('xyz')).toEqual([])
   })
 
+  it('met « Site public » en tête de la vitrine, lisible par l’admin et le coordinateur seulement', () => {
+    expect(filtrerMenu('admin').find(g => g.id === 'vitrine')?.entrees[0]?.nom).toBe('Site public')
+    expect(noms('bandeau')).toEqual(['Site public'])
+    expect(noms('horaires')).toEqual(['Site public'])
+    expect(noms('tiktok')).toEqual(['Site public'])
+    expect(noms('whatsapp')).toEqual(['Commandes', 'Site public'])
+    const ids = (role: Parameters<typeof filtrerMenu>[0]) => filtrerMenu(role).flatMap(g => g.entrees.map(e => e.id))
+    expect(ids('coordinateur')).toContain('site')
+    expect(ids('gestionnaire')).not.toContain('site')
+  })
+
   it('n’affiche que les sections que le rôle peut lire', () => {
     for (const groupe of filtrerMenu('gestionnaire')) {
       for (const entree of groupe.entrees) expect(ACCES[entree.section].lecture).toContain('gestionnaire')

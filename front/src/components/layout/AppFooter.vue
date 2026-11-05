@@ -32,9 +32,9 @@ const ancre = (cible: string) => (route.path === '/' ? cible : '/' + cible)
             <span><span class="sr-only">WhatsApp : </span>{{ WHATSAPP_AFFICHAGE }}</span>
           </a>
 
-          <!-- Réseaux sociaux : liens centralisés dans config/contact.ts -->
-          <p class="text-xs font-bold text-foret uppercase tracking-wider mt-5 mb-2">Suivez-nous</p>
-          <ul class="flex gap-3">
+          <!-- Réseaux sociaux : config/contact.ts, modifiables dans l'admin (« Site public ») ; un lien vidé masque le réseau -->
+          <p v-if="RESEAUX_SOCIAUX.length" class="text-xs font-bold text-foret uppercase tracking-wider mt-5 mb-2">Suivez-nous</p>
+          <ul v-if="RESEAUX_SOCIAUX.length" class="flex gap-3">
             <li v-for="reseau in RESEAUX_SOCIAUX" :key="reseau.nom">
               <a
                 :href="reseau.url"

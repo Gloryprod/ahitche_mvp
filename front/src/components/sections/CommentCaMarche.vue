@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import { lienWhatsApp, MESSAGES_WHATSAPP, LIVRAISON_ANNONCE, PAIEMENT_ANNONCE } from '@/config/contact'
 import { vApparition } from '@/directives/apparition'
 
 // Trois étapes, la dernière rappelle le paiement à la livraison : lever la peur de payer d'avance
-const etapes = [
+const etapes = computed(() => [
   {
     icone: 'choisir',
     titre: 'Choisissez votre formule',
@@ -18,9 +19,9 @@ const etapes = [
   {
     icone: 'recevoir',
     titre: 'Recevez et payez à la livraison',
-    texte: `${LIVRAISON_ANNONCE} à Cotonou et Abomey-Calavi ; le livreur vous appelle avant d'arriver. Paiement ${PAIEMENT_ANNONCE} à la réception.`,
+    texte: `${LIVRAISON_ANNONCE.value} à Cotonou et Abomey-Calavi ; le livreur vous appelle avant d'arriver. Paiement ${PAIEMENT_ANNONCE.value} à la réception.`,
   },
-] as const
+] as const)
 </script>
 
 <template>

@@ -109,6 +109,12 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/components/admin/equipe/EquipeAcces.vue')
       },
       {
+        path: 'site',
+        name: 'site-public-page',
+        meta: { roles: ACCES.site.lecture },
+        component: () => import('@/components/admin/site/SitePublic.vue')
+      },
+      {
         path: 'avis',
         name: 'avis-page',
         meta: { roles: ACCES.avis.lecture },

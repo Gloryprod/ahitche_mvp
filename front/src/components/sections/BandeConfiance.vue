@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { PAIEMENT_ANNONCE } from '@/config/contact'
 // Bande de confiance, juste sous le hero : rassurer avant le choix d'une formule.
 // Soutien institutionnel cité en texte (logos des partenaires seulement avec leur autorisation).
-const elements = [
+// Liste calculée : le moyen de paiement suit la valeur publiée depuis l'admin
+const elements = computed(() => [
   {
     icone: 'soutien',
     titre: 'Projet soutenu',
@@ -11,14 +13,14 @@ const elements = [
   {
     icone: 'paiement',
     titre: 'Vous payez à la livraison',
-    texte: `${PAIEMENT_ANNONCE}, une fois vos vivres reçus.`,
+    texte: `${PAIEMENT_ANNONCE.value}, une fois vos vivres reçus.`,
   },
   {
     icone: 'garantie',
     titre: 'Garantie Ahitché',
     texte: "Produit manquant ou abîmé : remplacé à l'identique à la livraison suivante.",
   },
-] as const
+] as const)
 </script>
 
 <template>

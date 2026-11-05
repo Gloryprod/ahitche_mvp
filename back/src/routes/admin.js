@@ -23,6 +23,7 @@ const ficheC = require('../controllers/FicheController');
 const vipC = require('../controllers/VipController');
 const equipeC = require('../controllers/admin/EquipeController');
 const compteurC = require('../controllers/admin/CompteurController');
+const siteC = require('../controllers/admin/SiteController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -51,6 +52,7 @@ router.use('/avis', acces(ACCES.avis));
 router.use('/fiches', acces(ACCES.fiches));
 router.use('/vip', acces(ACCES.vip));
 router.use('/equipe', acces(ACCES.equipe));
+router.use('/site', acces(ACCES.site));
 
 // Compteurs du menu admin (pastilles) : lecture pour toute l'équipe, aucune écriture. Ce n'est pas une section :
 // chaque clé de la réponse n'est donnée qu'aux rôles qui lisent sa section (commandes, avis), voir le contrôleur.
@@ -143,6 +145,12 @@ router.put('/equipe/:id', equipeC.modifierMembre);
 router.post('/equipe/:id/mot-de-passe', equipeC.definirMotDePasse); // Provisoire, renvoyé une seule fois
 router.patch('/equipe/:id/statut', equipeC.changerStatut); // { actif }
 router.post('/equipe/:id/lien-reinitialisation', equipeC.envoyerLien);
+
+// Site public : contenus du site modifiables sans code (infos pratiques, bandeau d'annonce), chaque publication journalisée
+router.get('/site', siteC.listerContenus);
+router.get('/site/:cle/versions/:id', siteC.voirVersion);
+router.put('/site/:cle', siteC.publierContenu); // { valeurs }
+router.post('/site/:cle/versions/:id/restaurer', siteC.restaurerVersion);
 
 // --- Formules / Packs ---
 router.get('/formulas/:packType', formulaC.getPackDetails);

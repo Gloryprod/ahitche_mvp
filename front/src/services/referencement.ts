@@ -81,20 +81,20 @@ export function donneesCommerce() {
     logo: `${SITE}/logo-ahitche-512.webp`,
     image: `${SITE}/og-image.jpeg`,
     description: 'Ravitaillement alimentaire régulier livré à domicile à Cotonou et Abomey-Calavi : formules mensuelles de produits de base, paiement à la livraison.',
-    telephone: `+${WHATSAPP_NUMERO}`,
+    telephone: `+${WHATSAPP_NUMERO.value}`,
     areaServed: [
       { '@type': 'City', name: 'Cotonou' },
       { '@type': 'City', name: 'Abomey-Calavi' },
     ],
     openingHoursSpecification: [{
       '@type': 'OpeningHoursSpecification',
-      dayOfWeek: HORAIRES_GOOGLE.jours,
-      opens: HORAIRES_GOOGLE.ouverture,
-      closes: HORAIRES_GOOGLE.fermeture,
+      dayOfWeek: HORAIRES_GOOGLE.value.jours,
+      opens: HORAIRES_GOOGLE.value.ouverture,
+      closes: HORAIRES_GOOGLE.value.fermeture,
     }],
     currenciesAccepted: 'XOF',
-    paymentAccepted: PAIEMENT_ANNONCE,
-    sameAs: RESEAUX_SOCIAUX.map(r => r.url),
+    paymentAccepted: PAIEMENT_ANNONCE.value,
+    sameAs: RESEAUX_SOCIAUX.value.map(r => r.url),
     hasOfferCatalog: {
       '@type': 'OfferCatalog',
       name: 'Formules mensuelles',
@@ -116,7 +116,7 @@ export function donneesFaq() {
   return {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: FAQ.map(q => ({
+    mainEntity: FAQ.value.map(q => ({
       '@type': 'Question',
       name: q.question,
       acceptedAnswer: { '@type': 'Answer', text: q.reponse },

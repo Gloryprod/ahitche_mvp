@@ -48,7 +48,9 @@ function retourEnHaut() {
 </script>
 
 <template>
-  <div class="fixed inset-x-0 bottom-0 z-90 pointer-events-none px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+  <!-- Au-dessus du bandeau d'annonce quand il est affiché (--hauteur-bandeau, components/layout/BandeauAnnonce.vue) :
+       remontés par une transformation, qui ne compte pas comme un décalage de mise en page -->
+  <div class="fixed inset-x-0 bottom-0 translate-y-[calc(var(--hauteur-bandeau,0px)*-1)] z-90 pointer-events-none px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
     <div class="max-w-[1160px] mx-auto flex items-end justify-end gap-3">
       <!-- Mobile : commande WhatsApp toujours à portée -->
       <a

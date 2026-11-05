@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import BaseButton from '../ui/BaseButton.vue'
 import PhotoAFournir from '../ui/PhotoAFournir.vue'
-import { lienWhatsApp, MESSAGES_WHATSAPP, LIVRAISON_ANNONCE } from '@/config/contact'
+import { lienWhatsApp, MESSAGES_WHATSAPP, LIVRAISON_ANNONCE_DU_CODE } from '@/config/contact'
 import { PRIX_D_APPEL, PRODUITS_INCLUS, formaterPrix } from '@/config/formules'
 import { PHOTOS } from '@/config/photos'
 
-// Les trois engagements qui lèvent les freins à la première commande
+// Les trois engagements qui lèvent les freins à la première commande. Haut de page rendu au build : textes du code,
+// pour que rien ne change à l'arrivée des valeurs publiées (le lien WhatsApp, lui, suit le numéro publié)
 const reassurances = [
   { texte: 'Paiement à la livraison', icone: 'paiement' },
-  { texte: LIVRAISON_ANNONCE, icone: 'livraison' },
+  { texte: LIVRAISON_ANNONCE_DU_CODE, icone: 'livraison' },
   { texte: 'Produit manquant remplacé', icone: 'garantie' },
 ] as const
 </script>

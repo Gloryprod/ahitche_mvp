@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { FAQ } from '@/config/faq'
 import { ajouterDonneesStructurees, donneesFaq } from '@/services/referencement'
 
-// Données structurées FAQPage (référencement local) : ajoutées au <head> le temps de l'affichage de l'accueil
+// Données structurées FAQPage (référencement local) : ajoutées au <head> le temps de l'affichage de l'accueil,
+// remises à jour à l'arrivée des valeurs publiées depuis l'admin
+const donnees = computed(donneesFaq)
 let retirer: (() => void) | undefined
 onMounted(() => {
-  retirer = ajouterDonneesStructurees('donnees-faq', donneesFaq())
+  retirer = ajouterDonneesStructurees('donnees-faq', donnees.value)
 })
+watch(donnees, d => { retirer = ajouterDonneesStructurees('donnees-faq', d) })
 onUnmounted(() => retirer?.())
 </script>
 
