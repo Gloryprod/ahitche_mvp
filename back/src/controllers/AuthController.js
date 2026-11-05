@@ -97,7 +97,9 @@ async function login(req, res) {
 
         // Jeton JWT dans un cookie HttpOnly : 1 jour, ou 1 h glissante pour l'équipe (sauf l'admin principal)
         const inactivite = ouvrirSession(res, user);
-        await User.updateOne({ _id: user._id }, { $set: { derniereConnexion: new Date() } });
+        // Date de dernière connexion enregistrée sans faire attendre la réponse ; un échec n'empêche pas la connexion
+        User.updateOne({ _id: user._id }, { $set: { derniereConnexion: new Date() } })
+            .catch(error => console.error("Erreur enregistrement derniereConnexion:", error.message));
 
         // On renvoie l'utilisateur au front, MAIS SANS LE TOKEN textuel.
         // Les champs profil sont nécessaires au dashboard pour pré-remplir la fiche client.

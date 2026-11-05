@@ -22,6 +22,7 @@ const avisC = require('../controllers/AvisController');
 const ficheC = require('../controllers/FicheController');
 const vipC = require('../controllers/VipController');
 const equipeC = require('../controllers/admin/EquipeController');
+const compteurC = require('../controllers/admin/CompteurController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const uploadC  = require('../controllers/admin/UploadController');
@@ -50,6 +51,10 @@ router.use('/avis', acces(ACCES.avis));
 router.use('/fiches', acces(ACCES.fiches));
 router.use('/vip', acces(ACCES.vip));
 router.use('/equipe', acces(ACCES.equipe));
+
+// Compteurs du menu admin (pastilles) : lecture pour toute l'équipe, aucune écriture. Ce n'est pas une section :
+// chaque clé de la réponse n'est donnée qu'aux rôles qui lisent sa section (commandes, avis), voir le contrôleur.
+router.get('/compteurs', acces({ lecture: EQUIPE, ecriture: [] }), compteurC.compteurs);
 
 // Users
 router.get('/users', userC.index);

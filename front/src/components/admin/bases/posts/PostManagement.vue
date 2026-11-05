@@ -247,7 +247,7 @@ const showNotification = (text: string, type: string) => {
     
     <!-- En-tête de la page -->
     <div class="bg-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
-      <h1 class="font-display font-bold text-xl text-noir">Gestion des Contenus & Médias</h1>
+      <h1 class="font-display font-bold text-xl text-noir">Articles du blog</h1>
       <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
         <div class="relative w-full sm:w-60">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gris stroke-[2.5]" />

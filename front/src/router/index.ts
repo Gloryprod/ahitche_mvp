@@ -15,10 +15,10 @@ const TITRES: Record<string, string> = {
   register: 'Créer un compte', login: 'Connexion', blog: 'Actualités et médias', 'blog-article': 'Actualités', 'mentions-legales': 'Mentions légales',
   ResetPassword: 'Nouveau mot de passe', 'user-dashboard': 'Mon espace', 'page-introuvable': 'Page introuvable',
   'admin-dashboard-page': 'Tableau de bord', 'client-page': 'Clients', 'commandes-page': 'Commandes', 'categories-page': 'Catégories',
-  'regles-page': 'Règles de composition', 'products-page': 'Produits', 'formulas-page': 'Formules', 'saveStock-page': 'Entrées de stock',
+  'regles-page': 'Règles de composition', 'products-page': 'Produits (catalogue)', 'formulas-page': 'Formules et prix', 'saveStock-page': 'Entrées de stock',
   'inventaire-page': 'Inventaire', 'mouvement-stock-page': 'Mouvements de stock', 'bon-commande-page': 'Bons de commande', 'prevision-achats-page': 'Prévision d\'achats',
   'prestataires-page': 'Prestataires', 'logistique-page': 'Logistique', 'finances-page': 'Finances', 'simulateurs-page': 'Simulateurs',
-  'idees-repas-page': 'Idées de repas', 'nutrition-page': 'Nutrition', 'posts-page': 'Contenus et médias', 'complements-page': 'Compléments de la semaine',
+  'idees-repas-page': 'Idées de repas', 'nutrition-page': 'Nutrition', 'posts-page': 'Articles du blog', 'complements-page': 'Compléments de la semaine',
   'avis-page': 'Avis clients', 'fiches-page': 'Fiches produits', 'vip-page': 'Codes VIP', 'equipe-page': 'Équipe et accès',
 }
 router.afterEach((to) => {

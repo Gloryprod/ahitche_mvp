@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
 import { useQuery, keepPreviousData, useQueries } from '@tanstack/vue-query'
 import axios from 'axios'
 import api from '@/stores/api'
@@ -11,12 +11,14 @@ import { estAchatLibre } from '@/config/vip'
 import { useTauxChange } from '@/composables/useTauxChange'
 import { useToast } from 'vue-toastification'
 import type { Commande, ProductItem } from '@/type'
-import { 
-  AlertTriangle, 
-  Bell, 
+import { ACTIONS_RAPIDES, entreeMenu } from '@/config/menuAdmin'
+import {
+  AlertTriangle,
+  Bell,
   MessageSquare,
   RefreshCw,
-  Clock
+  Clock,
+  Globe
 } from 'lucide-vue-next'
 
 // --- INTERFACES ---
@@ -37,6 +39,8 @@ interface InventoryItem {
   enAlerte: boolean
 }
 
+const authStore = useAuthStore()
+
 // --- 1. CHARGEMENT DES COMMANDES ---
 const fetchDashboardOrders = async (): Promise<PaginatedCommandesResponse> => {
   try {
@@ -50,7 +54,7 @@ const fetchDashboardOrders = async (): Promise<PaginatedCommandesResponse> => {
   }
 }
 
-const { data: ordersData, isLoading: isLoadingOrders, refetch: refetchOrders } = useQuery<PaginatedCommandesResponse>({
+const { data: ordersData, isLoading: isLoadingOrders, isPending: commandesEnAttenteDeDonnees, refetch: refetchOrders } = useQuery<PaginatedCommandesResponse>({
   queryKey: ['dashboard-orders'],
   queryFn: fetchDashboardOrders,
   placeholderData: keepPreviousData,
@@ -58,6 +62,18 @@ const { data: ordersData, isLoading: isLoadingOrders, refetch: refetchOrders } =
 })
 
 const ordersList = computed<Commande[]>(() => ordersData.value?.orders || [])
+
+// Ordre de chargement : les commandes d'abord (elles font l'essentiel de la page) ; les requêtes secondaires
+// (fréquentation, détails des formules) partent ensuite, pour ne pas se disputer une connexion lente.
+const commandesChargees = computed(() => !commandesEnAttenteDeDonnees.value)
+
+// Raccourcis vers les pages que le rôle peut modifier (mêmes adresses que le menu)
+const actionsRapides = computed(() =>
+  ACTIONS_RAPIDES
+    .map(action => ({ ...action, entree: entreeMenu(action.id) }))
+    .filter((action): action is typeof action & { entree: NonNullable<typeof action.entree> } =>
+      !!action.entree && peutEcrire(authStore.role.value, action.entree.section))
+)
 
 // --- 2. CHARGEMENT DE L'INVENTAIRE (STOCK) ---
 const fetchGlobalInventory = async (): Promise<InventoryItem[]> => {
@@ -86,7 +102,6 @@ const inventaireRaw = computed((): InventoryItem[] => {
 const stockAlerts = computed(() => inventaireRaw.value.filter(item => item.enAlerte))
 
 // Taux USD/FCFA en vigueur (section Finances), affiché seulement aux rôles qui y ont accès
-const authStore = useAuthStore()
 const toast = useToast()
 const { data: tauxData } = useQuery({
   queryKey: ['finances', 'taux'],
@@ -182,10 +197,29 @@ interface Frequentation {
   origines: { detail: string; nombre: number }[]
   pages: { detail: string; nombre: number }[]
 }
-const { data: frequentation } = useQuery({
+const voirFrequentation = computed(() => peutLire(authStore.role.value, 'mesures'))
+
+// La carte attend aussi d'approcher de l'écran (sur téléphone, elle est loin sous les indicateurs)
+const zoneFrequentation = useTemplateRef<HTMLElement>('zoneFrequentation')
+const frequentationProcheEcran = ref(typeof IntersectionObserver === 'undefined')
+let observateur: IntersectionObserver | undefined
+watch(zoneFrequentation, (zone) => {
+  observateur?.disconnect()
+  if (!zone || frequentationProcheEcran.value) return
+  observateur = new IntersectionObserver((entrees) => {
+    if (entrees.some(entree => entree.isIntersecting)) {
+      frequentationProcheEcran.value = true
+      observateur?.disconnect()
+    }
+  }, { rootMargin: '200px' })
+  observateur.observe(zone)
+})
+onBeforeUnmount(() => observateur?.disconnect())
+
+const { data: frequentation, isError: erreurFrequentation } = useQuery({
   queryKey: ['frequentation', 30],
   queryFn: async () => (await api.get('/api/admin/mesures', { params: { jours: 30 } })).data as Frequentation,
-  enabled: computed(() => peutLire(authStore.role.value, 'mesures')),
+  enabled: computed(() => voirFrequentation.value && commandesChargees.value && frequentationProcheEcran.value),
 })
 // « accueil:formule-ahi-equilibre » -> « Accueil · carte AHI ÉQUILIBRÉ » ; « accueil:hero » -> « Accueil · hero »
 const libelleOrigine = (detail: string) => {
@@ -264,12 +298,13 @@ const formulaQueries = useQueries({
       return response.data
     },
     staleTime: 1000 * 60 * 5, // Cache 5 minutes
-    enabled: voirMarges
+    // Après les commandes : ces détails servent aux marges et aux cycles de relance (calculés une fois arrivés)
+    enabled: computed(() => voirMarges.value && commandesChargees.value)
   }))
 })
 
-// Indique si au moins une formule est en cours de chargement
-const isLoadingFormulas = computed(() => formulaQueries.value.some(q => q.isLoading))
+// Indique si au moins une formule n'a pas encore de données (requête en attente ou en cours)
+const isLoadingFormulas = computed(() => formulaQueries.value.some(q => q.isPending))
 
 // Calcul dynamique des marges pour chaque pack
 const grossMargins = computed(() => {
@@ -349,9 +384,50 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
       </div>
     </div>
 
-    <!-- CHARGEMENT INITIAL -->
-    <div v-if="isLoadingOrders && isLoadingStock" class="text-center py-12 bg-white rounded-2xl border border-gray-100">
-      <span class="animate-pulse text-gris font-medium">Synchronisation des données en cours...</span>
+    <!-- ACTIONS RAPIDES : pages que le rôle peut modifier -->
+    <nav aria-label="Actions rapides" class="bg-white p-3 rounded-2xl border border-creme2">
+      <h2 class="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-gris">Actions rapides</h2>
+      <ul class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <li v-for="action in actionsRapides" :key="action.id">
+          <RouterLink
+            :to="action.entree.chemin"
+            class="min-h-11 w-full px-3 rounded-xl bg-creme hover:bg-foret/5 border border-creme2 hover:border-foret/30 flex items-center gap-2 text-xs font-semibold text-noir transition-colors focus-visible:outline-2 focus-visible:outline-foret"
+          >
+            <component :is="action.entree.icone" class="w-4 h-4 shrink-0 text-foret" aria-hidden="true" />
+            <span class="truncate">{{ action.libelle }}</span>
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink
+            to="/"
+            class="min-h-11 w-full px-3 rounded-xl bg-creme hover:bg-foret/5 border border-creme2 hover:border-foret/30 flex items-center gap-2 text-xs font-semibold text-noir transition-colors focus-visible:outline-2 focus-visible:outline-foret"
+          >
+            <Globe class="w-4 h-4 shrink-0 text-foret" aria-hidden="true" />
+            <span class="truncate">Voir le site</span>
+          </RouterLink>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- CHARGEMENT INITIAL : emplacements gris aux places des indicateurs et des cartes -->
+    <div v-if="commandesEnAttenteDeDonnees" aria-busy="true" class="space-y-5">
+      <p role="status" class="sr-only">Chargement du tableau de bord…</p>
+      <div aria-hidden="true" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div v-for="n in 4" :key="n" class="bg-white p-4 rounded-2xl border border-creme2 space-y-3">
+          <div class="h-2.5 w-24 rounded-full bg-creme2 motion-safe:animate-pulse"></div>
+          <div class="h-6 w-16 rounded-lg bg-creme2 motion-safe:animate-pulse"></div>
+        </div>
+      </div>
+      <div aria-hidden="true" class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2 bg-white p-4 rounded-2xl border border-creme2 space-y-3">
+          <div class="h-3 w-32 rounded-full bg-creme2 motion-safe:animate-pulse"></div>
+          <div v-for="n in 5" :key="n" class="h-3 rounded-full bg-creme2 motion-safe:animate-pulse"></div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-creme2 space-y-3">
+          <div class="h-3 w-28 rounded-full bg-creme2 motion-safe:animate-pulse"></div>
+          <div v-for="n in 3" :key="n" class="h-10 rounded-xl bg-creme2 motion-safe:animate-pulse"></div>
+        </div>
+      </div>
     </div>
 
     <template v-else>
@@ -452,8 +528,15 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                 </div>
             </div>
 
-            <!-- FRÉQUENTATION DU SITE -->
-            <div v-if="frequentation" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-4">
+            <!-- FRÉQUENTATION DU SITE (chargée quand la carte approche de l'écran ; rien en cas d'erreur) -->
+            <div v-if="voirFrequentation && !erreurFrequentation" ref="zoneFrequentation">
+            <div v-if="!frequentation" aria-hidden="true" class="bg-white p-4 rounded-2xl border border-creme2 space-y-3">
+                <div class="h-3 w-36 rounded-full bg-creme2 motion-safe:animate-pulse"></div>
+                <div class="grid grid-cols-3 gap-3">
+                <div v-for="n in 3" :key="n" class="h-10 rounded-xl bg-creme2 motion-safe:animate-pulse"></div>
+                </div>
+            </div>
+            <div v-else class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-4">
                 <div class="flex items-center justify-between border-b border-gray-100 pb-2">
                 <h2 class="font-bold text-noir text-sm">Fréquentation du site</h2>
                 <span class="px-2 py-0.5 bg-gray-100 text-gris rounded-md text-[10px]">30 derniers jours, sans cookie</span>
@@ -474,6 +557,7 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
                 </div>
                 <p v-else class="text-xs text-gris">Aucun clic vers WhatsApp mesuré sur la période.</p>
             </div>
+            </div>
 
             <!-- MARGE BRUTE -->
             <div v-if="voirMarges" class="bg-white p-4 rounded-2xl border border-gray-100 shadow-3xs space-y-3">
@@ -488,8 +572,9 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
             </div>
 
             <!-- Indication pendant le chargement -->
-            <div v-if="isLoadingFormulas" class="text-center py-6 text-gris animate-pulse">
-                Calcul des coûts et marges par formule...
+            <div v-if="isLoadingFormulas" class="space-y-2.5 py-2">
+                <p class="sr-only" role="status">Calcul des coûts et marges par formule…</p>
+                <div v-for="n in 5" :key="n" aria-hidden="true" class="h-6 rounded-lg bg-creme2 motion-safe:animate-pulse"></div>
             </div>
 
             <div v-defilable="'Marge brute par formule'" v-else class="overflow-x-auto">

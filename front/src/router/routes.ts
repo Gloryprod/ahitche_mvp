@@ -5,6 +5,12 @@ import HomeView from '../views/HomeView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 import { ACCES, EQUIPE } from '@/config/roles'
 
+// Espaces après connexion : les mêmes import() servent au routeur et au préchargement de la page de connexion
+// (LoginView), pour que le navigateur réutilise les fichiers déjà téléchargés
+export const chargerEspaceClient = () => import('@/views/dashboard/user/ProfileView.vue')
+export const chargerEspaceAdmin = () => import('@/views/dashboard/admin/ProfileView.vue')
+export const chargerTableauDeBord = () => import('@/components/admin/DashboardHome.vue')
+
 // Pages du site et du back-office. Le routeur du navigateur (index.ts) et le rendu de l'accueil au build
 // (entry-prerendu.ts) utilisent la même liste.
 export const routes: RouteRecordRaw[] = [
@@ -51,20 +57,20 @@ export const routes: RouteRecordRaw[] = [
   {
     path: '/dashboard/user',
     name: 'user-dashboard',
-    component: () => import('@/views/dashboard/user/ProfileView.vue'),
+    component: chargerEspaceClient,
     meta: { hideNavigation: true, requiresAuth: true, roles: ['user'] }
   },
   {
     path: '/dashboard/admin',
     name: 'admin-dashboard',
-    component: () => import('@/views/dashboard/admin/ProfileView.vue'),
+    component: chargerEspaceAdmin,
     meta: { hideNavigation: true, requiresAuth: true, roles: EQUIPE },
     children: [
       {
         path: '',
         name: 'admin-dashboard-page',
         meta: { roles: ACCES.tableauDeBord.lecture },
-        component: () => import('@/components/admin/DashboardHome.vue')
+        component: chargerTableauDeBord
       },
       {
         path: 'clients',
