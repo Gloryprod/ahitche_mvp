@@ -56,10 +56,11 @@ export const MESSAGES_WHATSAPP = infosSite.messages
 
 export interface ReseauSocial { nom: 'Facebook' | 'TikTok'; url: string; libelle: string }
 // Réseaux dont le lien est rempli (un lien vidé dans l'admin masque le réseau)
-export const RESEAUX_SOCIAUX = computed<ReseauSocial[]>(() => [
-  { nom: 'Facebook' as const, url: infosSite.facebook, libelle: 'Ahitché sur Facebook' },
-  { nom: 'TikTok' as const, url: infosSite.tiktok, libelle: 'Ahitché sur TikTok' },
-].filter(r => r.url))
+export const reseauxDe = (infos: Pick<InfosSite, 'facebook' | 'tiktok'>): ReseauSocial[] => [
+  { nom: 'Facebook' as const, url: infos.facebook, libelle: 'Ahitché sur Facebook' },
+  { nom: 'TikTok' as const, url: infos.tiktok, libelle: 'Ahitché sur TikTok' },
+].filter(r => r.url)
+export const RESEAUX_SOCIAUX = computed<ReseauSocial[]>(() => reseauxDe(infosSite))
 
 export const HORAIRES = computed(() => formaterHoraires(infosSite.horaires)) // « Lundi – Samedi, 9h00 – 18h00 »
 // Les mêmes horaires pour Google (données structurées de l'accueil)
