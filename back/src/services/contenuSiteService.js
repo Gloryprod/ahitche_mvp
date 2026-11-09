@@ -1,13 +1,14 @@
 // Contenus du site public modifiables depuis l'admin (écran « Site public », section « site »).
-// Contrats : docs-internes/admin/CONTRAT-site-public-A.md (lot A : « infos », infos pratiques, et « bandeau »)
-// et CONTRAT-site-public-B.md (lot B : « formules », textes des cartes de la vitrine).
-// Les lots suivants (faq, actualites, photos) s'ajoutent à la table CONTENUS, sans toucher au contrôleur :
+// Contrats : docs-internes/admin/CONTRAT-site-public-A.md (lot A : « infos », infos pratiques, et « bandeau »),
+// CONTRAT-site-public-B.md (lot B : « formules », textes des cartes de la vitrine) et CONTRAT-site-public-C.md
+// (lot C : « faq » et « actualites », des listes, avec des variables dans les réponses et les résumés).
+// Les lots suivants (photos) s'ajoutent à la table CONTENUS, sans toucher au contrôleur :
 //   cle → { libelle, valider(valeurs) → { valeurs } | { erreur }, resumer(avant, apres) → texte, publier?(valeurs, maintenant) }
 //  - valider : contrôle complet, renvoie seulement les champs du contrat, nettoyés (jamais un champ inconnu) ;
 //  - resumer : phrase du journal, ce qui change en clair (« Infos pratiques publiées : numéro WhatsApp, horaires ») ;
-//  - publier : facultatif, ce que voit le site à cet instant (ex. bandeau hors de ses dates → null).
+//  - publier : facultatif, ce que voit le site à cet instant (ex. bandeau hors de ses dates → null, questions masquées retirées).
 // Aucune valeur par défaut ici : sans publication, le site garde celles du code (front/src/config/contact.ts,
-// formules.ts) ; seul llms.txt en garde une copie côté serveur (services/llmsService.js).
+// formules.ts, faq.ts, actualites.ts) ; seul llms.txt en garde une copie côté serveur (services/llmsService.js).
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -38,17 +39,23 @@ const objet = (valeur) => valeur !== null && typeof valeur === 'object' && !Arra
 
 // Adresse https d'un des domaines autorisés (nom exact : « facebook.com.evil.bj » est refusé), sans identifiant ni port.
 // Renvoie l'adresse normalisée par le lecteur d'URL (espaces et accents encodés), celle que suivra le navigateur.
-function adresseHttps(valeur, nom, domaines, cheminValide) {
+// cheminValide(chemin, domaine) contrôle le chemin ; `message` remplace le motif de refus par défaut.
+function adresseHttps(valeur, nom, domaines, cheminValide, message = `adresse invalide (elle doit commencer par https://${domaines[0]}/)`) {
   const brute = texte(valeur, nom, 0, URL_MAX);
   if (!brute) return '';
-  const invalide = () => refuser(`${nom} : adresse invalide (elle doit commencer par https://${domaines[0]}/).`);
+  const invalide = () => refuser(`${nom} : ${message}.`);
   if (/[\\"'`]/.test(brute) || !/^https:\/\/[^/]/i.test(brute)) invalide();
   let url;
   try { url = new URL(brute); } catch { invalide(); }
   if (url.protocol !== 'https:' || url.username || url.password || url.port || !domaines.includes(url.hostname)
-    || !cheminValide(url.pathname) || url.href.length > 2 * URL_MAX) invalide();
+    || !cheminValide(url.pathname, url.hostname) || url.href.length > 2 * URL_MAX) invalide();
   return url.href;
 }
+
+// Chemin interne du site : « /… », jamais « // » ni « /\ » (adresse d'un autre site pour le navigateur), sans espace ni guillemet
+const CHEMIN_INTERNE = /^\/(?![/\\])[^\s\\"'`]*$/;
+// Ancre de l'accueil : « #formules » (lettres, chiffres, tiret)
+const ANCRE = /^#[A-Za-z0-9-]+$/;
 
 // Jour « AAAA-MM-JJ » existant au calendrier, ou vide
 function jour(valeur, nom) {
@@ -63,11 +70,12 @@ function jour(valeur, nom) {
 // Date du jour à Cotonou (UTC+1), « AAAA-MM-JJ »
 const jourCotonou = (maintenant = new Date()) => new Date(maintenant.getTime() + DECALAGE_COTONOU_MS).toISOString().slice(0, 10);
 
-// Exécute une validation qui lève ErreurSaisie ; toute autre erreur remonte (erreur serveur)
-function valider(fn) {
+// Exécute une validation qui lève ErreurSaisie ; toute autre erreur remonte (erreur serveur).
+// `liste` : les valeurs sont une liste (faq, actualites), sinon un objet.
+function valider(fn, liste = false) {
   return (valeurs) => {
     try {
-      if (!objet(valeurs)) return { erreur: 'Valeurs manquantes ou invalides.' };
+      if (liste ? !Array.isArray(valeurs) : !objet(valeurs)) return { erreur: 'Valeurs manquantes ou invalides.' };
       return { valeurs: fn(valeurs) };
     } catch (e) {
       if (e instanceof ErreurSaisie) return { erreur: e.message };
@@ -152,7 +160,7 @@ function lienBandeau(valeur) {
   const lien = texte(valeur, 'Lien du bandeau', 0, URL_MAX);
   if (!lien) return '';
   if (lien.startsWith('/')) {
-    if (!/^\/(?![/\\])[^\s\\"'`]*$/.test(lien)) refuser('Lien du bandeau : chemin du site invalide (ex. /blog).');
+    if (!CHEMIN_INTERNE.test(lien)) refuser('Lien du bandeau : chemin du site invalide (ex. /blog).');
     return lien;
   }
   return adresseHttps(lien, 'Lien du bandeau', ['wa.me'], (p) => /^\/[\w/-]*$/.test(p));
@@ -251,6 +259,174 @@ function resumerFormules(avant, apres) {
 }
 
 // ------------------------------------------------------------------
+// Questions fréquentes et actualités (lot C, docs-internes/admin/CONTRAT-site-public-C.md)
+// ------------------------------------------------------------------
+
+// Variables des réponses de la FAQ et des résumés des actualités, remplacées à l'affichage par le site (et par l'aperçu
+// de l'admin) avec les valeurs publiées : le texte reste juste quand le paiement, les jours de livraison ou les
+// horaires changent. Liste à garder identique à celle du front.
+const VARIABLES = ['paiement', 'livraison', 'jours_livraison', 'horaires', 'whatsapp', 'nb_produits'];
+const LISTE_VARIABLES = VARIABLES.map((v) => `{${v}}`).join(', ');
+const VARIABLE = /\{([^{}]*)\}/g;
+
+// Texte qui accepte les variables : chaque accolade appartient à une variable connue (« {prix} » ou « { » seule : refus)
+function texteAvecVariables(valeur, nom, min, max) {
+  const propre = texte(valeur, nom, min, max);
+  for (const [, variable] of propre.matchAll(VARIABLE)) {
+    if (!VARIABLES.includes(variable)) {
+      refuser(`${nom} : variable inconnue : {${Array.from(variable).slice(0, 30).join('')}}. Variables possibles : ${LISTE_VARIABLES}.`);
+    }
+  }
+  if (/[{}]/.test(propre.replace(VARIABLE, ''))) refuser(`${nom} : accolade seule ; une variable s'écrit entre accolades, par exemple {paiement}.`);
+  return propre;
+}
+
+// Texte sans variable (question, titre, catégorie, texte d'un lien) : aucune accolade, pour qu'aucune ne s'affiche telle quelle
+function texteSansVariable(valeur, nom, min, max) {
+  const propre = texte(valeur, nom, min, max);
+  if (/[{}]/.test(propre)) refuser(`${nom} : les accolades ne sont acceptées que dans les réponses et les résumés, pour les variables.`);
+  return propre;
+}
+
+// Identifiant stable d'un élément de liste (« paiement », « lancement-2026 »), unique dans la liste
+const IDENTIFIANT = /^[a-z0-9-]{1,40}$/;
+function identifiant(valeur, nom, vus, element) {
+  if (typeof valeur !== 'string' || !IDENTIFIANT.test(valeur)) {
+    refuser(`${nom} : identifiant invalide (1 à 40 caractères : lettres minuscules sans accent, chiffres, tiret).`);
+  }
+  if (vus.has(valeur)) refuser(`${nom} : identifiant « ${valeur} » déjà utilisé par ${element} ${vus.get(valeur)}.`);
+  return valeur;
+}
+
+// Pages externes admises dans une carte d'actualité, chemin contrôlé comme au lot A (Facebook, TikTok « /@… », wa.me)
+const DOMAINES_FACEBOOK = ['facebook.com', 'www.facebook.com', 'm.facebook.com'];
+const DOMAINES_TIKTOK = ['tiktok.com', 'www.tiktok.com'];
+const DOMAINES_EXTERNES = [...DOMAINES_FACEBOOK, ...DOMAINES_TIKTOK, 'wa.me'];
+function cheminExterne(chemin, domaine) {
+  if (DOMAINES_FACEBOOK.includes(domaine)) return chemin.length > 1;
+  if (DOMAINES_TIKTOK.includes(domaine)) return /^\/@[^/]+/.test(chemin);
+  return /^\/[\w/-]*$/.test(chemin); // wa.me
+}
+
+// Lien sous une question ou une carte : null, ou { texte, vers }. Absent, null ou deux champs vides : pas de lien.
+// vers : chemin interne (« /… »), ancre (« #… ») ou, si `externe`, une page https:// Facebook, TikTok ou WhatsApp.
+function lienContenu(valeur, nom, maxTexte, externe) {
+  if (valeur === undefined || valeur === null) return null;
+  if (!objet(valeur)) refuser(`${nom} : lien invalide.`);
+  const vide = (v) => typeof v === 'string' && !v.trim();
+  if (vide(valeur.texte) && vide(valeur.vers)) return null;
+  const texteLien = texteSansVariable(valeur.texte, `${nom} : texte du lien`, 1, maxTexte);
+  const nomVers = `${nom} : adresse du lien`;
+  const vers = texte(valeur.vers, nomVers, 1, URL_MAX);
+  const attendu = externe
+    ? 'chemin du site (ex. /blog), ancre de l\'accueil (ex. #formules) ou page https:// Facebook, TikTok ou WhatsApp'
+    : 'chemin du site (ex. /mentions-legales) ou ancre de l\'accueil (ex. #formules)';
+  if (vers.startsWith('/')) {
+    if (!CHEMIN_INTERNE.test(vers)) refuser(`${nomVers} : chemin du site invalide (${attendu}).`);
+    return { texte: texteLien, vers };
+  }
+  if (vers.startsWith('#')) {
+    if (!ANCRE.test(vers)) refuser(`${nomVers} : ancre invalide, lettres, chiffres et tiret seulement (ex. #formules).`);
+    return { texte: texteLien, vers };
+  }
+  if (!externe) refuser(`${nomVers} : ${attendu}.`);
+  return { texte: texteLien, vers: adresseHttps(vers, nomVers, DOMAINES_EXTERNES, cheminExterne, `adresse invalide (${attendu})`) };
+}
+
+const FAQ_MAX = 15;
+const ACTUALITES_MAX = 3;
+const ICONES = ['lancement', 'partenaire', 'communaute'];
+
+// Liste de 1 à 15 questions, dans l'ordre d'affichage ; au moins une affichée sur le site
+function validerFaq(liste) {
+  if (!liste.length) refuser('Questions fréquentes : ajoutez au moins une question.');
+  if (liste.length > FAQ_MAX) refuser(`Questions fréquentes : ${FAQ_MAX} questions au plus.`);
+  const vus = new Map();
+  const faq = liste.map((q, i) => {
+    const nom = `Question ${i + 1}`;
+    if (!objet(q)) refuser(`${nom} : valeurs manquantes.`);
+    const id = identifiant(q.id, nom, vus, 'la question');
+    vus.set(id, i + 1);
+    const question = texteSansVariable(q.question, `${nom} : question`, 5, 140);
+    const reponse = texteAvecVariables(q.reponse, `${nom} : réponse`, 10, 700);
+    if (typeof q.visible !== 'boolean') refuser(`${nom} : « Afficher sur le site », oui ou non.`);
+    return { id, question, reponse, visible: q.visible, lien: lienContenu(q.lien, nom, 50, false) };
+  });
+  if (!faq.some((q) => q.visible)) refuser('Questions fréquentes : au moins une question doit être affichée sur le site.');
+  return faq;
+}
+
+// Liste de 0 à 3 cartes, dans l'ordre d'affichage (vide : section « Actualités » masquée)
+function validerActualites(liste) {
+  if (liste.length > ACTUALITES_MAX) refuser(`Actualités : ${ACTUALITES_MAX} cartes au plus.`);
+  const vus = new Map();
+  return liste.map((c, i) => {
+    const nom = `Carte ${i + 1}`;
+    if (!objet(c)) refuser(`${nom} : valeurs manquantes.`);
+    const id = identifiant(c.id, nom, vus, 'la carte');
+    vus.set(id, i + 1);
+    const categorie = texteSansVariable(c.categorie, `${nom} : catégorie`, 2, 30);
+    if (!ICONES.includes(c.icone)) refuser(`${nom} : icône, « lancement », « partenaire » ou « communaute ».`);
+    const titre = texteSansVariable(c.titre, `${nom} : titre`, 5, 90);
+    const resume = texteAvecVariables(c.resume, `${nom} : résumé`, 10, 300);
+    return { id, categorie, icone: c.icone, titre, resume, lien: lienContenu(c.lien, nom, 40, true) };
+  });
+}
+
+// Écarts entre deux listes, élément par élément (même identifiant) : positions (dans la nouvelle liste, à partir de 1)
+// des ajoutés, modifiés (champs du contenu), masqués et affichés à nouveau ; nombre de supprimés ; ordre changé
+function ecartsListe(avant, apres, champs) {
+  const anciens = new Map((Array.isArray(avant) ? avant : []).filter(objet).map((e) => [e.id, e]));
+  const ids = new Set(apres.map((e) => e.id));
+  const e = { ajoutes: [], modifies: [], masques: [], affiches: [], supprimes: 0, ordre: false };
+  apres.forEach((element, i) => {
+    const ancien = anciens.get(element.id);
+    if (!ancien) { e.ajoutes.push(i + 1); return; }
+    if (champs.some((c) => !egal(ancien[c], element[c]))) e.modifies.push(i + 1);
+    if ('visible' in element && !!ancien.visible !== element.visible) (element.visible ? e.affiches : e.masques).push(i + 1);
+  });
+  e.supprimes = [...anciens.keys()].filter((id) => !ids.has(id)).length;
+  e.ordre = !egal([...anciens.keys()].filter((id) => ids.has(id)), apres.map((x) => x.id).filter((id) => anciens.has(id)));
+  return e;
+}
+
+// « 1 et 3 », « 1, 2 et 3 »
+const enumerer = (n) => (n.length > 1 ? `${n.slice(0, -1).join(', ')} et ${n[n.length - 1]}` : String(n[0]));
+
+// « FAQ publiée : 2 questions modifiées, 1 ajoutée, 1 masquée, ordre changé »
+function resumerFaq(avant, apres) {
+  const e = ecartsListe(avant, apres, ['question', 'reponse', 'lien']);
+  const liste = [];
+  for (const [n, singulier, pluriel] of [
+    [e.modifies.length, 'modifiée', 'modifiées'], [e.ajoutes.length, 'ajoutée', 'ajoutées'], [e.supprimes, 'supprimée', 'supprimées'],
+    [e.masques.length, 'masquée', 'masquées'], [e.affiches.length, 'affichée à nouveau', 'affichées à nouveau'],
+  ]) {
+    if (!n) continue;
+    const nom = liste.length ? '' : (n > 1 ? ' questions' : ' question'); // Le nom seulement au premier groupe
+    liste.push(`${n}${nom} ${n > 1 ? pluriel : singulier}`);
+  }
+  if (e.ordre) liste.push('ordre changé');
+  return phrase('FAQ publiée', avant, liste);
+}
+
+// « Actualités publiées : carte 2 modifiée, carte 3 ajoutée, 1 carte supprimée, ordre changé »
+function resumerActualites(avant, apres) {
+  const e = ecartsListe(avant, apres, ['categorie', 'icone', 'titre', 'resume', 'lien']);
+  const cartes = (positions, singulier, pluriel) => (positions.length > 1
+    ? `cartes ${enumerer(positions)} ${pluriel}` : `carte ${positions[0]} ${singulier}`);
+  const liste = [];
+  if (e.modifies.length) liste.push(cartes(e.modifies, 'modifiée', 'modifiées'));
+  if (e.ajoutes.length) liste.push(cartes(e.ajoutes, 'ajoutée', 'ajoutées'));
+  if (e.supprimes) liste.push(`${e.supprimes} carte${e.supprimes > 1 ? 's supprimées' : ' supprimée'}`);
+  if (e.ordre) liste.push('ordre changé');
+  if (!apres.length && Array.isArray(avant) && avant.length) liste.push('section « Actualités » masquée');
+  return phrase('Actualités publiées', avant, liste);
+}
+
+// Ce que reçoit le site : les questions affichées seulement, sans le champ `visible`
+const faqPubliee = (faq) => faq.filter((q) => q.visible).map(({ id, question, reponse, lien }) => ({ id, question, reponse, lien }));
+
+// ------------------------------------------------------------------
 
 const CONTENUS = {
   infos: { libelle: 'Infos pratiques', valider: valider(validerInfos), resumer: resumerInfos },
@@ -259,10 +435,12 @@ const CONTENUS = {
     publier: (valeurs, maintenant) => (bandeauVisible(valeurs, maintenant) ? valeurs : null),
   },
   formules: { libelle: 'Formules', valider: valider(validerFormules), resumer: resumerFormules },
+  faq: { libelle: 'Questions fréquentes', valider: valider(validerFaq, true), resumer: resumerFaq, publier: faqPubliee },
+  actualites: { libelle: 'Actualités', valider: valider(validerActualites, true), resumer: resumerActualites },
 };
 const CLES = Object.keys(CONTENUS);
 
 // Définition d'une clé, ou null (jamais une propriété héritée comme « constructor » ou « __proto__ »)
 const contenu = (cle) => (typeof cle === 'string' && Object.hasOwn(CONTENUS, cle) ? CONTENUS[cle] : null);
 
-module.exports = { CONTENUS, CLES, contenu, bandeauVisible, jourCotonou, egal, SLUGS_VITRINE };
+module.exports = { CONTENUS, CLES, contenu, bandeauVisible, jourCotonou, egal, SLUGS_VITRINE, VARIABLES };

@@ -2,8 +2,9 @@ const mongoose = require('mongoose');
 const { CLES } = require('../services/contenuSiteService');
 
 // Contenus du site public modifiés depuis l'admin (écran « Site public », docs-internes/admin/CONTRAT-site-public-A.md).
-// Un document par contenu, identifié par sa clé (« infos », « bandeau » ; plus tard « formules », « faq »…, voir
-// services/contenuSiteService.js). Pas de document = jamais publié : le site garde les valeurs du code (aucune migration).
+// Un document par contenu, identifié par sa clé (« infos », « bandeau », « formules », « faq », « actualites » ;
+// plus tard « photos », voir services/contenuSiteService.js). Pas de document = jamais publié : le site garde les valeurs
+// du code (aucune migration).
 // `valeurs` est toujours validé par le service avant l'écriture ; `versions` garde les 10 dernières publications,
 // la plus récente en tête.
 

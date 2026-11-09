@@ -6,7 +6,7 @@ const { CLES, contenu, egal, SLUGS_VITRINE } = require('../../services/contenuSi
 const { prixVitrine } = require('../../services/formuleService');
 const { journaliser } = require('../../services/journalService');
 
-// Écran « Site public » (docs-internes/admin/CONTRAT-site-public-A.md et -B.md), section « site » : lecture admin et
+// Écran « Site public » (docs-internes/admin/CONTRAT-site-public-A.md, -B.md et -C.md), section « site » : lecture admin et
 // coordinateur, écriture (publication, retour à une version) admin seulement, contrôlée par acces() dans routes/admin.js.
 // Chaque publication remplace les valeurs, s'ajoute en tête des versions (10 au plus) et est journalisée
 // (entité « Site public »). Validation propre à chaque contenu : services/contenuSiteService.js.
@@ -66,7 +66,8 @@ async function publier(req, cle, def, valeurs, versionRestauree = null) {
   return { doc };
 }
 
-// GET /api/admin/site -> { contenus: { infos: { valeurs, updatedAt, versions: [{ _id, publieLe, publiePar: { nom } }] } | null, bandeau: …, formules: … },
+// GET /api/admin/site -> { contenus: { infos: { valeurs, updatedAt, versions: [{ _id, publieLe, publiePar: { nom } }] } | null, bandeau: …, formules: …,
+//   faq: … (toutes les questions, masquées comprises), actualites: … },
 //   prix: { [slug]: number | null } } (prix de vente de la vitrine, en lecture : il se modifie dans « Formules et prix »)
 async function listerContenus(req, res) {
   try {
