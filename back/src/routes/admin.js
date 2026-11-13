@@ -146,7 +146,7 @@ router.post('/equipe/:id/mot-de-passe', equipeC.definirMotDePasse); // Provisoir
 router.patch('/equipe/:id/statut', equipeC.changerStatut); // { actif }
 router.post('/equipe/:id/lien-reinitialisation', equipeC.envoyerLien);
 
-// Site public : contenus du site modifiables sans code (infos pratiques, bandeau d'annonce, formules), chaque publication journalisée
+// Site public : contenus du site modifiables sans code (infos pratiques, bandeau d'annonce, formules, questions fréquentes, actualités), chaque publication journalisée
 router.get('/site', siteC.listerContenus);
 router.get('/site/:cle/versions/:id', siteC.voirVersion);
 router.put('/site/:cle', siteC.publierContenu); // { valeurs }

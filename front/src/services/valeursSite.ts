@@ -238,3 +238,185 @@ export function lireBandeau(recu: unknown): BandeauSite | null {
     fin: texte(recu.fin, ''),
   }
 }
+
+// --- Questions fréquentes et actualités (lot C, docs-internes/admin/CONTRAT-site-public-C.md) ---
+
+// Variables des réponses de la FAQ et des résumés des actualités, remplacées à l'affichage par les valeurs du site
+export const VARIABLES_TEXTE = [
+  { nom: 'paiement', description: 'moyens de paiement' },
+  { nom: 'livraison', description: 'annonce de livraison, en minuscule au milieu d\'une phrase' },
+  { nom: 'jours_livraison', description: 'jours de livraison publiés ; vide sinon, et la virgule qui le précède disparaît avec lui' },
+  { nom: 'horaires', description: 'horaires de réponse' },
+  { nom: 'whatsapp', description: 'numéro WhatsApp affiché' },
+  { nom: 'nb_produits', description: 'nombre de produits de base' },
+] as const
+export type NomVariable = (typeof VARIABLES_TEXTE)[number]['nom']
+export type ValeursVariables = Record<NomVariable, string>
+const NOMS_VARIABLES: readonly string[] = VARIABLES_TEXTE.map(v => v.nom)
+
+// Valeurs des variables d'après les infos pratiques (celles du site, ou celles publiées pour l'aperçu de l'admin)
+export const valeursVariables = (infos: InfosSite, nbProduits: number): ValeursVariables => ({
+  paiement: infos.paiement,
+  livraison: annonceLivraison(infos.joursLivraison),
+  jours_livraison: infos.joursLivraison,
+  horaires: formaterHoraires(infos.horaires),
+  whatsapp: formaterNumero(infos.whatsappNumero),
+  nb_produits: String(nbProduits),
+})
+
+// Texte affiché : chaque {variable} remplacée par sa valeur.
+// - Une variable vide disparaît avec la virgule et les espaces qui la précèdent (« à jour fixe, {jours_livraison} : »
+//   devient « à jour fixe : »).
+// - {livraison} garde sa majuscule en début de texte ou de phrase, et passe en minuscule ailleurs
+//   (« 17 produits de base, livraison à jour fixe et… »).
+// - Une accolade qui n'est pas une variable connue reste telle quelle (le serveur la refuse à la publication).
+export function remplacerVariables(texte: string, valeurs: ValeursVariables): string {
+  const remplace = texte.replace(/(,?[ \t]*)\{([a-z_]+)\}/g, (tout: string, avant: string, nom: string, position: number) => {
+    if (!NOMS_VARIABLES.includes(nom)) return tout
+    const valeur = valeurs[nom as NomVariable].trim()
+    if (!valeur) return ''
+    if (nom !== 'livraison') return avant + valeur
+    const precedent = texte.slice(0, position).replace(/[ \t]+$/, '')
+    const debutDePhrase = !avant.includes(',') && (precedent === '' || /[.!?…]$/.test(precedent))
+    return avant + (debutDePhrase ? majuscule(valeur) : valeur.charAt(0).toLocaleLowerCase('fr-FR') + valeur.slice(1))
+  })
+  return remplace.replace(/[ \t]{2,}/g, ' ').trim()
+}
+
+// Première accolade qui n'est pas une variable connue (« {prix} », ou « { » seule), sinon null
+export function accoladeInconnue(texte: string): string | null {
+  const reste = texte.replace(/\{([a-z_]+)\}/g, (tout: string, nom: string) => (NOMS_VARIABLES.includes(nom) ? '' : tout))
+  return reste.match(/\{[^{}]*\}|[{}]/)?.[0] ?? null
+}
+
+export const ICONES_ACTUALITE = ['lancement', 'partenaire', 'communaute'] as const
+export type IconeActualite = (typeof ICONES_ACTUALITE)[number]
+
+export interface LienContenu { texte: string; vers: string }
+
+export interface QuestionFaq {
+  id: string // a-z, 0-9 et -, stable d'une publication à l'autre
+  question: string
+  reponse: string // Peut contenir des {variables}
+  visible: boolean // Masquée : gardée dans la liste, ni affichée ni donnée à Google
+  lien: LienContenu | null // Chemin interne (/…) ou ancre (#…)
+}
+
+export interface CarteActualite {
+  id: string
+  categorie: string
+  icone: IconeActualite
+  titre: string
+  resume: string // Peut contenir des {variables}
+  lien: LienContenu | null // Chemin interne, ancre ou adresse https:// Facebook, TikTok ou wa.me (nouvel onglet)
+}
+
+// Règles du contrat (longueurs en caractères), reprises pour lire prudemment et contrôler avant l'envoi
+export const REGLES_FAQ = {
+  max: 15,
+  question: { min: 5, max: 140 },
+  reponse: { min: 10, max: 700 },
+  texteLien: { min: 1, max: 50 },
+} as const
+export const REGLES_ACTUALITE = {
+  max: 3,
+  categorie: { min: 2, max: 30 },
+  titre: { min: 5, max: 90 },
+  resume: { min: 10, max: 300 },
+  texteLien: { min: 1, max: 40 },
+} as const
+export const ID_CONTENU = /^[a-z0-9-]{1,40}$/
+
+// Lien de la FAQ : chemin interne (pas « // » ni « /\ », sans espace ni guillemet) ou ancre (« #formules »)
+const CHEMIN_INTERNE = /^\/(?![/\\])[^\s\\"'`<>]*$/
+const ANCRE = /^#[A-Za-z0-9-]+$/
+export const lienFaqValide = (vers: string) => CHEMIN_INTERNE.test(vers) || ANCRE.test(vers)
+
+// Lien d'une actualité : celui de la FAQ, ou https:// vers une page Facebook, TikTok (/@…) ou wa.me (nom exact, sans
+// identifiant ni port) : mêmes règles que le serveur (back/src/services/contenuSiteService.js)
+const DOMAINES_FACEBOOK = ['facebook.com', 'www.facebook.com', 'm.facebook.com']
+const DOMAINES_TIKTOK = ['tiktok.com', 'www.tiktok.com']
+function cheminExterneValide(chemin: string, domaine: string): boolean {
+  if (DOMAINES_FACEBOOK.includes(domaine)) return chemin.length > 1
+  if (DOMAINES_TIKTOK.includes(domaine)) return /^\/@[^/]+/.test(chemin)
+  return domaine === 'wa.me' && /^\/[\w/-]*$/.test(chemin)
+}
+export const lienExterne = (vers: string) => vers.startsWith('https://')
+export function lienActualiteValide(vers: string): boolean {
+  if (vers.startsWith('/') || vers.startsWith('#')) return lienFaqValide(vers)
+  if (!/^https:\/\/[^/]/i.test(vers) || /[\\"'`<>]/.test(vers)) return false
+  try {
+    const url = new URL(vers)
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port && cheminExterneValide(url.pathname, url.hostname)
+  } catch {
+    return false
+  }
+}
+
+// Texte publié accepté : chaîne de la bonne longueur, sans < > ni retour à la ligne
+function texteValide(v: unknown, regle: { min: number; max: number }): v is string {
+  if (typeof v !== 'string' || /[<>\r\n]/.test(v)) return false
+  const n = longueur(v.trim())
+  return n >= regle.min && n <= regle.max
+}
+function lireLien(v: unknown, max: number, valide: (vers: string) => boolean): LienContenu | null {
+  if (!estObjet(v) || !texteValide(v.texte, { min: 1, max }) || typeof v.vers !== 'string' || !valide(v.vers)) return null
+  return { texte: v.texte.trim(), vers: v.vers }
+}
+const lireId = (v: unknown) => (typeof v === 'string' && ID_CONTENU.test(v) ? v : null)
+const copierLien = (lien: LienContenu | null) => (lien ? { ...lien } : null)
+
+// Questions publiées : une question mal formée est ignorée ; sans question visible lisible, celles du code restent.
+// Le site public ne reçoit que les questions visibles, sans « visible » : un champ absent vaut « affichée ».
+export function fusionnerFaq(defaut: readonly QuestionFaq[], recu: unknown): QuestionFaq[] {
+  if (!Array.isArray(recu)) return defaut.map(q => ({ ...q, lien: copierLien(q.lien) }))
+  const ids = new Set<string>()
+  const liste: QuestionFaq[] = []
+  for (const q of recu.slice(0, REGLES_FAQ.max)) {
+    if (!estObjet(q)) continue
+    const id = lireId(q.id)
+    if (!id || ids.has(id) || !texteValide(q.question, REGLES_FAQ.question) || !texteValide(q.reponse, REGLES_FAQ.reponse)) continue
+    ids.add(id)
+    liste.push({
+      id,
+      question: q.question.trim(),
+      reponse: q.reponse.trim(),
+      visible: q.visible !== false,
+      lien: lireLien(q.lien, REGLES_FAQ.texteLien.max, lienFaqValide),
+    })
+  }
+  return liste.some(q => q.visible) ? liste : defaut.map(q => ({ ...q, lien: copierLien(q.lien) }))
+}
+
+// Cartes publiées : null ou absent, celles du code ; une liste vide masque la section ; une carte mal formée est ignorée
+export function fusionnerActualites(defaut: readonly CarteActualite[], recu: unknown): CarteActualite[] {
+  if (!Array.isArray(recu)) return defaut.map(c => ({ ...c, lien: copierLien(c.lien) }))
+  const ids = new Set<string>()
+  const liste: CarteActualite[] = []
+  for (const c of recu.slice(0, REGLES_ACTUALITE.max)) {
+    if (!estObjet(c)) continue
+    const id = lireId(c.id)
+    if (!id || ids.has(id) || !ICONES_ACTUALITE.includes(c.icone as IconeActualite)) continue
+    if (!texteValide(c.categorie, REGLES_ACTUALITE.categorie) || !texteValide(c.titre, REGLES_ACTUALITE.titre)
+      || !texteValide(c.resume, REGLES_ACTUALITE.resume)) continue
+    ids.add(id)
+    liste.push({
+      id,
+      categorie: c.categorie.trim(),
+      icone: c.icone as IconeActualite,
+      titre: c.titre.trim(),
+      resume: c.resume.trim(),
+      lien: lireLien(c.lien, REGLES_ACTUALITE.texteLien.max, lienActualiteValide),
+    })
+  }
+  return liste
+}
+
+// Identifiant d'un nouvel élément : préfixe et horodatage en base 36 (jamais réutilisé après une suppression),
+// suffixé « -2 », « -3 »… s'il est déjà pris
+export function nouvelId(prefixe: string, existants: readonly string[], graine = Date.now()): string {
+  const base = `${prefixe}-${Math.abs(Math.trunc(graine)).toString(36)}`.slice(0, 36)
+  let id = base
+  for (let n = 2; existants.includes(id); n++) id = `${base}-${n}`
+  return id
+}
