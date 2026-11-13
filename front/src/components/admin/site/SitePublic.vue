@@ -8,18 +8,23 @@ import api from '@/stores/api'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
 import { appliquerInfos } from '@/config/contact'
+import { appliquerFormules } from '@/config/formules'
 import { messageErreur } from '@/services/erreurs'
 import BandeauAnnonce from '@/components/layout/BandeauAnnonce.vue'
+import OngletFormules from './OngletFormules.vue'
 import {
   JOURS_SEMAINE, annonceLivraison, formaterHoraires, formaterNumero, lienBandeauValide, type BandeauSite, type InfosSite,
+  type TextesFormules,
 } from '@/services/valeursSite'
 import {
-  CHAMPS_BANDEAU, CHAMPS_INFOS, TITRES_CONTENUS, bandeauAEnvoyer, bandeauPublie, champDeLErreur, changements,
-  infosAEnvoyer, infosPubliees, periodeBandeau, type Changement, type CleContenu, type ContenuEcran, type ContenusSite, type Version,
+  CHAMPS_BANDEAU, CHAMPS_FORMULES, CHAMPS_INFOS, TITRES_CONTENUS, bandeauAEnvoyer, bandeauPublie, champDeLErreur, changements,
+  controlerFormules, formulesAEnvoyer, formulesPubliees, infosAEnvoyer, infosPubliees, lireReponseSite, periodeBandeau,
+  type Changement, type CleContenu, type ContenuEcran, type ContenusSite, type ReponseSite, type Version,
 } from './champsSite'
 
-// « Site public » (docs-internes/admin/CONTRAT-site-public-A.md), section « site » : lecture admin et coordinateur,
-// publication admin seulement (le serveur fait foi). Lot A : infos pratiques et bandeau d'annonce. Chaque onglet :
+// « Site public » (docs-internes/admin/CONTRAT-site-public-A.md et -B.md), section « site » : lecture admin et
+// coordinateur, publication admin seulement (le serveur fait foi). Lot A : infos pratiques et bandeau d'annonce ;
+// lot B : textes des cartes des formules (le prix, lui, se modifie dans « Formules et prix »). Chaque onglet :
 // formulaire prérempli (valeurs publiées, sinon celles du code), aperçu en direct, publication confirmée et
 // historique des 10 dernières versions.
 
@@ -31,36 +36,44 @@ const ecriture = computed(() => peutEcrire(auth.role.value, 'site'))
 const CLE_REQUETE = ['site-public']
 const { data, isLoading, isError } = useQuery({
   queryKey: CLE_REQUETE,
-  queryFn: async () => (await api.get('/api/admin/site')).data.contenus as ContenusSite,
+  queryFn: async (): Promise<ReponseSite> => lireReponseSite((await api.get('/api/admin/site')).data),
 })
+const contenusSite = computed(() => data.value?.contenus)
+const prixBase = computed(() => lireReponseSite(data.value).prix) // Prix de vente de la base (lecture seule)
 
 const onglet = ref<CleContenu>('infos')
 
 // --- Formulaires : remplis une fois au chargement, puis après chaque publication ---
 const infos = reactive<InfosSite>(infosPubliees(undefined))
 const bandeau = reactive<BandeauSite>(bandeauPublie(undefined))
-const rempli = { infos: false, bandeau: false }
+const formules = reactive<TextesFormules>(formulesPubliees(undefined))
+const rempli = { infos: false, bandeau: false, formules: false }
 
 function remplir(cle: CleContenu, contenus: ContenusSite) {
   if (cle === 'infos') Object.assign(infos, infosPubliees(contenus.infos))
-  else Object.assign(bandeau, bandeauPublie(contenus.bandeau))
+  else if (cle === 'bandeau') Object.assign(bandeau, bandeauPublie(contenus.bandeau))
+  else Object.assign(formules, formulesPubliees(contenus.formules))
   rempli[cle] = true
 }
-watch(data, contenus => {
+watch(contenusSite, contenus => {
   if (!contenus) return
   if (!rempli.infos) remplir('infos', contenus)
   if (!rempli.bandeau) remplir('bandeau', contenus)
+  if (!rempli.formules) remplir('formules', contenus)
 }, { immediate: true })
 
-const jamaisPublie = (cle: CleContenu) => !!data.value && !data.value[cle]
-const versions = (cle: CleContenu): Version[] => data.value?.[cle]?.versions ?? []
+const jamaisPublie = (cle: CleContenu) => !!contenusSite.value && !contenusSite.value[cle]
+const versions = (cle: CleContenu): Version[] => contenusSite.value?.[cle]?.versions ?? []
 
 // --- Ce qui change par rapport au site ---
 const envoiInfos = computed(() => infosAEnvoyer(infos))
 const envoiBandeau = computed(() => bandeauAEnvoyer(bandeau))
-const changementsInfos = computed(() => changements(CHAMPS_INFOS, infosPubliees(data.value?.infos), envoiInfos.value))
-const changementsBandeau = computed(() => changements(CHAMPS_BANDEAU, bandeauPublie(data.value?.bandeau), envoiBandeau.value))
-const aChange = (cle: CleContenu) => (cle === 'infos' ? changementsInfos.value : changementsBandeau.value).length > 0
+const envoiFormules = computed(() => formulesAEnvoyer(formules))
+const changementsInfos = computed(() => changements(CHAMPS_INFOS, infosPubliees(contenusSite.value?.infos), envoiInfos.value))
+const changementsBandeau = computed(() => changements(CHAMPS_BANDEAU, bandeauPublie(contenusSite.value?.bandeau), envoiBandeau.value))
+const changementsFormules = computed(() => changements(CHAMPS_FORMULES, formulesPubliees(contenusSite.value?.formules), envoiFormules.value))
+const listeChangementsDe = (cle: CleContenu) => ({ infos: changementsInfos, bandeau: changementsBandeau, formules: changementsFormules }[cle].value)
+const aChange = (cle: CleContenu) => listeChangementsDe(cle).length > 0
 
 // --- Aperçu en direct ---
 const lienEssai = (message: string) => `https://wa.me/${envoiInfos.value.whatsappNumero}?text=${encodeURIComponent(message)}`
@@ -83,10 +96,12 @@ const MESSAGES = [
 const erreurs = reactive<Record<CleContenu, { champ: string; message: string }>>({
   infos: { champ: '', message: '' },
   bandeau: { champ: '', message: '' },
+  formules: { champ: '', message: '' },
 })
 // Une erreur affichée disparaît dès que le formulaire change (elle reviendra à la prochaine publication si besoin)
 watch(() => JSON.stringify(infos), () => { erreurs.infos = { champ: '', message: '' } })
 watch(() => JSON.stringify(bandeau), () => { erreurs.bandeau = { champ: '', message: '' } })
+watch(() => JSON.stringify(formules), () => { erreurs.formules = { champ: '', message: '' } })
 const idChamp = (id: string) => `champ-site-${id.replace(/\./g, '-')}`
 const erreurDe = (cle: CleContenu, champ: string) => (erreurs[cle].champ === champ ? erreurs[cle].message : '')
 const attributsErreur = (cle: CleContenu, champ: string) => (erreurDe(cle, champ)
@@ -109,6 +124,7 @@ function controler(cle: CleContenu): { champ: string; message: string } | null {
     if (infos.horaires.ouverture >= infos.horaires.fermeture) return { champ: 'horaires.fermeture', message: 'Horaires : l\'heure d\'ouverture doit précéder l\'heure de fermeture.' }
     return null
   }
+  if (cle === 'formules') return controlerFormules(envoiFormules.value)
   const b = envoiBandeau.value
   if (b.lien && !lienBandeauValide(b.lien)) return { champ: 'lien', message: 'Lien du bandeau : un chemin du site (ex. /blog) ou une adresse https://wa.me/…' }
   if (b.debut && b.fin && b.fin < b.debut) return { champ: 'fin', message: 'Fin du bandeau : ne peut pas précéder le début.' }
@@ -124,16 +140,19 @@ const listeChangements = (liste: Changement[]) => `<ul style="text-align:left;fo
 
 // Cache public du serveur (60 s, puis 300 s de reprise) : une nouvelle version met quelques minutes à s'afficher partout
 const AVIS_CACHE = 'Le site affiche la nouvelle version d\'ici quelques minutes.'
-const nouvelleVersion = reactive<Record<CleContenu, boolean>>({ infos: false, bandeau: false })
+const nouvelleVersion = reactive<Record<CleContenu, boolean>>({ infos: false, bandeau: false, formules: false })
 
 // Met à jour l'écran (et le site de cet onglet) avec la réponse du serveur ; le message du serveur est affiché tel quel
-function enregistrerReponse(cle: CleContenu, contenu: ContenuEcran<InfosSite> | ContenuEcran<BandeauSite> | null, message: string) {
+type ContenuRecu = ContenuEcran<InfosSite> | ContenuEcran<BandeauSite> | ContenuEcran<TextesFormules> | null
+function enregistrerReponse(cle: CleContenu, contenu: ContenuRecu, message: string) {
   const avant = versions(cle)[0]?._id
   const publiee = !!contenu?.versions?.[0] && contenu.versions[0]._id !== avant
-  const contenus = { ...(data.value ?? { infos: null, bandeau: null }), [cle]: contenu } as ContenusSite
-  queryClient.setQueryData(CLE_REQUETE, contenus)
+  const actuel = lireReponseSite(data.value)
+  const contenus = { ...actuel.contenus, [cle]: contenu } as ContenusSite
+  queryClient.setQueryData<ReponseSite>(CLE_REQUETE, { contenus, prix: actuel.prix })
   remplir(cle, contenus)
   if (cle === 'infos' && contenus.infos) appliquerInfos(contenus.infos.valeurs)
+  if (cle === 'formules' && contenus.formules) appliquerFormules(contenus.formules.valeurs, actuel.prix)
   if (publiee) {
     nouvelleVersion[cle] = true
     toast.success(`${message} ${AVIS_CACHE}`)
@@ -143,24 +162,25 @@ function enregistrerReponse(cle: CleContenu, contenu: ContenuEcran<InfosSite> | 
 }
 
 const envoi = ref<CleContenu | ''>('')
+const OBJETS_PUBLICATION: Record<CleContenu, string> = { infos: 'les infos pratiques', bandeau: 'le bandeau d\'annonce', formules: 'les textes des formules' }
 
 async function publier(cle: CleContenu) {
   if (!ecriture.value || envoi.value) return
   erreurs[cle] = { champ: '', message: '' }
   const probleme = controler(cle)
   if (probleme) return signaler(cle, probleme.message, probleme.champ)
-  const liste = cle === 'infos' ? changementsInfos.value : changementsBandeau.value
+  const liste = listeChangementsDe(cle)
   if (!liste.length) return toast.info('Aucun changement par rapport au site.')
   const choix = await Swal.fire({
     ...STYLE_SWAL,
-    title: `Publier ${cle === 'infos' ? 'les infos pratiques' : 'le bandeau d\'annonce'} ?`,
+    title: `Publier ${OBJETS_PUBLICATION[cle]} ?`,
     html: `<p style="font-size:.875rem;margin-bottom:.5rem">Le site change dès la publication. Ce qui change :</p>${listeChangements(liste)}`,
     showCancelButton: true, confirmButtonText: 'Publier', cancelButtonText: 'Annuler', focusCancel: true,
   })
   if (!choix.isConfirmed) return
   envoi.value = cle
   try {
-    const valeurs = cle === 'infos' ? envoiInfos.value : envoiBandeau.value
+    const valeurs = { infos: envoiInfos, bandeau: envoiBandeau, formules: envoiFormules }[cle].value
     const { data: r } = await api.put(`/api/admin/site/${cle}`, { valeurs })
     enregistrerReponse(cle, r.contenu, r.message)
   } catch (err) {
@@ -174,7 +194,7 @@ async function publier(cle: CleContenu) {
 const dateHeure = (d: string) => new Date(d).toLocaleString('fr-FR', {
   day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Porto-Novo',
 })
-interface VersionDetaillee { valeurs: InfosSite | BandeauSite; publieLe: string; publiePar: { nom: string } }
+interface VersionDetaillee { valeurs: InfosSite | BandeauSite | TextesFormules; publieLe: string; publiePar: { nom: string } }
 const cacheVersions = new Map<string, VersionDetaillee>()
 async function chargerVersion(cle: CleContenu, id: string): Promise<VersionDetaillee> {
   const cleCache = `${cle}:${id}`
@@ -185,9 +205,22 @@ async function chargerVersion(cle: CleContenu, id: string): Promise<VersionDetai
   return v
 }
 
-const lignesVersion = (cle: CleContenu, valeurs: InfosSite | BandeauSite) => (cle === 'infos'
-  ? CHAMPS_INFOS.map(c => ({ libelle: c.libelle, valeur: c.lire(infosPubliees({ valeurs: valeurs as InfosSite, updatedAt: '', versions: [] })) }))
-  : CHAMPS_BANDEAU.map(c => ({ libelle: c.libelle, valeur: c.lire(bandeauPublie({ valeurs: valeurs as BandeauSite, updatedAt: '', versions: [] })) })))
+// Une version lue comme le site la lirait : ses lignes (« Voir ») et ce qui change par rapport au site actuel
+function enContenu<T>(valeurs: unknown): ContenuEcran<T> {
+  return { valeurs: valeurs as T, updatedAt: '', versions: [] }
+}
+function comparerVersion(cle: CleContenu, valeurs: VersionDetaillee['valeurs']): { lignes: { libelle: string; valeur: string }[]; liste: Changement[] } {
+  if (cle === 'infos') {
+    const v = infosPubliees(enContenu<InfosSite>(valeurs))
+    return { lignes: CHAMPS_INFOS.map(c => ({ libelle: c.libelle, valeur: c.lire(v) })), liste: changements(CHAMPS_INFOS, infosPubliees(contenusSite.value?.infos), v) }
+  }
+  if (cle === 'bandeau') {
+    const v = bandeauPublie(enContenu<BandeauSite>(valeurs))
+    return { lignes: CHAMPS_BANDEAU.map(c => ({ libelle: c.libelle, valeur: c.lire(v) })), liste: changements(CHAMPS_BANDEAU, bandeauPublie(contenusSite.value?.bandeau), v) }
+  }
+  const v = formulesPubliees(enContenu<TextesFormules>(valeurs))
+  return { lignes: CHAMPS_FORMULES.map(c => ({ libelle: c.libelle, valeur: c.lire(v) })), liste: changements(CHAMPS_FORMULES, formulesPubliees(contenusSite.value?.formules), v) }
+}
 
 const fenetre = reactive({ ouverte: false, cle: 'infos' as CleContenu, version: null as Version | null, chargement: false, erreur: '', lignes: [] as { libelle: string; valeur: string }[] })
 let declencheur: HTMLElement | null = null
@@ -200,7 +233,7 @@ async function voir(cle: CleContenu, version: Version) {
   boutonFermer.value?.focus()
   try {
     const v = await chargerVersion(cle, version._id)
-    fenetre.lignes = lignesVersion(cle, v.valeurs)
+    fenetre.lignes = comparerVersion(cle, v.valeurs).lignes
   } catch (err) {
     fenetre.erreur = messageErreur(err, 'Cette version n\'a pas pu être chargée.')
   } finally {
@@ -224,9 +257,7 @@ async function revenir(cle: CleContenu, version: Version) {
   } catch (err) {
     return toast.error(messageErreur(err, 'Cette version n\'a pas pu être chargée.'))
   }
-  const liste = cle === 'infos'
-    ? changements(CHAMPS_INFOS, infosPubliees(data.value?.infos), infosPubliees({ valeurs: v.valeurs as InfosSite, updatedAt: '', versions: [] }))
-    : changements(CHAMPS_BANDEAU, bandeauPublie(data.value?.bandeau), bandeauPublie({ valeurs: v.valeurs as BandeauSite, updatedAt: '', versions: [] }))
+  const liste = comparerVersion(cle, v.valeurs).liste
   const brouillon = aChange(cle)
   const choix = await Swal.fire({
     ...STYLE_SWAL,
@@ -276,6 +307,9 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
       </button>
       <button id="onglet-bandeau" type="button" role="tab" :aria-selected="onglet === 'bandeau'" aria-controls="panneau-bandeau" :class="boutonOnglet(onglet === 'bandeau')" @click="onglet = 'bandeau'">
         Bandeau d'annonce
+      </button>
+      <button id="onglet-formules" type="button" role="tab" :aria-selected="onglet === 'formules'" aria-controls="panneau-formules" :class="boutonOnglet(onglet === 'formules')" @click="onglet = 'formules'">
+        Formules
       </button>
     </div>
 
@@ -539,6 +573,54 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
                   <Eye class="w-4 h-4" aria-hidden="true" /> Voir
                 </button>
                 <button v-if="ecriture && !estEnLigne('bandeau', v)" type="button" :disabled="envoi !== ''" :class="[bouton, 'bg-creme text-foret hover:bg-creme2']" :aria-label="`Revenir à la version du ${dateHeure(v.publieLe)}`" @click="revenir('bandeau', v)">
+                  <RotateCcw class="w-4 h-4" aria-hidden="true" /> Revenir à cette version
+                </button>
+              </div>
+            </li>
+          </ul>
+        </section>
+      </section>
+
+      <!-- ============ FORMULES ============ -->
+      <section v-show="onglet === 'formules'" id="panneau-formules" role="tabpanel" aria-labelledby="onglet-formules" class="space-y-4">
+        <form class="bg-white rounded-2xl p-4 space-y-5 min-w-0" novalidate aria-labelledby="titre-formules" @submit.prevent="publier('formules')">
+          <div class="space-y-1">
+            <h2 id="titre-formules" class="font-bold text-noir text-base">Formules</h2>
+            <p v-if="jamaisPublie('formules')" class="text-xs p-2.5 rounded-xl bg-creme text-noir">Valeurs actuelles du site (jamais modifiées depuis l'admin)</p>
+            <p v-else-if="versions('formules')[0]" class="text-xs">Publié le {{ dateHeure(versions('formules')[0]!.publieLe) }} par {{ versions('formules')[0]!.publiePar.nom || 'un administrateur' }}.</p>
+            <p class="text-xs">Textes des cartes de l'accueil. Nom, couleurs, niveau et produits restent fixes ; le prix vient de l'écran « Formules et prix ».</p>
+          </div>
+          <p v-if="erreurs.formules.message && !erreurs.formules.champ" id="erreur-haut-formules" role="alert" tabindex="-1" class="p-3 rounded-xl bg-red-50 text-red-800 text-xs font-semibold">{{ erreurs.formules.message }}</p>
+
+          <fieldset :disabled="!ecriture" class="min-w-0">
+            <legend class="sr-only">Textes des formules du site</legend>
+            <OngletFormules v-model:textes="formules" :prix="prixBase" :erreur="erreurs.formules" />
+          </fieldset>
+
+          <div v-if="ecriture" class="pt-3 border-t border-creme2 space-y-2">
+            <button type="submit" :disabled="envoi !== '' || !aChange('formules')" :class="[bouton, 'w-full sm:w-auto bg-foret text-white hover:bg-savane px-5 text-sm']">
+              <Send class="w-4 h-4" aria-hidden="true" /> {{ envoi === 'formules' ? 'Publication…' : 'Publier' }}
+            </button>
+            <p v-if="nouvelleVersion.formules" role="status" class="text-xs text-foret font-semibold">{{ AVIS_CACHE }}</p>
+            <p class="text-xs">{{ aChange('formules') ? `${changementsFormules.length} changement(s) à publier.` : 'Aucun changement par rapport au site.' }}</p>
+            <p class="text-xs text-noir font-semibold">Repas et heures : des estimations, pas des promesses. Pas de promesse de santé.</p>
+          </div>
+        </form>
+
+        <section class="bg-white rounded-2xl p-4 space-y-3" aria-labelledby="titre-historique-formules">
+          <h2 id="titre-historique-formules" class="font-bold text-noir text-base">Historique (10 dernières publications)</h2>
+          <p v-if="!versions('formules').length" class="text-xs">Aucune publication pour l'instant.</p>
+          <ul v-else class="divide-y divide-creme2">
+            <li v-for="v in versions('formules')" :key="v._id" class="py-2.5 flex flex-col sm:flex-row sm:items-center gap-2">
+              <p class="flex-1 min-w-0 text-noir">
+                {{ dateHeure(v.publieLe) }} <span class="text-gris">par {{ v.publiePar.nom || 'un administrateur' }}</span>
+                <span v-if="estEnLigne('formules', v)" class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-foret/10 text-foret">En ligne</span>
+              </p>
+              <div class="flex gap-2">
+                <button type="button" :class="[bouton, 'bg-creme text-foret hover:bg-creme2']" :aria-label="`Voir la version du ${dateHeure(v.publieLe)}`" @click="voir('formules', v)">
+                  <Eye class="w-4 h-4" aria-hidden="true" /> Voir
+                </button>
+                <button v-if="ecriture && !estEnLigne('formules', v)" type="button" :disabled="envoi !== ''" :class="[bouton, 'bg-creme text-foret hover:bg-creme2']" :aria-label="`Revenir à la version du ${dateHeure(v.publieLe)}`" @click="revenir('formules', v)">
                   <RotateCcw class="w-4 h-4" aria-hidden="true" /> Revenir à cette version
                 </button>
               </div>

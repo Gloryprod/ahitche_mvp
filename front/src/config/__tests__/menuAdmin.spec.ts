@@ -17,7 +17,7 @@ describe('menu du back-office', () => {
   })
 
   it('trouve un outil par son nom ou ses mots-clés, sans tenir compte des accents', () => {
-    expect(noms('prix')).toEqual(['Formules et prix', 'Produits (catalogue)'])
+    expect(noms('prix')).toEqual(['Site public', 'Formules et prix', 'Produits (catalogue)'])
     expect(noms('livreur')).toEqual(['Logistique', 'Équipe et accès'])
     expect(noms('fournisseur')).toEqual(['Bons de commande', 'Prestataires'])
     expect(noms('photo')).toEqual(['Compléments de la semaine', 'Fiches produits'])
@@ -30,6 +30,8 @@ describe('menu du back-office', () => {
     expect(noms('bandeau')).toEqual(['Site public'])
     expect(noms('horaires')).toEqual(['Site public'])
     expect(noms('tiktok')).toEqual(['Site public'])
+    expect(noms('accroche')).toEqual(['Site public'])
+    expect(noms('formules')).toEqual(['Site public', 'Formules et prix'])
     expect(noms('whatsapp')).toEqual(['Commandes', 'Site public'])
     const ids = (role: Parameters<typeof filtrerMenu>[0]) => filtrerMenu(role).flatMap(g => g.entrees.map(e => e.id))
     expect(ids('coordinateur')).toContain('site')

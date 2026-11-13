@@ -1,8 +1,10 @@
 // Contenus du site publiés depuis l'admin (écran « Site public ») : GET /api/public/site, une seule fois par
 // chargement de page, sans bloquer l'affichage. Délai maximal de 5 s ; en cas d'échec, le site garde les valeurs
-// du code (config/contact.ts) et aucun bandeau ne s'affiche. Jamais appelé pendant le rendu de l'accueil au build.
+// du code (config/contact.ts, config/formules.ts) et aucun bandeau ne s'affiche. Jamais appelé pendant le rendu de
+// l'accueil au build. Lot B : textes des cartes des formules et prix de vente de la base (null : prix du code).
 import { shallowRef } from 'vue'
 import { appliquerInfos } from '@/config/contact'
+import { appliquerFormules } from '@/config/formules'
 import { lireBandeau, type BandeauSite } from './valeursSite'
 
 const API = import.meta.env.PROD ? 'https://api.ahitchebj.com' : ''
@@ -23,8 +25,9 @@ export function chargerContenuSite(): Promise<void> {
       if (!reponse.ok) return
       const donnees: unknown = await reponse.json()
       if (typeof donnees !== 'object' || donnees === null) return
-      const { infos, bandeau } = donnees as { infos?: unknown; bandeau?: unknown }
+      const { infos, bandeau, formules, prix } = donnees as { infos?: unknown; bandeau?: unknown; formules?: unknown; prix?: unknown }
       if (infos) appliquerInfos(infos)
+      if (formules || prix) appliquerFormules(formules, prix)
       bandeauSite.value = lireBandeau(bandeau)
     } catch {
       // Hors ligne, délai dépassé ou réponse illisible : les valeurs du code restent affichées

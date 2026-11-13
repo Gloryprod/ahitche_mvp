@@ -18,7 +18,8 @@ router.get('/sitemap.xml', postC.planDuSite); // Servi sur ahitchebj.com/sitemap
 router.get('/zones', zoneC.listerZonesPubliques);
 router.get('/formules/valeurs', formuleC.valeursEstimees); // Prix barrés de l'accueil (D-03)
 router.get('/complements', complementC.complementsDeLaSemaine); // « Disponible cette semaine » de l'accueil
-router.get('/site', siteC.contenusPublies); // Infos pratiques et bandeau publiés depuis l'admin (null : valeurs du code)
+router.get('/site', siteC.contenusPublies); // Infos pratiques, bandeau et formules publiés depuis l'admin (null : valeurs du code), prix de la vitrine
+router.get('/llms.txt', siteC.llmsTxt); // Résumé pour les assistants IA, servi sur ahitchebj.com/llms.txt (vercel.json)
 router.get('/avis', avisC.avisPublies); // Avis clients publiés par l'admin (« Ce que disent nos clients »)
 router.post('/mesure', limiteMesure, express.text({ type: 'text/plain', limit: '1kb' }), mesureC.enregistrerMesure); // Mesure d'audience (sendBeacon : texte JSON)
 

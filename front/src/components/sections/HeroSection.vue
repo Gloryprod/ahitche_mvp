@@ -2,11 +2,12 @@
 import BaseButton from '../ui/BaseButton.vue'
 import PhotoAFournir from '../ui/PhotoAFournir.vue'
 import { lienWhatsApp, MESSAGES_WHATSAPP, LIVRAISON_ANNONCE_DU_CODE } from '@/config/contact'
-import { PRIX_D_APPEL, PRODUITS_INCLUS, formaterPrix } from '@/config/formules'
+import { PRIX_D_APPEL, PRIX_D_APPEL_DU_CODE, PRODUITS_INCLUS, formaterPrix } from '@/config/formules'
 import { PHOTOS } from '@/config/photos'
 
 // Les trois engagements qui lèvent les freins à la première commande. Haut de page rendu au build : textes du code,
-// pour que rien ne change à l'arrivée des valeurs publiées (le lien WhatsApp, lui, suit le numéro publié)
+// pour que rien ne change à l'arrivée des valeurs publiées (le lien WhatsApp, lui, suit le numéro publié).
+// Seule exception, le prix d'appel : c'est un prix, il suit le plus petit prix de vente de la base (voir le gabarit).
 const reassurances = [
   { texte: 'Paiement à la livraison', icone: 'paiement' },
   { texte: LIVRAISON_ANNONCE_DU_CODE, icone: 'livraison' },
@@ -36,7 +37,16 @@ const reassurances = [
 
         <p class="text-base sm:text-lg text-white/90 mb-8 md:max-w-xl">
           Pour une alimentation suivie et organisée sans stress&nbsp;: {{ PRODUITS_INCLUS.length }} produits de base
-          composés selon votre foyer, dès <strong class="text-or font-bold text-xl whitespace-nowrap">{{ formaterPrix(PRIX_D_APPEL) }} FCFA</strong> par mois.
+          composés selon votre foyer, dès
+          <!-- Prix d'appel : rendu au build avec le prix du code, remplacé sans animation par celui de la base. Le prix du
+               code, invisible, occupe la même case : la largeur est réservée et les chiffres ont la même chasse, la
+               ligne ne bouge pas (un prix plus long d'un chiffre l'élargirait). Prix calé au début de la case : son
+               premier chiffre ne se déplace pas quand il change. -->
+          <strong class="inline-grid justify-items-start text-or font-bold text-xl whitespace-nowrap tabular-nums">
+            <span class="col-start-1 row-start-1 invisible" aria-hidden="true">{{ formaterPrix(PRIX_D_APPEL_DU_CODE) }} FCFA</span>
+            <span class="col-start-1 row-start-1">{{ formaterPrix(PRIX_D_APPEL) }} FCFA</span>
+          </strong>
+          par mois.
         </p>
 
         <div class="flex flex-col sm:flex-row gap-3 justify-center md:justify-start mb-8">

@@ -146,6 +146,77 @@ export function fusionnerInfos(defaut: InfosSite, recu: unknown): InfosSite {
   }
 }
 
+// --- Formules de la vitrine (lot B, docs-internes/admin/CONTRAT-site-public-B.md) ---
+// Textes publiés de chaque carte ; nom, emoji, teinte, niveau, ordre et produits restent dans le code.
+export const TAILLES_FOYER_VALIDES = ['1', '2-3', '4-6'] as const
+export type Foyer = (typeof TAILLES_FOYER_VALIDES)[number]
+
+export interface TexteFormule {
+  cible: string
+  accroche: string
+  repas: string // « 20–30 »
+  heures: string // « 2–4h »
+  foyer: Foyer
+  recommandee: boolean
+}
+export type TextesFormules = Record<string, TexteFormule> // Par slug de la vitrine
+export type PrixSite = Record<string, number | null> // Prix de vente de la base par slug ; null : celui du code
+
+// Règles du contrat, reprises pour lire prudemment ce que renvoie le serveur
+export const REGLES_FORMULE = {
+  cible: { max: 60 },
+  accroche: { max: 120 },
+  repas: { max: 15, motif: /^(?=.*\d)[\d \-–]+$/ }, // Au moins un chiffre, comme le serveur
+  heures: { max: 15, motif: /^(?=.*\d)[\d \-–h]+$/ },
+} as const
+const longueur = (v: string) => Array.from(v).length
+
+// Texte d'une carte accepté : chaîne non vide, assez courte, au bon format, sans < > ni retour à la ligne
+export function texteFormuleValide(champ: keyof typeof REGLES_FORMULE, valeur: unknown): valeur is string {
+  if (typeof valeur !== 'string' || /[<>\r\n]/.test(valeur)) return false
+  const propre = valeur.trim()
+  const regle: { max: number; motif?: RegExp } = REGLES_FORMULE[champ]
+  return propre.length > 0 && longueur(propre) <= regle.max && (!regle.motif || regle.motif.test(propre))
+}
+
+// Textes publiés, champ par champ : un slug absent ou un champ mal formé garde la valeur du code. La formule
+// recommandée n'est reprise que si chaque formule a un booléen et qu'il y en a au plus une ; sinon, celle du code.
+// De même, une taille de foyer par formule : deux formules sur la même taille et les foyers du code reviennent.
+export function fusionnerTextesFormules(defaut: TextesFormules, recu: unknown): TextesFormules {
+  const publie = estObjet(recu) ? recu : {}
+  const resultat: TextesFormules = {}
+  for (const [slug, d] of Object.entries(defaut)) {
+    const v = estObjet(publie[slug]) ? publie[slug] as Record<string, unknown> : {}
+    const champ = (nom: keyof typeof REGLES_FORMULE) => (texteFormuleValide(nom, v[nom]) ? (v[nom] as string).trim() : d[nom])
+    resultat[slug] = {
+      cible: champ('cible'),
+      accroche: champ('accroche'),
+      repas: champ('repas'),
+      heures: champ('heures'),
+      foyer: TAILLES_FOYER_VALIDES.includes(v.foyer as Foyer) ? v.foyer as Foyer : d.foyer,
+      recommandee: d.recommandee,
+    }
+  }
+  const choix = Object.keys(defaut).map(slug => (estObjet(publie[slug]) ? (publie[slug] as Record<string, unknown>).recommandee : undefined))
+  if (choix.every(c => typeof c === 'boolean') && choix.filter(Boolean).length <= 1) {
+    Object.keys(defaut).forEach((slug, i) => { resultat[slug]!.recommandee = choix[i] === true })
+  }
+  const foyers = Object.values(resultat).map(t => t.foyer)
+  if (new Set(foyers).size !== foyers.length) {
+    for (const [slug, d] of Object.entries(defaut)) resultat[slug]!.foyer = d.foyer
+  }
+  return resultat
+}
+
+// Prix de vente accepté : nombre entier de FCFA, strictement positif
+const prixValide = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0 && v < 100_000_000
+
+// Prix de la base par slug ; null (formule inactive, bientôt disponible, sans prix ou valeur mal formée) : celui du code
+export function lirePrix(slugs: readonly string[], recu: unknown): PrixSite {
+  const publie = estObjet(recu) ? recu : {}
+  return Object.fromEntries(slugs.map(slug => [slug, prixValide(publie[slug]) ? publie[slug] as number : null]))
+}
+
 // Lien du bandeau accepté : chemin interne (pas « // ») ou adresse wa.me
 export const lienBandeauValide = (lien: string) => (lien.startsWith('/') && !lien.startsWith('//')) || lien.startsWith('https://wa.me/')
 

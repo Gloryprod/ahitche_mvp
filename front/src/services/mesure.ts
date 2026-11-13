@@ -26,7 +26,8 @@ export function mesurerVisite(to: RouteLocationNormalized, from: RouteLocationNo
 export function suivreClicsWhatsApp() {
   document.addEventListener('click', (e) => {
     const lien = (e.target as Element | null)?.closest?.('a[href*="wa.me/"]')
-    if (!lien) return
+    // Pas de mesure dans les espaces connectés (aperçus de l'admin, espace client), comme pour les pages vues
+    if (!lien || location.pathname.startsWith('/dashboard')) return
     const origine = lien.getAttribute('data-mesure')
       || lien.closest('section[id]')?.id
       || (lien.closest('header, nav') ? 'menu' : lien.closest('footer') ? 'pied-de-page' : 'autre')

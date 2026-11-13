@@ -71,6 +71,7 @@ export function ajouterDonneesStructurees(id: string, donnees: object): () => vo
 
 // Commerce local (Cotonou et Abomey-Calavi) et formules mensuelles avec leur prix. Aucune adresse postale :
 // elle n'est pas publiée, rien n'est inventé.
+// Les offres suivent les textes et les prix publiés (FORMULES est réactif : valeurs du code au build et sans API).
 export function donneesCommerce() {
   return {
     '@context': 'https://schema.org',

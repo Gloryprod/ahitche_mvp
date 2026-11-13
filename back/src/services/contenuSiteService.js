@@ -1,11 +1,13 @@
 // Contenus du site public modifiables depuis l'admin (écran « Site public », section « site »).
-// Contrat : docs-internes/admin/CONTRAT-site-public-A.md. Lot A : « infos » (infos pratiques) et « bandeau ».
-// Les lots suivants (formules, faq, actualites, photos) s'ajoutent à la table CONTENUS, sans toucher au contrôleur :
+// Contrats : docs-internes/admin/CONTRAT-site-public-A.md (lot A : « infos », infos pratiques, et « bandeau »)
+// et CONTRAT-site-public-B.md (lot B : « formules », textes des cartes de la vitrine).
+// Les lots suivants (faq, actualites, photos) s'ajoutent à la table CONTENUS, sans toucher au contrôleur :
 //   cle → { libelle, valider(valeurs) → { valeurs } | { erreur }, resumer(avant, apres) → texte, publier?(valeurs, maintenant) }
 //  - valider : contrôle complet, renvoie seulement les champs du contrat, nettoyés (jamais un champ inconnu) ;
 //  - resumer : phrase du journal, ce qui change en clair (« Infos pratiques publiées : numéro WhatsApp, horaires ») ;
 //  - publier : facultatif, ce que voit le site à cet instant (ex. bandeau hors de ses dates → null).
-// Aucune valeur par défaut ici : sans publication, le site garde celles du code (front/src/config/contact.ts).
+// Aucune valeur par défaut ici : sans publication, le site garde celles du code (front/src/config/contact.ts,
+// formules.ts) ; seul llms.txt en garde une copie côté serveur (services/llmsService.js).
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -186,6 +188,69 @@ function bandeauVisible(valeurs, maintenant = new Date()) {
 }
 
 // ------------------------------------------------------------------
+// Formules de la vitrine (lot B, docs-internes/admin/CONTRAT-site-public-B.md)
+// ------------------------------------------------------------------
+
+// Slugs des cartes de l'accueil, dans l'ordre de la liste FORMULES de front/src/config/formules.ts (à garder identiques).
+// Seuls les textes des cartes se publient ici ; nom, emoji, teinte, niveau, ordre et produits restent dans le code,
+// et le prix vient de la base (« Formules et prix »), jamais de cet écran.
+const FORMULES_VITRINE = {
+  'ahi-essentiel': 'Essentiel',
+  'ahi-equilibre': 'Équilibré',
+  'ahi-confort': 'Confort',
+};
+const SLUGS_VITRINE = Object.keys(FORMULES_VITRINE);
+const FOYERS = ['1', '2-3', '4-6'];
+const CHAMPS_FORMULE = [['cible', ['cible']], ['accroche', ['accroche']], ['repas', ['repas']], ['heures', ['heures']], ['taille de foyer', ['foyer']]];
+
+// Fourchettes « 20–30 » (repas) et « 2–4h » (heures) : au moins un chiffre ; tiret ou tiret demi-cadratin (U+2013)
+const REPAS = /^(?=.*\d)[\d \-–]+$/;
+const HEURES = /^(?=.*\d)[\d \-–h]+$/;
+
+function validerFormule(v, nom) {
+  if (!objet(v)) refuser(`${nom} : valeurs manquantes.`);
+  const cible = texte(v.cible, `${nom} : cible`, 1, 60);
+  const accroche = texte(v.accroche, `${nom} : accroche`, 1, 120);
+  const repas = texte(v.repas, `${nom} : repas`, 1, 15);
+  if (!REPAS.test(repas)) refuser(`${nom} : repas, chiffres et tiret seulement (ex. 20–30).`);
+  const heures = texte(v.heures, `${nom} : heures`, 1, 15);
+  if (!HEURES.test(heures)) refuser(`${nom} : heures, chiffres, tiret et « h » seulement (ex. 2–4h).`);
+  if (!FOYERS.includes(v.foyer)) refuser(`${nom} : taille de foyer, 1, 2-3 ou 4-6.`);
+  if (typeof v.recommandee !== 'boolean') refuser(`${nom} : recommandée, oui ou non.`);
+  return { cible, accroche, repas, heures, foyer: v.foyer, recommandee: v.recommandee };
+}
+
+function validerFormules(v) {
+  const inconnue = Object.keys(v).find((slug) => !Object.hasOwn(FORMULES_VITRINE, slug));
+  if (inconnue !== undefined) refuser(`Formule inconnue : ${inconnue.slice(0, 40)}.`);
+  const formules = {};
+  for (const [slug, nom] of Object.entries(FORMULES_VITRINE)) {
+    if (!Object.hasOwn(v, slug)) refuser(`${nom} : formule manquante.`);
+    formules[slug] = validerFormule(v[slug], nom);
+  }
+  if (SLUGS_VITRINE.filter((slug) => formules[slug].recommandee).length > 1) refuser('Formule recommandée : une seule au plus.');
+  // Le comparateur de l'accueil conseille une formule par taille de foyer : deux formules ne visent pas le même foyer
+  const foyers = SLUGS_VITRINE.map((slug) => formules[slug].foyer);
+  if (new Set(foyers).size !== foyers.length) refuser('Taille de foyer : une formule différente pour chaque taille (1, 2-3, 4-6).');
+  return formules;
+}
+
+// Phrase du journal, formule par formule : « Formules publiées : Essentiel (accroche, repas), Confort (cible),
+// formule recommandée : Confort »
+function resumerFormules(avant, apres) {
+  const liste = SLUGS_VITRINE.map((slug) => {
+    const champs = changements(avant?.[slug], apres[slug], CHAMPS_FORMULE);
+    return champs.length ? `${FORMULES_VITRINE[slug]} (${champs.join(', ')})` : null;
+  }).filter(Boolean);
+  const recommandee = (valeurs) => SLUGS_VITRINE.find((slug) => valeurs?.[slug]?.recommandee) ?? null;
+  const nouvelle = recommandee(apres);
+  if (avant && recommandee(avant) !== nouvelle) {
+    liste.push(nouvelle ? `formule recommandée : ${FORMULES_VITRINE[nouvelle]}` : 'plus de formule recommandée');
+  }
+  return phrase('Formules publiées', avant, liste);
+}
+
+// ------------------------------------------------------------------
 
 const CONTENUS = {
   infos: { libelle: 'Infos pratiques', valider: valider(validerInfos), resumer: resumerInfos },
@@ -193,10 +258,11 @@ const CONTENUS = {
     libelle: "Bandeau d'annonce", valider: valider(validerBandeau), resumer: resumerBandeau,
     publier: (valeurs, maintenant) => (bandeauVisible(valeurs, maintenant) ? valeurs : null),
   },
+  formules: { libelle: 'Formules', valider: valider(validerFormules), resumer: resumerFormules },
 };
 const CLES = Object.keys(CONTENUS);
 
 // Définition d'une clé, ou null (jamais une propriété héritée comme « constructor » ou « __proto__ »)
 const contenu = (cle) => (typeof cle === 'string' && Object.hasOwn(CONTENUS, cle) ? CONTENUS[cle] : null);
 
-module.exports = { CONTENUS, CLES, contenu, bandeauVisible, jourCotonou, egal };
+module.exports = { CONTENUS, CLES, contenu, bandeauVisible, jourCotonou, egal, SLUGS_VITRINE };
