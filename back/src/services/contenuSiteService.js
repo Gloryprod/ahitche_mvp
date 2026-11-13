@@ -1,14 +1,18 @@
 // Contenus du site public modifiables depuis l'admin (écran « Site public », section « site »).
 // Contrats : docs-internes/admin/CONTRAT-site-public-A.md (lot A : « infos », infos pratiques, et « bandeau »),
-// CONTRAT-site-public-B.md (lot B : « formules », textes des cartes de la vitrine) et CONTRAT-site-public-C.md
-// (lot C : « faq » et « actualites », des listes, avec des variables dans les réponses et les résumés).
-// Les lots suivants (photos) s'ajoutent à la table CONTENUS, sans toucher au contrôleur :
+// CONTRAT-site-public-B.md (lot B : « formules », textes des cartes de la vitrine), CONTRAT-site-public-C.md
+// (lot C : « faq » et « actualites », des listes, avec des variables dans les réponses et les résumés) et
+// CONTRAT-site-public-D.md (lot D : « photos » de la frise, envoyées dans Cloudinary, et « temoignages »).
+// Un nouveau contenu s'ajoute à la table CONTENUS, sans toucher au contrôleur :
 //   cle → { libelle, valider(valeurs) → { valeurs } | { erreur }, resumer(avant, apres) → texte, publier?(valeurs, maintenant) }
 //  - valider : contrôle complet, renvoie seulement les champs du contrat, nettoyés (jamais un champ inconnu) ;
 //  - resumer : phrase du journal, ce qui change en clair (« Infos pratiques publiées : numéro WhatsApp, horaires ») ;
 //  - publier : facultatif, ce que voit le site à cet instant (ex. bandeau hors de ses dates → null, questions masquées retirées).
 // Aucune valeur par défaut ici : sans publication, le site garde celles du code (front/src/config/contact.ts,
-// formules.ts, faq.ts, actualites.ts) ; seul llms.txt en garde une copie côté serveur (services/llmsService.js).
+// formules.ts, faq.ts, actualites.ts, photos.ts, temoignages.ts) ; seul llms.txt en garde une copie côté serveur
+// (services/llmsService.js).
+
+const { echapperRegex } = require('../utils/texte');
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -393,20 +397,27 @@ function ecartsListe(avant, apres, champs) {
 // « 1 et 3 », « 1, 2 et 3 »
 const enumerer = (n) => (n.length > 1 ? `${n.slice(0, -1).join(', ')} et ${n[n.length - 1]}` : String(n[0]));
 
+// Écarts d'une liste en clair : « 2 questions modifiées, 1 ajoutée, 1 masquée, ordre changé » (le nom seulement au
+// premier groupe). `nom` : [singulier, pluriel] ; `feminin` accorde les participes (question modifiée, témoignage modifié).
+function decompte(e, [singulier, pluriel], feminin) {
+  const accord = (participe, n) => `${participe}${feminin ? 'e' : ''}${n > 1 ? 's' : ''}`;
+  const liste = [];
+  for (const [n, participe, suite] of [
+    [e.modifies.length, 'modifié', ''], [e.ajoutes.length, 'ajouté', ''], [e.supprimes, 'supprimé', ''],
+    [e.masques.length, 'masqué', ''], [e.affiches.length, 'affiché', ' à nouveau'],
+  ]) {
+    if (!n) continue;
+    const nom = liste.length ? '' : ` ${n > 1 ? pluriel : singulier}`;
+    liste.push(`${n}${nom} ${accord(participe, n)}${suite}`);
+  }
+  if (e.ordre) liste.push('ordre changé');
+  return liste;
+}
+
 // « FAQ publiée : 2 questions modifiées, 1 ajoutée, 1 masquée, ordre changé »
 function resumerFaq(avant, apres) {
   const e = ecartsListe(avant, apres, ['question', 'reponse', 'lien']);
-  const liste = [];
-  for (const [n, singulier, pluriel] of [
-    [e.modifies.length, 'modifiée', 'modifiées'], [e.ajoutes.length, 'ajoutée', 'ajoutées'], [e.supprimes, 'supprimée', 'supprimées'],
-    [e.masques.length, 'masquée', 'masquées'], [e.affiches.length, 'affichée à nouveau', 'affichées à nouveau'],
-  ]) {
-    if (!n) continue;
-    const nom = liste.length ? '' : (n > 1 ? ' questions' : ' question'); // Le nom seulement au premier groupe
-    liste.push(`${n}${nom} ${n > 1 ? pluriel : singulier}`);
-  }
-  if (e.ordre) liste.push('ordre changé');
-  return phrase('FAQ publiée', avant, liste);
+  return phrase('FAQ publiée', avant, decompte(e, ['question', 'questions'], true));
 }
 
 // « Actualités publiées : carte 2 modifiée, carte 3 ajoutée, 1 carte supprimée, ordre changé »
@@ -427,6 +438,124 @@ function resumerActualites(avant, apres) {
 const faqPubliee = (faq) => faq.filter((q) => q.visible).map(({ id, question, reponse, lien }) => ({ id, question, reponse, lien }));
 
 // ------------------------------------------------------------------
+// Photos de la frise (lot D, docs-internes/admin/CONTRAT-site-public-D.md)
+// ------------------------------------------------------------------
+
+// Emplacements de la frise « De la ferme à vous » : clés de front/src/config/photos.ts et titres des étapes de
+// components/sections/FermeAVous.vue (à garder identiques). La photo du haut de l'accueil (heroReception) reste dans le
+// code : elle est rendue au build et chargée en priorité (vitesse sur téléphone).
+const EMPLACEMENTS_PHOTOS = {
+  fermeProduction: 'Production',
+  fermeRecolte: 'Récolte et tri',
+  fermePreparation: 'Préparation',
+  fermeLivraison: 'Livraison',
+  fermeReception: 'Réception',
+};
+// Adresse vide : l'emplacement garde la photo du code (« Revenir à la photo du code ») ; les autres champs sont alors vidés
+const PHOTO_DU_CODE = { url: '', publicId: '', alt: '', droits: false };
+// Identifiant Cloudinary d'une photo envoyée par POST /api/admin/site/photo (dossier « site »)
+const PHOTO_ID = /^site\/[\w-]{1,200}$/;
+
+/**
+ * Contrôle une photo envoyée depuis l'écran : identifiant « site/… » et adresse
+ * https://res.cloudinary.com/<CLOUDINARY_CLOUD_NAME>/image/upload/[v…/]<identifiant>.<jpg|jpeg|png|webp>, telle que
+ * Cloudinary la renvoie (ni autre compte ou domaine, ni transformation, ni paramètre : le site ajoute les siennes).
+ * Sert aussi à la route d'envoi, pour vérifier la réponse de Cloudinary.
+ * @returns {string | null} motif du refus, ou null si la photo est valide
+ */
+function refusPhoto(url, publicId) {
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME;
+  if (!cloud) return "le stockage des photos n'est pas configuré sur le serveur";
+  if (typeof publicId !== 'string' || !PHOTO_ID.test(publicId)) return 'identifiant de photo invalide ; envoyez la photo depuis cet écran';
+  const attendue = new RegExp(`^https://res\\.cloudinary\\.com/${echapperRegex(cloud)}/image/upload/(?:v\\d{1,12}/)?${echapperRegex(publicId)}\\.(?:jpg|jpeg|png|webp)$`);
+  if (typeof url !== 'string' || !attendue.test(url)) return 'adresse refusée ; envoyez la photo depuis cet écran';
+  return null;
+}
+
+function validerPhoto(v, nom) {
+  if (!objet(v)) refuser(`${nom} : valeurs manquantes.`);
+  const url = texte(v.url, `${nom} : adresse`, 0, URL_MAX);
+  if (!url) return { ...PHOTO_DU_CODE };
+  const motif = refusPhoto(url, v.publicId);
+  if (motif) refuser(`${nom} : ${motif}.`);
+  const alt = texte(v.alt ?? '', `${nom} : description`, 0, 200);
+  if (!alt) refuser(`${nom} : description obligatoire (ce que montre la photo, lue aux personnes malvoyantes).`);
+  if (Array.from(alt).length < 10) refuser(`${nom} : description : 10 caractères au moins.`);
+  if (v.droits !== true) {
+    refuser(`${nom} : cochez la case des droits (photo prise par l'équipe Ahitché, ou fournie avec l'accord écrit de son auteur et des personnes visibles).`);
+  }
+  return { url, publicId: v.publicId, alt, droits: true };
+}
+
+// Les 5 emplacements, obligatoires ; aucune autre clé
+function validerPhotos(v) {
+  const inconnu = Object.keys(v).find((cle) => !Object.hasOwn(EMPLACEMENTS_PHOTOS, cle));
+  if (inconnu !== undefined) refuser(`Emplacement de photo inconnu : ${inconnu.slice(0, 40)}.`);
+  const photos = {};
+  for (const [cle, titre] of Object.entries(EMPLACEMENTS_PHOTOS)) {
+    const nom = `Photo « ${titre} »`;
+    if (!Object.hasOwn(v, cle)) refuser(`${nom} : emplacement manquant.`);
+    photos[cle] = validerPhoto(v[cle], nom);
+  }
+  return photos;
+}
+
+// « Photos de la frise publiées : Production (photo remplacée), Livraison (photo du code rétablie), Réception (description modifiée) »
+function resumerPhotos(avant, apres) {
+  const liste = Object.entries(EMPLACEMENTS_PHOTOS).map(([cle, titre]) => {
+    const ancienne = objet(avant?.[cle]) && avant[cle].url ? avant[cle] : PHOTO_DU_CODE;
+    const nouvelle = apres[cle];
+    if (ancienne.url !== nouvelle.url) return `${titre} (${nouvelle.url ? 'photo remplacée' : 'photo du code rétablie'})`;
+    if (nouvelle.url && ancienne.alt !== nouvelle.alt) return `${titre} (description modifiée)`;
+    return null;
+  }).filter(Boolean);
+  if (!avant) return `Photos de la frise publiées pour la première fois${liste.length ? ` : ${liste.join(', ')}` : ''}`;
+  return phrase('Photos de la frise publiées', avant, liste);
+}
+
+// ------------------------------------------------------------------
+// Témoignages (lot D) : avis réels sans compte client (accord de la personne daté), affichés après les avis des clients
+// ------------------------------------------------------------------
+
+const TEMOIGNAGES_MAX = 6;
+const ACCORD_MIN = '2026-01-01';
+const dateFr = (j) => j.split('-').reverse().join('/'); // « 2026-10-04 » → « 04/10/2026 »
+
+// Liste de 0 à 6 témoignages, dans l'ordre d'affichage. accordLe : jour où la personne a validé le texte et accepté sa
+// publication, ni avant le 01/01/2026 ni après aujourd'hui (jour de Cotonou)
+function validerTemoignages(liste, maintenant = new Date()) {
+  if (liste.length > TEMOIGNAGES_MAX) refuser(`Témoignages : ${TEMOIGNAGES_MAX} au plus.`);
+  const aujourdhui = jourCotonou(maintenant);
+  const vus = new Map();
+  return liste.map((t, i) => {
+    const nom = `Témoignage ${i + 1}`;
+    if (!objet(t)) refuser(`${nom} : valeurs manquantes.`);
+    const id = identifiant(t.id, nom, vus, 'le témoignage');
+    vus.set(id, i + 1);
+    const prenom = texteSansVariable(t.prenom, `${nom} : prénom`, 2, 40);
+    const quartier = texteSansVariable(t.quartier, `${nom} : quartier`, 0, 60);
+    if (!Number.isInteger(t.note) || t.note < 1 || t.note > 5) refuser(`${nom} : note, un nombre entier de 1 à 5.`);
+    const propos = texteSansVariable(t.texte, `${nom} : texte`, 20, 600);
+    const accordLe = jour(t.accordLe, `${nom} : date de l'accord`);
+    if (!accordLe) refuser(`${nom} : date de l'accord obligatoire (jour où la personne a validé le texte et accepté sa publication).`);
+    if (accordLe < ACCORD_MIN) refuser(`${nom} : date de l'accord, pas avant le ${dateFr(ACCORD_MIN)}.`);
+    if (accordLe > aujourdhui) refuser(`${nom} : date de l'accord dans le futur (nous sommes le ${dateFr(aujourdhui)} à Cotonou).`);
+    if (typeof t.visible !== 'boolean') refuser(`${nom} : « Afficher sur le site », oui ou non.`);
+    return { id, prenom, quartier, note: t.note, texte: propos, accordLe, visible: t.visible };
+  });
+}
+
+// « Témoignages publiés : 1 témoignage modifié, 2 ajoutés, 1 masqué, ordre changé »
+function resumerTemoignages(avant, apres) {
+  const e = ecartsListe(avant, apres, ['prenom', 'quartier', 'note', 'texte', 'accordLe']);
+  return phrase('Témoignages publiés', avant, decompte(e, ['témoignage', 'témoignages'], false));
+}
+
+// Ce que reçoit le site : les témoignages affichés seulement, comme GET /api/public/avis (ni accordLe, ni visible, ni id)
+const temoignagesPublies = (liste) => liste.filter((t) => t.visible)
+  .map((t) => ({ prenom: t.prenom, quartier: t.quartier, note: t.note, texte: t.texte }));
+
+// ------------------------------------------------------------------
 
 const CONTENUS = {
   infos: { libelle: 'Infos pratiques', valider: valider(validerInfos), resumer: resumerInfos },
@@ -437,10 +566,14 @@ const CONTENUS = {
   formules: { libelle: 'Formules', valider: valider(validerFormules), resumer: resumerFormules },
   faq: { libelle: 'Questions fréquentes', valider: valider(validerFaq, true), resumer: resumerFaq, publier: faqPubliee },
   actualites: { libelle: 'Actualités', valider: valider(validerActualites, true), resumer: resumerActualites },
+  photos: { libelle: 'Photos de la frise', valider: valider(validerPhotos), resumer: resumerPhotos },
+  temoignages: {
+    libelle: 'Témoignages', valider: valider(validerTemoignages, true), resumer: resumerTemoignages, publier: temoignagesPublies,
+  },
 };
 const CLES = Object.keys(CONTENUS);
 
 // Définition d'une clé, ou null (jamais une propriété héritée comme « constructor » ou « __proto__ »)
 const contenu = (cle) => (typeof cle === 'string' && Object.hasOwn(CONTENUS, cle) ? CONTENUS[cle] : null);
 
-module.exports = { CONTENUS, CLES, contenu, bandeauVisible, jourCotonou, egal, SLUGS_VITRINE, VARIABLES };
+module.exports = { CONTENUS, CLES, contenu, bandeauVisible, jourCotonou, egal, SLUGS_VITRINE, VARIABLES, refusPhoto };

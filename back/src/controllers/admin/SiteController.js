@@ -2,11 +2,11 @@ const mongoose = require('mongoose');
 const ContenuSite = require('../../models/contenuSite');
 const { NB_VERSIONS } = require('../../models/contenuSite');
 const User = require('../../models/user');
-const { CLES, contenu, egal, SLUGS_VITRINE } = require('../../services/contenuSiteService');
+const { CLES, contenu, egal, SLUGS_VITRINE, refusPhoto } = require('../../services/contenuSiteService');
 const { prixVitrine } = require('../../services/formuleService');
 const { journaliser } = require('../../services/journalService');
 
-// Écran « Site public » (docs-internes/admin/CONTRAT-site-public-A.md, -B.md et -C.md), section « site » : lecture admin et
+// Écran « Site public » (docs-internes/admin/CONTRAT-site-public-A.md à -D.md), section « site » : lecture admin et
 // coordinateur, écriture (publication, retour à une version) admin seulement, contrôlée par acces() dans routes/admin.js.
 // Chaque publication remplace les valeurs, s'ajoute en tête des versions (10 au plus) et est journalisée
 // (entité « Site public »). Validation propre à chaque contenu : services/contenuSiteService.js.
@@ -67,7 +67,7 @@ async function publier(req, cle, def, valeurs, versionRestauree = null) {
 }
 
 // GET /api/admin/site -> { contenus: { infos: { valeurs, updatedAt, versions: [{ _id, publieLe, publiePar: { nom } }] } | null, bandeau: …, formules: …,
-//   faq: … (toutes les questions, masquées comprises), actualites: … },
+//   faq: … (toutes les questions, masquées comprises), actualites: …, photos: …, temoignages: … (tous, avec accordLe et visible) },
 //   prix: { [slug]: number | null } } (prix de vente de la vitrine, en lecture : il se modifie dans « Formules et prix »)
 async function listerContenus(req, res) {
   try {
@@ -141,4 +141,20 @@ async function restaurerVersion(req, res) {
   }
 }
 
-module.exports = { listerContenus, voirVersion, publierContenu, restaurerVersion };
+// POST /api/admin/site/photo : champ « photo » (JPEG, PNG ou WebP, 5 Mo au plus, réduite dans le navigateur avant l'envoi,
+// ramenée à 1600 px par Cloudinary, dossier « site ») -> { url, publicId }. L'envoi seul ne publie rien : la photo n'apparaît
+// sur le site qu'avec la publication des photos de la frise (PUT /api/admin/site/photos). Les photos remplacées restent
+// dans Cloudinary, pour que « Revenir à cette version » fonctionne. Erreurs de téléversement : gestionnaire de back/index.js.
+async function televerserPhoto(req, res) {
+  if (!req.file) return res.status(400).json({ message: 'Photo manquante ou format non accepté (JPEG, PNG ou WebP).' });
+  const { path: url, filename: publicId } = req.file;
+  // Réponse de Cloudinary contrôlée comme une publication : une photo envoyée ici doit pouvoir être publiée
+  const motif = refusPhoto(url, publicId);
+  if (motif) {
+    console.error('Erreur televerserPhoto (site) : réponse de Cloudinary inattendue :', motif, { url, publicId });
+    return res.status(502).json({ message: "La photo a été envoyée mais son adresse n'est pas reconnue. Prévenez l'équipe technique." });
+  }
+  return res.status(200).json({ url, publicId });
+}
+
+module.exports = { listerContenus, voirVersion, publierContenu, restaurerVersion, televerserPhoto };

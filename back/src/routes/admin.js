@@ -146,7 +146,9 @@ router.post('/equipe/:id/mot-de-passe', equipeC.definirMotDePasse); // Provisoir
 router.patch('/equipe/:id/statut', equipeC.changerStatut); // { actif }
 router.post('/equipe/:id/lien-reinitialisation', equipeC.envoyerLien);
 
-// Site public : contenus du site modifiables sans code (infos pratiques, bandeau d'annonce, formules, questions fréquentes, actualités), chaque publication journalisée
+// Site public : contenus du site modifiables sans code (infos pratiques, bandeau d'annonce, formules, questions fréquentes, actualités,
+// photos de la frise, témoignages), chaque publication journalisée
+router.post('/site/photo', upload.uploadPhotoSite.single('photo'), siteC.televerserPhoto); // Écriture (admin) : envoi seul, rien n'est publié
 router.get('/site', siteC.listerContenus);
 router.get('/site/:cle/versions/:id', siteC.voirVersion);
 router.put('/site/:cle', siteC.publierContenu); // { valeurs }
