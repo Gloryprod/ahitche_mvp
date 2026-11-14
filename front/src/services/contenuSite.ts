@@ -2,9 +2,12 @@
 // chargement de page, sans bloquer l'affichage. Délai maximal de 5 s ; en cas d'échec, le site garde les valeurs
 // du code (config/contact.ts, config/formules.ts) et aucun bandeau ne s'affiche. Jamais appelé pendant le rendu de
 // l'accueil au build. Lot B : textes des cartes des formules et prix de vente de la base (null : prix du code).
+// Lot C : questions fréquentes (visibles seulement) et actualités (liste vide : section masquée) ; null : celles du code.
 import { shallowRef } from 'vue'
 import { appliquerInfos } from '@/config/contact'
 import { appliquerFormules } from '@/config/formules'
+import { appliquerFaq } from '@/config/faq'
+import { appliquerActualites } from '@/config/actualites'
 import { lireBandeau, type BandeauSite } from './valeursSite'
 
 const API = import.meta.env.PROD ? 'https://api.ahitchebj.com' : ''
@@ -25,9 +28,11 @@ export function chargerContenuSite(): Promise<void> {
       if (!reponse.ok) return
       const donnees: unknown = await reponse.json()
       if (typeof donnees !== 'object' || donnees === null) return
-      const { infos, bandeau, formules, prix } = donnees as { infos?: unknown; bandeau?: unknown; formules?: unknown; prix?: unknown }
+      const { infos, bandeau, formules, prix, faq, actualites } = donnees as Record<string, unknown>
       if (infos) appliquerInfos(infos)
       if (formules || prix) appliquerFormules(formules, prix)
+      if (faq) appliquerFaq(faq)
+      if (actualites) appliquerActualites(actualites)
       bandeauSite.value = lireBandeau(bandeau)
     } catch {
       // Hors ligne, délai dépassé ou réponse illisible : les valeurs du code restent affichées

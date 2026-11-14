@@ -1,21 +1,28 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue'
-import { FAQ } from '@/config/faq'
+import { FAQ, type QuestionFaq } from '@/config/faq'
 import { ajouterDonneesStructurees, donneesFaq } from '@/services/referencement'
+
+// Questions fréquentes de l'accueil : celles publiées depuis l'admin (visibles, variables remplacées), sinon celles
+// du code. Avec « apercu » (écran « Site public ») : les questions passées en propriété, sans ancre ni données
+// structurées, liens ouverts dans un nouvel onglet (le formulaire en cours reste ouvert).
+const props = defineProps<{ questions?: QuestionFaq[]; apercu?: boolean }>()
+const liste = computed(() => (props.apercu ? props.questions ?? [] : FAQ.value))
+const cibleLien = (vers: string) => (props.apercu && vers.startsWith('#') ? `/${vers}` : vers)
 
 // Données structurées FAQPage (référencement local) : ajoutées au <head> le temps de l'affichage de l'accueil,
 // remises à jour à l'arrivée des valeurs publiées depuis l'admin
 const donnees = computed(donneesFaq)
 let retirer: (() => void) | undefined
 onMounted(() => {
-  retirer = ajouterDonneesStructurees('donnees-faq', donnees.value)
+  if (!props.apercu) retirer = ajouterDonneesStructurees('donnees-faq', donnees.value)
 })
-watch(donnees, d => { retirer = ajouterDonneesStructurees('donnees-faq', d) })
+watch(donnees, d => { if (!props.apercu) retirer = ajouterDonneesStructurees('donnees-faq', d) })
 onUnmounted(() => retirer?.())
 </script>
 
 <template>
-  <section id="faq" class="py-20 bg-white">
+  <section :id="apercu ? undefined : 'faq'" :class="[apercu ? 'py-8' : 'py-20', 'bg-white']">
     <div class="max-w-3xl mx-auto px-4">
       <div class="text-center mb-10">
         <span class="text-xs font-bold tracking-wider text-foret uppercase bg-savane/10 px-3 py-1 rounded-full">
@@ -28,7 +35,7 @@ onUnmounted(() => retirer?.())
 
       <!-- Accordéon natif (<details>) : utilisable au clavier et sans JavaScript -->
       <div class="divide-y divide-creme2 border-y border-creme2">
-        <details v-for="q in FAQ" :key="q.question" class="faq-item group">
+        <details v-for="q in liste" :key="q.id" class="faq-item group">
           <summary class="flex items-center justify-between gap-4 min-h-14 py-4 cursor-pointer list-none text-left font-bold text-noir hover:text-foret focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-or rounded-lg">
             {{ q.question }}
             <span class="shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-creme text-foret transition-transform duration-300 group-open:rotate-45" aria-hidden="true">
@@ -37,9 +44,15 @@ onUnmounted(() => retirer?.())
           </summary>
           <div class="pb-5 pr-12 text-gris leading-relaxed">
             <p>{{ q.reponse }}</p>
-            <RouterLink v-if="q.lien" :to="q.lien.vers" class="inline-block mt-2 font-semibold text-foret underline underline-offset-4 hover:text-savane">
-              {{ q.lien.texte }}
-            </RouterLink>
+            <template v-if="q.lien">
+              <!-- Page du site : navigation sans rechargement ; ancre de l'accueil ou aperçu : lien simple -->
+              <RouterLink v-if="q.lien.vers.startsWith('/') && !apercu" :to="q.lien.vers" class="inline-block mt-2 font-semibold text-foret underline underline-offset-4 hover:text-savane">
+                {{ q.lien.texte }}
+              </RouterLink>
+              <a v-else :href="cibleLien(q.lien.vers)" :target="apercu ? '_blank' : undefined" :rel="apercu ? 'noopener' : undefined" class="inline-block mt-2 font-semibold text-foret underline underline-offset-4 hover:text-savane">
+                {{ q.lien.texte }}
+              </a>
+            </template>
           </div>
         </details>
       </div>

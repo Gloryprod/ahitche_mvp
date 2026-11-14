@@ -3,28 +3,36 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useToast } from 'vue-toastification'
 import Swal from 'sweetalert2'
-import { PanelsTopLeft, Send, Eye, RotateCcw, X, ExternalLink } from 'lucide-vue-next'
+import { PanelsTopLeft, Send, RotateCcw, X, ExternalLink } from 'lucide-vue-next'
 import api from '@/stores/api'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
 import { appliquerInfos } from '@/config/contact'
-import { appliquerFormules } from '@/config/formules'
+import { PRODUITS_INCLUS, appliquerFormules } from '@/config/formules'
+import { appliquerFaq } from '@/config/faq'
+import { appliquerActualites } from '@/config/actualites'
 import { messageErreur } from '@/services/erreurs'
 import BandeauAnnonce from '@/components/layout/BandeauAnnonce.vue'
 import OngletFormules from './OngletFormules.vue'
+import OngletFaq from './OngletFaq.vue'
+import OngletActualites from './OngletActualites.vue'
+import HistoriqueVersions from './HistoriqueVersions.vue'
 import {
-  JOURS_SEMAINE, annonceLivraison, formaterHoraires, formaterNumero, lienBandeauValide, type BandeauSite, type InfosSite,
-  type TextesFormules,
+  JOURS_SEMAINE, annonceLivraison, formaterHoraires, formaterNumero, lienBandeauValide, valeursVariables, type BandeauSite,
+  type CarteActualite, type InfosSite, type QuestionFaq, type TextesFormules,
 } from '@/services/valeursSite'
 import {
-  CHAMPS_BANDEAU, CHAMPS_FORMULES, CHAMPS_INFOS, TITRES_CONTENUS, bandeauAEnvoyer, bandeauPublie, champDeLErreur, changements,
-  controlerFormules, formulesAEnvoyer, formulesPubliees, infosAEnvoyer, infosPubliees, lireReponseSite, periodeBandeau,
-  type Changement, type CleContenu, type ContenuEcran, type ContenusSite, type ReponseSite, type Version,
+  CHAMPS_BANDEAU, CHAMPS_FORMULES, CHAMPS_INFOS, STYLE_SWAL, TITRES_CONTENUS, actualitesAEnvoyer, actualitesEnFormulaire, actualitesPubliees,
+  bandeauAEnvoyer, bandeauPublie, champDeLErreur, changements, controlerActualites, controlerFaq, controlerFormules, dateHeure, ecartsActualites,
+  ecartsFaq, faqAEnvoyer, faqEnFormulaire, faqPubliee, formulesAEnvoyer, formulesPubliees, infosAEnvoyer, infosPubliees, lignesActualites, lignesFaq,
+  lireReponseSite, periodeBandeau,
+  type CarteFormulaire, type Changement, type CleContenu, type ContenuEcran, type ContenusSite, type QuestionFormulaire, type ReponseSite, type Version,
 } from './champsSite'
 
-// « Site public » (docs-internes/admin/CONTRAT-site-public-A.md et -B.md), section « site » : lecture admin et
+// « Site public » (docs-internes/admin/CONTRAT-site-public-A.md, -B.md et -C.md), section « site » : lecture admin et
 // coordinateur, publication admin seulement (le serveur fait foi). Lot A : infos pratiques et bandeau d'annonce ;
-// lot B : textes des cartes des formules (le prix, lui, se modifie dans « Formules et prix »). Chaque onglet :
+// lot B : textes des cartes des formules (le prix, lui, se modifie dans « Formules et prix ») ; lot C : questions
+// fréquentes et actualités. Chaque onglet :
 // formulaire prérempli (valeurs publiées, sinon celles du code), aperçu en direct, publication confirmée et
 // historique des 10 dernières versions.
 
@@ -47,12 +55,19 @@ const onglet = ref<CleContenu>('infos')
 const infos = reactive<InfosSite>(infosPubliees(undefined))
 const bandeau = reactive<BandeauSite>(bandeauPublie(undefined))
 const formules = reactive<TextesFormules>(formulesPubliees(undefined))
-const rempli = { infos: false, bandeau: false, formules: false }
+const faq = ref<QuestionFormulaire[]>([])
+const actualites = ref<CarteFormulaire[]>([])
+const rempli = { infos: false, bandeau: false, formules: false, faq: false, actualites: false }
+// Infos pratiques du site : variables de la FAQ et des actualités, réseaux de la carte « Suivez-nous » du code
+const infosDuSite = computed(() => infosPubliees(contenusSite.value?.infos))
+const variables = computed(() => valeursVariables(infosDuSite.value, PRODUITS_INCLUS.length))
 
 function remplir(cle: CleContenu, contenus: ContenusSite) {
   if (cle === 'infos') Object.assign(infos, infosPubliees(contenus.infos))
   else if (cle === 'bandeau') Object.assign(bandeau, bandeauPublie(contenus.bandeau))
-  else Object.assign(formules, formulesPubliees(contenus.formules))
+  else if (cle === 'formules') Object.assign(formules, formulesPubliees(contenus.formules))
+  else if (cle === 'faq') faq.value = faqEnFormulaire(faqPubliee(contenus.faq))
+  else actualites.value = actualitesEnFormulaire(actualitesPubliees(contenus.actualites, infosPubliees(contenus.infos)))
   rempli[cle] = true
 }
 watch(contenusSite, contenus => {
@@ -60,6 +75,8 @@ watch(contenusSite, contenus => {
   if (!rempli.infos) remplir('infos', contenus)
   if (!rempli.bandeau) remplir('bandeau', contenus)
   if (!rempli.formules) remplir('formules', contenus)
+  if (!rempli.faq) remplir('faq', contenus)
+  if (!rempli.actualites) remplir('actualites', contenus)
 }, { immediate: true })
 
 const jamaisPublie = (cle: CleContenu) => !!contenusSite.value && !contenusSite.value[cle]
@@ -72,7 +89,13 @@ const envoiFormules = computed(() => formulesAEnvoyer(formules))
 const changementsInfos = computed(() => changements(CHAMPS_INFOS, infosPubliees(contenusSite.value?.infos), envoiInfos.value))
 const changementsBandeau = computed(() => changements(CHAMPS_BANDEAU, bandeauPublie(contenusSite.value?.bandeau), envoiBandeau.value))
 const changementsFormules = computed(() => changements(CHAMPS_FORMULES, formulesPubliees(contenusSite.value?.formules), envoiFormules.value))
-const listeChangementsDe = (cle: CleContenu) => ({ infos: changementsInfos, bandeau: changementsBandeau, formules: changementsFormules }[cle].value)
+const envoiFaq = computed(() => faqAEnvoyer(faq.value))
+const envoiActualites = computed(() => actualitesAEnvoyer(actualites.value))
+const changementsFaq = computed(() => ecartsFaq(faqPubliee(contenusSite.value?.faq), envoiFaq.value))
+const changementsActualites = computed(() => ecartsActualites(actualitesPubliees(contenusSite.value?.actualites, infosDuSite.value), envoiActualites.value))
+const listeChangementsDe = (cle: CleContenu) => ({
+  infos: changementsInfos, bandeau: changementsBandeau, formules: changementsFormules, faq: changementsFaq, actualites: changementsActualites,
+}[cle].value)
 const aChange = (cle: CleContenu) => listeChangementsDe(cle).length > 0
 
 // --- Aperçu en direct ---
@@ -97,18 +120,25 @@ const erreurs = reactive<Record<CleContenu, { champ: string; message: string }>>
   infos: { champ: '', message: '' },
   bandeau: { champ: '', message: '' },
   formules: { champ: '', message: '' },
+  faq: { champ: '', message: '' },
+  actualites: { champ: '', message: '' },
 })
 // Une erreur affichée disparaît dès que le formulaire change (elle reviendra à la prochaine publication si besoin)
 watch(() => JSON.stringify(infos), () => { erreurs.infos = { champ: '', message: '' } })
 watch(() => JSON.stringify(bandeau), () => { erreurs.bandeau = { champ: '', message: '' } })
 watch(() => JSON.stringify(formules), () => { erreurs.formules = { champ: '', message: '' } })
+watch(() => JSON.stringify(faq.value), () => { erreurs.faq = { champ: '', message: '' } })
+watch(() => JSON.stringify(actualites.value), () => { erreurs.actualites = { champ: '', message: '' } })
 const idChamp = (id: string) => `champ-site-${id.replace(/\./g, '-')}`
 const erreurDe = (cle: CleContenu, champ: string) => (erreurs[cle].champ === champ ? erreurs[cle].message : '')
 const attributsErreur = (cle: CleContenu, champ: string) => (erreurDe(cle, champ)
   ? { 'aria-invalid': 'true' as const, 'aria-describedby': `${idChamp(champ)}-erreur` }
   : {})
 
-async function signaler(cle: CleContenu, message: string, champ = champDeLErreur(cle, message)) {
+// Identifiants des éléments du formulaire, pour retrouver le champ d'une erreur « Question 3 : … »
+const idsDe = (cle: CleContenu) => (cle === 'faq' ? faq.value : cle === 'actualites' ? actualites.value : []).map(e => e.id)
+
+async function signaler(cle: CleContenu, message: string, champ = champDeLErreur(cle, message, idsDe(cle))) {
   erreurs[cle] = { champ, message }
   await nextTick()
   const cible = champ ? document.getElementById(idChamp(champ)) : document.getElementById(`erreur-haut-${cle}`)
@@ -125,6 +155,8 @@ function controler(cle: CleContenu): { champ: string; message: string } | null {
     return null
   }
   if (cle === 'formules') return controlerFormules(envoiFormules.value)
+  if (cle === 'faq') return controlerFaq(envoiFaq.value)
+  if (cle === 'actualites') return controlerActualites(envoiActualites.value)
   const b = envoiBandeau.value
   if (b.lien && !lienBandeauValide(b.lien)) return { champ: 'lien', message: 'Lien du bandeau : un chemin du site (ex. /blog) ou une adresse https://wa.me/…' }
   if (b.debut && b.fin && b.fin < b.debut) return { champ: 'fin', message: 'Fin du bandeau : ne peut pas précéder le début.' }
@@ -132,7 +164,6 @@ function controler(cle: CleContenu): { champ: string; message: string } | null {
 }
 
 // --- Confirmation : la liste de ce qui change ---
-const STYLE_SWAL = { confirmButtonColor: 'var(--color-foret)', cancelButtonColor: 'var(--color-gris)', customClass: { popup: 'rounded-2xl font-body' } }
 const echapper = (texte: string) => texte.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c]!))
 const listeChangements = (liste: Changement[]) => `<ul style="text-align:left;font-size:.875rem;line-height:1.45;margin:0;padding:0;list-style:none">${liste
   .map(c => `<li style="padding:.5rem 0;border-top:1px solid var(--color-creme2)"><strong>${echapper(c.libelle)}</strong><br><span style="color:var(--color-gris)">Avant : ${echapper(c.avant)}</span><br>Après : ${echapper(c.apres)}</li>`)
@@ -140,19 +171,24 @@ const listeChangements = (liste: Changement[]) => `<ul style="text-align:left;fo
 
 // Cache public du serveur (60 s, puis 300 s de reprise) : une nouvelle version met quelques minutes à s'afficher partout
 const AVIS_CACHE = 'Le site affiche la nouvelle version d\'ici quelques minutes.'
-const nouvelleVersion = reactive<Record<CleContenu, boolean>>({ infos: false, bandeau: false, formules: false })
+const nouvelleVersion = reactive<Record<CleContenu, boolean>>({ infos: false, bandeau: false, formules: false, faq: false, actualites: false })
 
 // Met à jour l'écran (et le site de cet onglet) avec la réponse du serveur ; le message du serveur est affiché tel quel
-type ContenuRecu = ContenuEcran<InfosSite> | ContenuEcran<BandeauSite> | ContenuEcran<TextesFormules> | null
+type ContenuRecu = ContenuEcran<InfosSite> | ContenuEcran<BandeauSite> | ContenuEcran<TextesFormules> | ContenuEcran<QuestionFaq[]> | ContenuEcran<CarteActualite[]> | null
 function enregistrerReponse(cle: CleContenu, contenu: ContenuRecu, message: string) {
   const avant = versions(cle)[0]?._id
   const publiee = !!contenu?.versions?.[0] && contenu.versions[0]._id !== avant
   const actuel = lireReponseSite(data.value)
+  // Actualités jamais publiées : la carte « Suivez-nous » du code suit les réseaux publiés, sans brouillon perdu
+  const suivreReseaux = cle === 'infos' && !actuel.contenus.actualites && !aChange('actualites')
   const contenus = { ...actuel.contenus, [cle]: contenu } as ContenusSite
   queryClient.setQueryData<ReponseSite>(CLE_REQUETE, { contenus, prix: actuel.prix })
   remplir(cle, contenus)
+  if (suivreReseaux) remplir('actualites', contenus)
   if (cle === 'infos' && contenus.infos) appliquerInfos(contenus.infos.valeurs)
   if (cle === 'formules' && contenus.formules) appliquerFormules(contenus.formules.valeurs, actuel.prix)
+  if (cle === 'faq' && contenus.faq) appliquerFaq(contenus.faq.valeurs)
+  if (cle === 'actualites' && contenus.actualites) appliquerActualites(contenus.actualites.valeurs)
   if (publiee) {
     nouvelleVersion[cle] = true
     toast.success(`${message} ${AVIS_CACHE}`)
@@ -162,7 +198,9 @@ function enregistrerReponse(cle: CleContenu, contenu: ContenuRecu, message: stri
 }
 
 const envoi = ref<CleContenu | ''>('')
-const OBJETS_PUBLICATION: Record<CleContenu, string> = { infos: 'les infos pratiques', bandeau: 'le bandeau d\'annonce', formules: 'les textes des formules' }
+const OBJETS_PUBLICATION: Record<CleContenu, string> = {
+  infos: 'les infos pratiques', bandeau: 'le bandeau d\'annonce', formules: 'les textes des formules', faq: 'les questions fréquentes', actualites: 'les actualités',
+}
 
 async function publier(cle: CleContenu) {
   if (!ecriture.value || envoi.value) return
@@ -180,7 +218,7 @@ async function publier(cle: CleContenu) {
   if (!choix.isConfirmed) return
   envoi.value = cle
   try {
-    const valeurs = { infos: envoiInfos, bandeau: envoiBandeau, formules: envoiFormules }[cle].value
+    const valeurs = { infos: envoiInfos, bandeau: envoiBandeau, formules: envoiFormules, faq: envoiFaq, actualites: envoiActualites }[cle].value
     const { data: r } = await api.put(`/api/admin/site/${cle}`, { valeurs })
     enregistrerReponse(cle, r.contenu, r.message)
   } catch (err) {
@@ -191,10 +229,7 @@ async function publier(cle: CleContenu) {
 }
 
 // --- Historique : voir une version, y revenir ---
-const dateHeure = (d: string) => new Date(d).toLocaleString('fr-FR', {
-  day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Porto-Novo',
-})
-interface VersionDetaillee { valeurs: InfosSite | BandeauSite | TextesFormules; publieLe: string; publiePar: { nom: string } }
+interface VersionDetaillee { valeurs: InfosSite | BandeauSite | TextesFormules | QuestionFaq[] | CarteActualite[]; publieLe: string; publiePar: { nom: string } }
 const cacheVersions = new Map<string, VersionDetaillee>()
 async function chargerVersion(cle: CleContenu, id: string): Promise<VersionDetaillee> {
   const cleCache = `${cle}:${id}`
@@ -217,6 +252,14 @@ function comparerVersion(cle: CleContenu, valeurs: VersionDetaillee['valeurs']):
   if (cle === 'bandeau') {
     const v = bandeauPublie(enContenu<BandeauSite>(valeurs))
     return { lignes: CHAMPS_BANDEAU.map(c => ({ libelle: c.libelle, valeur: c.lire(v) })), liste: changements(CHAMPS_BANDEAU, bandeauPublie(contenusSite.value?.bandeau), v) }
+  }
+  if (cle === 'faq') {
+    const v = faqPubliee(enContenu<QuestionFaq[]>(valeurs))
+    return { lignes: lignesFaq(v), liste: ecartsFaq(faqPubliee(contenusSite.value?.faq), v) }
+  }
+  if (cle === 'actualites') {
+    const v = actualitesPubliees(enContenu<CarteActualite[]>(valeurs), infosDuSite.value)
+    return { lignes: lignesActualites(v), liste: ecartsActualites(actualitesPubliees(contenusSite.value?.actualites, infosDuSite.value), v) }
   }
   const v = formulesPubliees(enContenu<TextesFormules>(valeurs))
   return { lignes: CHAMPS_FORMULES.map(c => ({ libelle: c.libelle, valeur: c.lire(v) })), liste: changements(CHAMPS_FORMULES, formulesPubliees(contenusSite.value?.formules), v) }
@@ -310,6 +353,12 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
       </button>
       <button id="onglet-formules" type="button" role="tab" :aria-selected="onglet === 'formules'" aria-controls="panneau-formules" :class="boutonOnglet(onglet === 'formules')" @click="onglet = 'formules'">
         Formules
+      </button>
+      <button id="onglet-faq" type="button" role="tab" :aria-selected="onglet === 'faq'" aria-controls="panneau-faq" :class="boutonOnglet(onglet === 'faq')" @click="onglet = 'faq'">
+        Questions fréquentes
+      </button>
+      <button id="onglet-actualites" type="button" role="tab" :aria-selected="onglet === 'actualites'" aria-controls="panneau-actualites" :class="boutonOnglet(onglet === 'actualites')" @click="onglet = 'actualites'">
+        Actualités
       </button>
     </div>
 
@@ -450,26 +499,7 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
         </aside>
 
         <!-- Historique -->
-        <section class="bg-white rounded-2xl p-4 space-y-3 lg:col-span-2" aria-labelledby="titre-historique-infos">
-          <h2 id="titre-historique-infos" class="font-bold text-noir text-base">Historique (10 dernières publications)</h2>
-          <p v-if="!versions('infos').length" class="text-xs">Aucune publication pour l'instant.</p>
-          <ul v-else class="divide-y divide-creme2">
-            <li v-for="v in versions('infos')" :key="v._id" class="py-2.5 flex flex-col sm:flex-row sm:items-center gap-2">
-              <p class="flex-1 min-w-0 text-noir">
-                {{ dateHeure(v.publieLe) }} <span class="text-gris">par {{ v.publiePar.nom || 'un administrateur' }}</span>
-                <span v-if="estEnLigne('infos', v)" class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-foret/10 text-foret">En ligne</span>
-              </p>
-              <div class="flex gap-2">
-                <button type="button" :class="[bouton, 'bg-creme text-foret hover:bg-creme2']" :aria-label="`Voir la version du ${dateHeure(v.publieLe)}`" @click="voir('infos', v)">
-                  <Eye class="w-4 h-4" aria-hidden="true" /> Voir
-                </button>
-                <button v-if="ecriture && !estEnLigne('infos', v)" type="button" :disabled="envoi !== ''" :class="[bouton, 'bg-creme text-foret hover:bg-creme2']" :aria-label="`Revenir à la version du ${dateHeure(v.publieLe)}`" @click="revenir('infos', v)">
-                  <RotateCcw class="w-4 h-4" aria-hidden="true" /> Revenir à cette version
-                </button>
-              </div>
-            </li>
-          </ul>
-        </section>
+        <HistoriqueVersions cle="infos" :versions="versions('infos')" :ecriture="ecriture" :occupe="envoi !== ''" class="lg:col-span-2" @voir="voir('infos', $event)" @revenir="revenir('infos', $event)" />
       </section>
 
       <!-- ============ BANDEAU D'ANNONCE ============ -->
@@ -559,26 +589,7 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
           <p class="text-xs">{{ periodeBandeau(envoiBandeau) }}</p>
         </aside>
 
-        <section class="bg-white rounded-2xl p-4 space-y-3 lg:col-span-2" aria-labelledby="titre-historique-bandeau">
-          <h2 id="titre-historique-bandeau" class="font-bold text-noir text-base">Historique (10 dernières publications)</h2>
-          <p v-if="!versions('bandeau').length" class="text-xs">Aucune publication pour l'instant.</p>
-          <ul v-else class="divide-y divide-creme2">
-            <li v-for="v in versions('bandeau')" :key="v._id" class="py-2.5 flex flex-col sm:flex-row sm:items-center gap-2">
-              <p class="flex-1 min-w-0 text-noir">
-                {{ dateHeure(v.publieLe) }} <span class="text-gris">par {{ v.publiePar.nom || 'un administrateur' }}</span>
-                <span v-if="estEnLigne('bandeau', v)" class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-foret/10 text-foret">En ligne</span>
-              </p>
-              <div class="flex gap-2">
-                <button type="button" :class="[bouton, 'bg-creme text-foret hover:bg-creme2']" :aria-label="`Voir la version du ${dateHeure(v.publieLe)}`" @click="voir('bandeau', v)">
-                  <Eye class="w-4 h-4" aria-hidden="true" /> Voir
-                </button>
-                <button v-if="ecriture && !estEnLigne('bandeau', v)" type="button" :disabled="envoi !== ''" :class="[bouton, 'bg-creme text-foret hover:bg-creme2']" :aria-label="`Revenir à la version du ${dateHeure(v.publieLe)}`" @click="revenir('bandeau', v)">
-                  <RotateCcw class="w-4 h-4" aria-hidden="true" /> Revenir à cette version
-                </button>
-              </div>
-            </li>
-          </ul>
-        </section>
+        <HistoriqueVersions cle="bandeau" :versions="versions('bandeau')" :ecriture="ecriture" :occupe="envoi !== ''" class="lg:col-span-2" @voir="voir('bandeau', $event)" @revenir="revenir('bandeau', $event)" />
       </section>
 
       <!-- ============ FORMULES ============ -->
@@ -607,27 +618,60 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
           </div>
         </form>
 
-        <section class="bg-white rounded-2xl p-4 space-y-3" aria-labelledby="titre-historique-formules">
-          <h2 id="titre-historique-formules" class="font-bold text-noir text-base">Historique (10 dernières publications)</h2>
-          <p v-if="!versions('formules').length" class="text-xs">Aucune publication pour l'instant.</p>
-          <ul v-else class="divide-y divide-creme2">
-            <li v-for="v in versions('formules')" :key="v._id" class="py-2.5 flex flex-col sm:flex-row sm:items-center gap-2">
-              <p class="flex-1 min-w-0 text-noir">
-                {{ dateHeure(v.publieLe) }} <span class="text-gris">par {{ v.publiePar.nom || 'un administrateur' }}</span>
-                <span v-if="estEnLigne('formules', v)" class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-foret/10 text-foret">En ligne</span>
-              </p>
-              <div class="flex gap-2">
-                <button type="button" :class="[bouton, 'bg-creme text-foret hover:bg-creme2']" :aria-label="`Voir la version du ${dateHeure(v.publieLe)}`" @click="voir('formules', v)">
-                  <Eye class="w-4 h-4" aria-hidden="true" /> Voir
-                </button>
-                <button v-if="ecriture && !estEnLigne('formules', v)" type="button" :disabled="envoi !== ''" :class="[bouton, 'bg-creme text-foret hover:bg-creme2']" :aria-label="`Revenir à la version du ${dateHeure(v.publieLe)}`" @click="revenir('formules', v)">
-                  <RotateCcw class="w-4 h-4" aria-hidden="true" /> Revenir à cette version
-                </button>
-              </div>
-            </li>
-          </ul>
-        </section>
+        <HistoriqueVersions cle="formules" :versions="versions('formules')" :ecriture="ecriture" :occupe="envoi !== ''" @voir="voir('formules', $event)" @revenir="revenir('formules', $event)" />
       </section>
+      <!-- ============ QUESTIONS FRÉQUENTES ============ -->
+      <section v-show="onglet === 'faq'" id="panneau-faq" role="tabpanel" aria-labelledby="onglet-faq" class="space-y-4">
+        <form class="bg-white rounded-2xl p-4 space-y-5 min-w-0" novalidate aria-labelledby="titre-faq" @submit.prevent="publier('faq')">
+          <div class="space-y-1">
+            <h2 id="titre-faq" class="font-bold text-noir text-base">Questions fréquentes</h2>
+            <p v-if="jamaisPublie('faq')" class="text-xs p-2.5 rounded-xl bg-creme text-noir">Valeurs actuelles du site (jamais modifiées depuis l'admin)</p>
+            <p v-else-if="versions('faq')[0]" class="text-xs">Publié le {{ dateHeure(versions('faq')[0]!.publieLe) }} par {{ versions('faq')[0]!.publiePar.nom || 'un administrateur' }}.</p>
+            <p class="text-xs">Section « Vous vous demandez… » de l'accueil, reprise pour Google. Touchez une question pour la modifier.</p>
+          </div>
+          <p v-if="erreurs.faq.message && !erreurs.faq.champ" id="erreur-haut-faq" role="alert" tabindex="-1" class="p-3 rounded-xl bg-red-50 text-red-800 text-xs font-semibold">{{ erreurs.faq.message }}</p>
+
+          <OngletFaq v-model:questions="faq" :erreur="erreurs.faq" :lecture-seule="!ecriture" :valeurs="variables" />
+
+          <div v-if="ecriture" class="pt-3 border-t border-creme2 space-y-2">
+            <button type="submit" :disabled="envoi !== '' || !aChange('faq')" :class="[bouton, 'w-full sm:w-auto bg-foret text-white hover:bg-savane px-5 text-sm']">
+              <Send class="w-4 h-4" aria-hidden="true" /> {{ envoi === 'faq' ? 'Publication…' : 'Publier' }}
+            </button>
+            <p v-if="nouvelleVersion.faq" role="status" class="text-xs text-foret font-semibold">{{ AVIS_CACHE }}</p>
+            <p class="text-xs">{{ aChange('faq') ? `${listeChangementsDe('faq').length} changement(s) à publier.` : 'Aucun changement par rapport au site.' }}</p>
+            <p class="text-xs text-noir font-semibold">Uniquement des faits vérifiés, sans date inventée ni promesse de santé ou de prix.</p>
+          </div>
+        </form>
+
+        <HistoriqueVersions cle="faq" :versions="versions('faq')" :ecriture="ecriture" :occupe="envoi !== ''" @voir="voir('faq', $event)" @revenir="revenir('faq', $event)" />
+      </section>
+
+      <!-- ============ ACTUALITÉS ============ -->
+      <section v-show="onglet === 'actualites'" id="panneau-actualites" role="tabpanel" aria-labelledby="onglet-actualites" class="space-y-4">
+        <form class="bg-white rounded-2xl p-4 space-y-5 min-w-0" novalidate aria-labelledby="titre-actualites" @submit.prevent="publier('actualites')">
+          <div class="space-y-1">
+            <h2 id="titre-actualites" class="font-bold text-noir text-base">Actualités</h2>
+            <p v-if="jamaisPublie('actualites')" class="text-xs p-2.5 rounded-xl bg-creme text-noir">Valeurs actuelles du site (jamais modifiées depuis l'admin)</p>
+            <p v-else-if="versions('actualites')[0]" class="text-xs">Publié le {{ dateHeure(versions('actualites')[0]!.publieLe) }} par {{ versions('actualites')[0]!.publiePar.nom || 'un administrateur' }}.</p>
+            <p class="text-xs">Section « Ahitché en ce moment » de l'accueil : trois cartes au plus.<template v-if="jamaisPublie('actualites')"> Tant que rien n'est publié, la carte « Suivez-nous » suit les réseaux des Infos pratiques ; une fois publiée, elle garde le texte et le lien saisis ici.</template></p>
+          </div>
+          <p v-if="erreurs.actualites.message && !erreurs.actualites.champ" id="erreur-haut-actualites" role="alert" tabindex="-1" class="p-3 rounded-xl bg-red-50 text-red-800 text-xs font-semibold">{{ erreurs.actualites.message }}</p>
+
+          <OngletActualites v-model:cartes="actualites" :erreur="erreurs.actualites" :lecture-seule="!ecriture" :valeurs="variables" />
+
+          <div v-if="ecriture" class="pt-3 border-t border-creme2 space-y-2">
+            <button type="submit" :disabled="envoi !== '' || !aChange('actualites')" :class="[bouton, 'w-full sm:w-auto bg-foret text-white hover:bg-savane px-5 text-sm']">
+              <Send class="w-4 h-4" aria-hidden="true" /> {{ envoi === 'actualites' ? 'Publication…' : 'Publier' }}
+            </button>
+            <p v-if="nouvelleVersion.actualites" role="status" class="text-xs text-foret font-semibold">{{ AVIS_CACHE }}</p>
+            <p class="text-xs">{{ aChange('actualites') ? `${listeChangementsDe('actualites').length} changement(s) à publier.` : 'Aucun changement par rapport au site.' }}</p>
+            <p class="text-xs text-noir font-semibold">Uniquement des faits vérifiés, sans date inventée ni promesse de santé ou de prix.</p>
+          </div>
+        </form>
+
+        <HistoriqueVersions cle="actualites" :versions="versions('actualites')" :ecriture="ecriture" :occupe="envoi !== ''" @voir="voir('actualites', $event)" @revenir="revenir('actualites', $event)" />
+      </section>
+
     </template>
 
     <!-- Une ancienne version -->

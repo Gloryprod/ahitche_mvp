@@ -1,15 +1,20 @@
 // Écran « Site public » : champs de chaque contenu, tels qu'affichés dans la confirmation, l'historique et les
 // erreurs. Les libellés sont ceux des messages d'erreur du serveur (« Numéro WhatsApp : … »), ce qui permet
 // d'afficher une erreur à côté du champ concerné.
-import { INFOS_PAR_DEFAUT } from '@/config/contact'
+import { INFOS_PAR_DEFAUT, reseauxDe } from '@/config/contact'
 import { FORMULES_DU_CODE, SLUGS_VITRINE, TAILLES_FOYER, TEXTES_FORMULES_DU_CODE } from '@/config/formules'
+import { FAQ_PAR_DEFAUT } from '@/config/faq'
+import { cartesDuCode } from '@/config/actualites'
 import {
   BANDEAU_VIDE, annonceLivraison, copierInfos, formaterHoraires, formaterNumero, fusionnerInfos, normaliserNumero,
   JOURS_SEMAINE, REGLES_FORMULE, fusionnerTextesFormules, lirePrix,
-  type BandeauSite, type InfosSite, type PrixSite, type TextesFormules,
+  ICONES_ACTUALITE, ID_CONTENU, VARIABLES_TEXTE, REGLES_ACTUALITE, REGLES_FAQ, accoladeInconnue, fusionnerActualites, fusionnerFaq, lienActualiteValide,
+  lienFaqValide,
+  type BandeauSite, type CarteActualite, type IconeActualite, type InfosSite, type LienContenu, type PrixSite,
+  type QuestionFaq, type TextesFormules,
 } from '@/services/valeursSite'
 
-export type CleContenu = 'infos' | 'bandeau' | 'formules'
+export type CleContenu = 'infos' | 'bandeau' | 'formules' | 'faq' | 'actualites'
 
 export interface Version { _id: string; publieLe: string; publiePar: { nom: string } }
 export interface ContenuEcran<T> { valeurs: T; updatedAt: string; versions: Version[] }
@@ -17,16 +22,23 @@ export interface ContenusSite {
   infos: ContenuEcran<InfosSite> | null
   bandeau: ContenuEcran<BandeauSite> | null
   formules: ContenuEcran<TextesFormules> | null
+  faq: ContenuEcran<QuestionFaq[]> | null
+  actualites: ContenuEcran<CarteActualite[]> | null
 }
 // Réponse de GET /api/admin/site : contenus publiés et prix de vente de la base (lecture seule ici, lot B)
 export interface ReponseSite { contenus: ContenusSite; prix: PrixSite }
 
 export const lireReponseSite = (d: { contenus?: Partial<ContenusSite>; prix?: unknown } | undefined): ReponseSite => ({
-  contenus: { infos: d?.contenus?.infos ?? null, bandeau: d?.contenus?.bandeau ?? null, formules: d?.contenus?.formules ?? null },
+  contenus: {
+    infos: d?.contenus?.infos ?? null, bandeau: d?.contenus?.bandeau ?? null, formules: d?.contenus?.formules ?? null,
+    faq: d?.contenus?.faq ?? null, actualites: d?.contenus?.actualites ?? null,
+  },
   prix: lirePrix(SLUGS_VITRINE, d?.prix),
 })
 
-export const TITRES_CONTENUS: Record<CleContenu, string> = { infos: 'Infos pratiques', bandeau: 'Bandeau d\'annonce', formules: 'Formules' }
+export const TITRES_CONTENUS: Record<CleContenu, string> = {
+  infos: 'Infos pratiques', bandeau: 'Bandeau d\'annonce', formules: 'Formules', faq: 'Questions fréquentes', actualites: 'Actualités',
+}
 
 interface Champ<T> { id: string; libelle: string; lire: (v: T) => string }
 
@@ -87,8 +99,10 @@ const AUTRES_ERREURS: Record<string, string> = {
   'Heure de fermeture': 'horaires.fermeture',
 }
 
-// Champ nommé au début du message d'erreur (« Facebook : adresse invalide… »), sinon '' (erreur en haut du formulaire)
-export function champDeLErreur(cle: CleContenu, message: string): string {
+// Champ nommé au début du message d'erreur (« Facebook : adresse invalide… »), sinon '' (erreur en haut du formulaire).
+// FAQ et actualités : « Question 3 : réponse : … » ou « Carte 2 : titre : … », d'après les identifiants du formulaire.
+export function champDeLErreur(cle: CleContenu, message: string, ids: readonly string[] = []): string {
+  if (cle === 'faq' || cle === 'actualites') return champErreurListe(cle, message, ids)
   const champs: { id: string; libelle: string }[] = cle === 'infos' ? CHAMPS_INFOS : cle === 'bandeau' ? CHAMPS_BANDEAU : CHAMPS_FORMULES
   const libelles = [...champs, ...(cle === 'infos' ? Object.entries(AUTRES_ERREURS).map(([libelle, id]) => ({ id, libelle })) : [])]
   // « Essentiel : accroche : … », ou « Essentiel : repas, chiffres… » pour les formats des formules
@@ -206,6 +220,22 @@ export function controlerFormules(f: TextesFormules): { champ: string; message: 
   return null
 }
 
+// Classes et identifiants communs aux champs des listes (questions, cartes)
+export const CLASSES_FORMULAIRE = {
+  champ: 'mt-1 w-full min-h-11 px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal disabled:opacity-80 aria-invalid:border-red-400',
+  etiquette: 'block text-xs font-bold text-noir',
+  erreur: 'mt-1 text-xs font-semibold text-red-700',
+}
+export const idChamp = (id: string) => `champ-site-${id.replace(/\./g, '-')}`
+
+// Date et heure de Cotonou, dans l'historique
+export const dateHeure = (d: string) => new Date(d).toLocaleString('fr-FR', {
+  day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Porto-Novo',
+})
+
+// Fenêtres de confirmation de l'écran
+export const STYLE_SWAL = { confirmButtonColor: 'var(--color-foret)', cancelButtonColor: 'var(--color-gris)', customClass: { popup: 'rounded-2xl font-body' } }
+
 // Période d'affichage, en clair
 export function periodeBandeau(b: BandeauSite): string {
   if (!b.actif) return 'Bandeau masqué : rien ne s\'affiche sur le site.'
@@ -213,4 +243,197 @@ export function periodeBandeau(b: BandeauSite): string {
   if (b.debut) return `Affiché à partir du ${dateLisible(b.debut)} (heure de Cotonou), sans date de fin.`
   if (b.fin) return `Affiché dès la publication, jusqu'au ${dateLisible(b.fin)} inclus (heure de Cotonou).`
   return 'Affiché dès la publication, sans date de fin.'
+}
+
+// ------------------------------------------------------------------
+// Questions fréquentes et actualités (lot C, docs-internes/admin/CONTRAT-site-public-C.md)
+// ------------------------------------------------------------------
+
+// Formulaires : le lien est toujours un objet (deux champs vides : pas de lien)
+export interface QuestionFormulaire extends Omit<QuestionFaq, 'lien'> { lien: LienContenu }
+export interface CarteFormulaire extends Omit<CarteActualite, 'lien'> { lien: LienContenu }
+
+export const NOMS_ICONES: Record<IconeActualite, string> = {
+  lancement: 'Livraison (scooter)',
+  partenaire: 'Partenaire (bâtiment)',
+  communaute: 'Communauté (groupe)',
+}
+
+// Valeurs du site : publiées, sinon celles du code (la carte « Suivez-nous » d'après les réseaux des infos données)
+export const faqPubliee = (contenu: ContenusSite['faq'] | undefined): QuestionFaq[] => fusionnerFaq(FAQ_PAR_DEFAUT, contenu?.valeurs)
+export const actualitesPubliees = (contenu: ContenusSite['actualites'] | undefined, infos: InfosSite): CarteActualite[] =>
+  (contenu ? fusionnerActualites([], contenu.valeurs) : cartesDuCode(reseauxDe(infos)))
+
+const versFormulaire = <T extends { lien: LienContenu | null }>(e: T) => ({ ...e, lien: e.lien ? { ...e.lien } : { texte: '', vers: '' } })
+export const faqEnFormulaire = (liste: QuestionFaq[]): QuestionFormulaire[] => liste.map(versFormulaire)
+export const actualitesEnFormulaire = (liste: CarteActualite[]): CarteFormulaire[] => liste.map(versFormulaire)
+
+// Lien envoyé : null si ses deux champs sont vides
+function lienAEnvoyer(lien: LienContenu): LienContenu | null {
+  const texte = nettoyer(lien.texte)
+  const vers = lien.vers.trim()
+  return texte || vers ? { texte, vers } : null
+}
+export const faqAEnvoyer = (liste: QuestionFormulaire[]): QuestionFaq[] => liste.map(q => ({
+  id: q.id, question: nettoyer(q.question), reponse: nettoyer(q.reponse), visible: q.visible === true, lien: lienAEnvoyer(q.lien),
+}))
+export const actualitesAEnvoyer = (liste: CarteFormulaire[]): CarteActualite[] => liste.map(c => ({
+  id: c.id, categorie: nettoyer(c.categorie), icone: c.icone, titre: nettoyer(c.titre), resume: nettoyer(c.resume), lien: lienAEnvoyer(c.lien),
+}))
+
+// Champs d'un élément, tels que nommés dans la confirmation et les messages du serveur
+interface ChampElement<T> { libelle: string; lire: (e: T) => string }
+const lireLien = (lien: LienContenu | null) => (lien ? `${lien.texte} (${lien.vers})` : 'aucun')
+const CHAMPS_QUESTION: ChampElement<QuestionFaq>[] = [
+  { libelle: 'question', lire: q => q.question },
+  { libelle: 'réponse', lire: q => q.reponse },
+  { libelle: 'affichée sur le site', lire: q => (q.visible ? 'oui' : 'non (masquée)') },
+  { libelle: 'lien', lire: q => lireLien(q.lien) },
+]
+const CHAMPS_CARTE: ChampElement<CarteActualite>[] = [
+  { libelle: 'catégorie', lire: c => c.categorie },
+  { libelle: 'icône', lire: c => NOMS_ICONES[c.icone] },
+  { libelle: 'titre', lire: c => c.titre },
+  { libelle: 'résumé', lire: c => c.resume },
+  { libelle: 'lien', lire: c => lireLien(c.lien) },
+]
+
+// Ce qui change entre deux listes, élément par élément (même identifiant) : ajouts, champs modifiés, suppressions, ordre
+function changementsListe<T extends { id: string }>(
+  avant: T[], apres: T[], element: string, titre: (e: T) => string, champs: ChampElement<T>[],
+): Changement[] {
+  const liste: Changement[] = []
+  const anciens = new Map(avant.map(e => [e.id, e]))
+  apres.forEach((e, i) => {
+    const ancien = anciens.get(e.id)
+    if (!ancien) {
+      liste.push({ libelle: `${element} ${i + 1} ajoutée`, avant: '—', apres: titre(e) })
+      return
+    }
+    for (const c of champs) {
+      const a = c.lire(ancien)
+      const b = c.lire(e)
+      if (a !== b) liste.push({ libelle: `${element} ${i + 1} : ${c.libelle}`, avant: a, apres: b })
+    }
+  })
+  const ids = new Set(apres.map(e => e.id))
+  for (const e of avant) if (!ids.has(e.id)) liste.push({ libelle: `${element} supprimée`, avant: titre(e), apres: '—' })
+  const communs = (l: T[]) => l.filter(e => anciens.has(e.id) && ids.has(e.id)).map(e => e.id).join('|')
+  if (communs(avant) !== communs(apres)) {
+    const ordre = (l: T[]) => l.map((e, i) => `${i + 1}. ${titre(e)}`).join(' · ')
+    liste.push({ libelle: 'Ordre', avant: ordre(avant), apres: ordre(apres) })
+  }
+  return liste
+}
+export const ecartsFaq = (avant: QuestionFaq[], apres: QuestionFaq[]) =>
+  changementsListe(avant, apres, 'Question', q => q.question, CHAMPS_QUESTION)
+export const ecartsActualites = (avant: CarteActualite[], apres: CarteActualite[]) =>
+  changementsListe(avant, apres, 'Carte', c => c.titre, CHAMPS_CARTE)
+
+// Lignes d'une version (« Voir ») : un élément par ligne, textes tels qu'enregistrés (variables comprises)
+export const lignesFaq = (liste: QuestionFaq[]) => liste.map((q, i) => ({
+  libelle: `Question ${i + 1}${q.visible ? '' : ' (masquée)'}`,
+  valeur: `${q.question} — ${q.reponse}${q.lien ? ` Lien : ${lireLien(q.lien)}.` : ''}`,
+}))
+export const lignesActualites = (liste: CarteActualite[]) => (liste.length
+  ? liste.map((c, i) => ({
+      libelle: `Carte ${i + 1} : ${c.categorie} (${NOMS_ICONES[c.icone]})`,
+      valeur: `${c.titre} — ${c.resume}${c.lien ? ` Lien : ${lireLien(c.lien)}.` : ''}`,
+    }))
+  : [{ libelle: 'Actualités', valeur: 'aucune carte (section masquée)' }])
+
+// --- Contrôles avant l'envoi, avec les messages du serveur (« Question 3 : réponse : 700 caractères au plus. ») ---
+type Probleme = { champ: string; message: string } | null
+const LISTE_VARIABLES = VARIABLES_TEXTE.map(v => `{${v.nom}}`).join(', ')
+export const idElement = (cle: 'faq' | 'actualites', id: string, champ: string) => `${cle}.${id}.${champ}`
+
+// Variables acceptées dans les réponses et les résumés seulement ; ailleurs, aucune accolade
+function controlerTexte(valeur: string, regle: { min: number; max: number }, variables: boolean): string | null {
+  if (/[<>]/.test(valeur)) return 'les caractères < et > ne sont pas acceptés.'
+  const n = Array.from(valeur).length
+  if (n < regle.min) return regle.min === 1 ? 'obligatoire.' : `${regle.min} caractères au moins.`
+  if (n > regle.max) return `${regle.max} caractères au plus.`
+  if (variables) {
+    const accolade = accoladeInconnue(valeur)
+    if (accolade) {
+      return accolade.length > 1
+        ? `variable inconnue : ${accolade}. Variables possibles : ${LISTE_VARIABLES}.`
+        : 'accolade seule ; une variable s\'écrit entre accolades, par exemple {paiement}.'
+    }
+  } else if (/[{}]/.test(valeur)) {
+    return 'les accolades ne sont acceptées que dans les réponses et les résumés, pour les variables.'
+  }
+  return null
+}
+
+function controlerLien(lien: LienContenu | null, max: number, valide: (vers: string) => boolean, aide: string): { champ: string; texte: string } | null {
+  if (!lien) return null
+  const erreur = controlerTexte(lien.texte, { min: 1, max }, false)
+  if (erreur) return { champ: 'lien.texte', texte: `texte du lien : ${erreur}` }
+  if (!lien.vers) return { champ: 'lien.vers', texte: 'adresse du lien : obligatoire.' }
+  if (!valide(lien.vers)) return { champ: 'lien.vers', texte: `adresse du lien : ${aide}` }
+  return null
+}
+
+function controlerIds(liste: { id: string }[], element: string): Probleme {
+  const vus = new Set<string>()
+  for (const [i, e] of liste.entries()) {
+    if (!ID_CONTENU.test(e.id) || vus.has(e.id)) return { champ: '', message: `${element} ${i + 1} : identifiant invalide ou déjà utilisé. Rechargez la page.` }
+    vus.add(e.id)
+  }
+  return null
+}
+
+export const AIDE_LIEN_FAQ = 'chemin du site (ex. /mentions-legales) ou ancre de l\'accueil (ex. #formules).'
+export const AIDE_LIEN_ACTUALITE = 'chemin du site (ex. /blog), ancre de l\'accueil (ex. #formules) ou page https:// Facebook, TikTok ou WhatsApp.'
+
+export function controlerFaq(liste: QuestionFaq[]): Probleme {
+  if (!liste.length) return { champ: '', message: 'Questions fréquentes : ajoutez au moins une question.' }
+  if (liste.length > REGLES_FAQ.max) return { champ: '', message: `Questions fréquentes : ${REGLES_FAQ.max} questions au plus.` }
+  const ids = controlerIds(liste, 'Question')
+  if (ids) return ids
+  for (const [i, q] of liste.entries()) {
+    const nom = `Question ${i + 1}`
+    for (const [champ, libelle] of [['question', 'question'], ['reponse', 'réponse']] as const) {
+      const erreur = controlerTexte(q[champ], REGLES_FAQ[champ], champ === 'reponse')
+      if (erreur) return { champ: idElement('faq', q.id, champ), message: `${nom} : ${libelle} : ${erreur}` }
+    }
+    const lien = controlerLien(q.lien, REGLES_FAQ.texteLien.max, lienFaqValide, AIDE_LIEN_FAQ)
+    if (lien) return { champ: idElement('faq', q.id, lien.champ), message: `${nom} : ${lien.texte}` }
+  }
+  if (!liste.some(q => q.visible)) return { champ: '', message: 'Questions fréquentes : au moins une question doit être affichée sur le site.' }
+  return null
+}
+
+const CHAMPS_TEXTE_CARTE = [['categorie', 'catégorie'], ['titre', 'titre'], ['resume', 'résumé']] as const
+export function controlerActualites(liste: CarteActualite[]): Probleme {
+  if (liste.length > REGLES_ACTUALITE.max) return { champ: '', message: `Actualités : ${REGLES_ACTUALITE.max} cartes au plus.` }
+  const ids = controlerIds(liste, 'Carte')
+  if (ids) return ids
+  for (const [i, c] of liste.entries()) {
+    const nom = `Carte ${i + 1}`
+    for (const [champ, libelle] of CHAMPS_TEXTE_CARTE) {
+      const erreur = controlerTexte(c[champ], REGLES_ACTUALITE[champ], champ === 'resume')
+      if (erreur) return { champ: idElement('actualites', c.id, champ), message: `${nom} : ${libelle} : ${erreur}` }
+    }
+    if (!ICONES_ACTUALITE.includes(c.icone)) return { champ: idElement('actualites', c.id, 'icone'), message: `${nom} : icône, « lancement », « partenaire » ou « communaute ».` }
+    const lien = controlerLien(c.lien, REGLES_ACTUALITE.texteLien.max, lienActualiteValide, AIDE_LIEN_ACTUALITE)
+    if (lien) return { champ: idElement('actualites', c.id, lien.champ), message: `${nom} : ${lien.texte}` }
+  }
+  return null
+}
+
+// Champ d'une erreur du serveur : « Question 3 : réponse : … » -> faq.<id de la 3e question>.reponse ;
+// champ non reconnu : la question elle-même (sa carte s'ouvre) ; sans numéro : en haut du formulaire
+const CHAMPS_MESSAGE: Record<string, string> = {
+  question: 'question', réponse: 'reponse', catégorie: 'categorie', icône: 'icone', titre: 'titre', résumé: 'resume',
+  'texte du lien': 'lien.texte', 'adresse du lien': 'lien.vers',
+}
+function champErreurListe(cle: 'faq' | 'actualites', message: string, ids: readonly string[]): string {
+  const element = cle === 'faq' ? 'Question' : 'Carte'
+  const trouve = new RegExp(`^${element} (\\d+) : ([^:,.]+?)\\s*[:,.]`, 'i').exec(message)
+  const id = trouve ? ids[Number(trouve[1]) - 1] : undefined
+  if (!trouve || !id) return ''
+  const champ = CHAMPS_MESSAGE[trouve[2]!.trim().toLocaleLowerCase('fr-FR')] ?? (cle === 'faq' ? 'question' : 'titre')
+  return idElement(cle, id, champ)
 }
