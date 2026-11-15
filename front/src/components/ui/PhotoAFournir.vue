@@ -1,20 +1,29 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { EmplacementPhoto } from '@/config/photos'
+import { sourcesPhoto } from '@/services/images'
 
-// Photo responsive (WebP 400/800/1200 px, chargement différé) ou, sans fichier, cadre « PHOTO À FOURNIR »
-withDefaults(defineProps<{
+// Photo responsive (400/800/1200 px, chargement différé) : fichiers WebP du code (/photos/…) ou photo publiée depuis
+// l'admin (adresse Cloudinary, format et qualité automatiques, recadrée au rapport de l'emplacement). Sans photo :
+// cadre « PHOTO À FOURNIR ». Avec « attente », la place est réservée sans rien télécharger (frise de l'accueil, tant
+// que les valeurs publiées ne sont pas connues) : aucune photo n'est demandée deux fois, et rien ne bouge ensuite.
+const props = withDefaults(defineProps<{
   photo: EmplacementPhoto
   tailles?: string // Attribut sizes : largeur affichée selon l'écran
   prioritaire?: boolean // Photo visible dès l'ouverture de la page : chargée tout de suite
   compact?: boolean // Petit cadre : sujet masqué
-}>(), { tailles: '(min-width: 768px) 50vw, 100vw', prioritaire: false, compact: false })
+  attente?: boolean // Adresse pas encore connue : place réservée, aucune photo demandée
+}>(), { tailles: '(min-width: 768px) 50vw, 100vw', prioritaire: false, compact: false, attente: false })
+
+const sources = computed(() => sourcesPhoto(props.photo))
 </script>
 
 <template>
+  <div v-if="attente" aria-hidden="true" class="w-full h-full bg-creme2" :style="{ aspectRatio: photo.ratio }"></div>
   <img
-    v-if="photo.fichier"
-    :src="`${photo.fichier}-800.webp`"
-    :srcset="`${photo.fichier}-400.webp 400w, ${photo.fichier}-800.webp 800w, ${photo.fichier}-1200.webp 1200w`"
+    v-else-if="sources"
+    :src="sources.src"
+    :srcset="sources.srcset"
     :sizes="tailles"
     :alt="photo.alt ?? ''"
     :loading="prioritaire ? 'eager' : 'lazy'"

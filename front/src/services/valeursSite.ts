@@ -412,6 +412,98 @@ export function fusionnerActualites(defaut: readonly CarteActualite[], recu: unk
   return liste
 }
 
+// --- Photos de la frise et témoignages (lot D, docs-internes/admin/CONTRAT-site-public-D.md) ---
+
+// Emplacements de la frise « De la ferme à vous » (clés de config/photos.ts). La photo du haut de l'accueil reste dans
+// le code : elle est rendue au build et chargée en priorité.
+export const EMPLACEMENTS_FRISE = ['fermeProduction', 'fermeRecolte', 'fermePreparation', 'fermeLivraison', 'fermeReception'] as const
+export type EmplacementFrise = (typeof EMPLACEMENTS_FRISE)[number]
+
+export interface PhotoSite {
+  url: string // https://res.cloudinary.com/<compte>/image/upload/…/site/….webp ; vide : la photo du code
+  publicId: string // « site/… »
+  alt: string // Description lue aux personnes malvoyantes, 10 à 200 caractères si url est rempli
+  droits: boolean // Case des droits cochée (obligatoire si url est rempli)
+}
+export type PhotosSite = Record<EmplacementFrise, PhotoSite>
+export const REGLES_PHOTO = { alt: { min: 10, max: 200 } } as const
+export const photoDuCode = (): PhotoSite => ({ url: '', publicId: '', alt: '', droits: false })
+
+// Photo envoyée par l'écran « Site public » : adresse telle que Cloudinary la renvoie (dossier « site », sans
+// transformation ni paramètre) ; le compte exact est contrôlé par le serveur
+export const PUBLIC_ID_SITE = /^site\/[\w-]{1,200}$/
+const URL_PHOTO_SITE = /^https:\/\/res\.cloudinary\.com\/[\w-]+\/image\/upload\/(?:v\d{1,12}\/)?(site\/[\w-]{1,200})\.(?:jpg|jpeg|png|webp)$/
+export const urlPhotoValide = (url: string, publicId?: string) => {
+  const trouve = URL_PHOTO_SITE.exec(url)
+  return !!trouve && (publicId === undefined || trouve[1] === publicId)
+}
+
+// Photo publiée lue prudemment : sans adresse Cloudinary valide ou sans description, l'emplacement garde la photo du code
+function lirePhoto(v: unknown): PhotoSite {
+  if (!estObjet(v) || typeof v.url !== 'string' || !urlPhotoValide(v.url) || !texteValide(v.alt, REGLES_PHOTO.alt)) return photoDuCode()
+  return {
+    url: v.url,
+    publicId: typeof v.publicId === 'string' && PUBLIC_ID_SITE.test(v.publicId) ? v.publicId : '',
+    alt: v.alt.trim(),
+    droits: v.droits === true,
+  }
+}
+export function fusionnerPhotos(recu: unknown): PhotosSite {
+  const publie = estObjet(recu) ? recu : {}
+  return Object.fromEntries(EMPLACEMENTS_FRISE.map(cle => [cle, lirePhoto(publie[cle])])) as PhotosSite
+}
+
+export interface Temoignage {
+  prenom: string
+  quartier: string
+  note: number // Étoiles sur 5
+  texte: string
+}
+// Témoignage tel que l'admin le gère : identifiant, date de l'accord de la personne et affichage
+export interface TemoignageSite extends Temoignage {
+  id: string
+  accordLe: string // AAAA-MM-JJ : jour où la personne a validé le texte et accepté sa publication
+  visible: boolean
+}
+export const REGLES_TEMOIGNAGE = {
+  max: 6,
+  prenom: { min: 2, max: 40 },
+  quartier: { min: 0, max: 60 },
+  texte: { min: 20, max: 600 },
+  accordMin: '2026-01-01',
+} as const
+export const noteValide = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 5
+const JOUR = /^\d{4}-\d{2}-\d{2}$/
+
+// Témoignages publiés : une liste (même vide : seuls les avis des clients s'affichent alors), un témoignage mal formé
+// est ignoré ; null ou absent : ceux du code. Le site public ne reçoit que les visibles, sans id, date ni « visible ».
+export function fusionnerTemoignages(defaut: readonly TemoignageSite[], recu: unknown): TemoignageSite[] {
+  if (!Array.isArray(recu)) return defaut.map(t => ({ ...t }))
+  const ids = new Set<string>()
+  const liste: TemoignageSite[] = []
+  for (const [i, t] of recu.slice(0, REGLES_TEMOIGNAGE.max).entries()) {
+    if (!estObjet(t)) continue
+    const id = t.id === undefined ? `temoignage-${i + 1}` : lireId(t.id)
+    const quartier = t.quartier ?? ''
+    if (!id || ids.has(id) || !texteValide(t.prenom, REGLES_TEMOIGNAGE.prenom) || !texteValide(quartier, REGLES_TEMOIGNAGE.quartier)
+      || !noteValide(t.note) || !texteValide(t.texte, REGLES_TEMOIGNAGE.texte)) continue
+    ids.add(id)
+    liste.push({
+      id,
+      prenom: t.prenom.trim(),
+      quartier: quartier.trim(),
+      note: t.note,
+      texte: t.texte.trim(),
+      accordLe: typeof t.accordLe === 'string' && JOUR.test(t.accordLe) ? t.accordLe : '',
+      visible: t.visible !== false,
+    })
+  }
+  return liste
+}
+
+// Jour de Cotonou (UTC+1, sans heure d'été), « AAAA-MM-JJ » : la date de l'accord ne peut pas le dépasser
+export const jourCotonou = (maintenant = new Date()) => new Date(maintenant.getTime() + 3_600_000).toISOString().slice(0, 10)
+
 // Identifiant d'un nouvel élément : préfixe et horodatage en base 36 (jamais réutilisé après une suppression),
 // suffixé « -2 », « -3 »… s'il est déjà pris
 export function nouvelId(prefixe: string, existants: readonly string[], graine = Date.now()): string {

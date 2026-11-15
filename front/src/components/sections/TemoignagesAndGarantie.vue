@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
+import CarteTemoignage from './CarteTemoignage.vue'
 import api from '@/stores/api'
 import { lienWhatsApp, MESSAGES_WHATSAPP } from '@/config/contact'
 import { TEMOIGNAGES, type Temoignage } from '@/config/temoignages'
 import { vApparition } from '@/directives/apparition'
 
-// Avatar générique (pas de vrai visage) : initiale sur une couleur de la charte
-const COULEURS_AVATAR = ['bg-foret text-or', 'bg-or text-noir', 'bg-savane text-white']
-
-// Avis publiés par l'admin depuis les espaces clients, placés avant les témoignages. Chargés à l'approche
-// de la section seulement : rien de plus à télécharger pour qui ne descend pas jusque-là.
+// Avis publiés par l'admin depuis les espaces clients, placés avant les témoignages (ceux publiés dans « Site public »,
+// sinon ceux du code). Chargés à l'approche de la section seulement : rien de plus à télécharger pour qui ne descend
+// pas jusque-là.
 const avisPublies = ref<Temoignage[]>([])
-const avis = computed(() => [...avisPublies.value, ...TEMOIGNAGES])
+const avis = computed(() => [...avisPublies.value, ...TEMOIGNAGES.value])
 // Ordinateur : rangées complètes de trois (six avis au plus, les plus récents d'abord) ; téléphone : tous, à faire glisser
 const visiblesOrdinateur = computed(() => Math.min(6, Math.floor(avis.value.length / 3) * 3) || avis.value.length)
 
@@ -47,27 +46,15 @@ onBeforeUnmount(() => observateur?.disconnect())
           </h2>
         </div>
 
-        <!-- Mobile : cartes à faire glisser ; ordinateur : trois colonnes -->
-        <ul tabindex="0" aria-label="Avis de clients" class="flex md:grid md:grid-cols-3 gap-4 md:gap-6 -mx-4 px-4 md:mx-0 md:px-0 mb-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-px-4 pb-2 [scrollbar-width:none]">
+        <!-- Mobile : cartes à faire glisser ; ordinateur : trois colonnes. Aucun avis ni témoignage : liste retirée -->
+        <ul v-if="avis.length" tabindex="0" aria-label="Avis de clients" class="flex md:grid md:grid-cols-3 gap-4 md:gap-6 -mx-4 px-4 md:mx-0 md:px-0 mb-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-px-4 pb-2 [scrollbar-width:none]">
           <li
             v-for="(t, i) in avis"
             :key="`${t.prenom}-${i}`"
             v-apparition="(i % 3) * 100"
             :class="['snap-start shrink-0 w-[85%] sm:w-[60%] md:w-auto', i >= visiblesOrdinateur ? 'md:hidden' : '']"
           >
-            <figure class="h-full flex flex-col bg-white rounded-3xl p-6 border border-creme2 shadow-xs">
-              <div class="flex items-center gap-1 text-or mb-4" role="img" :aria-label="`Note : ${t.note} sur 5`">
-                <svg v-for="n in 5" :key="n" class="w-5 h-5" :class="n <= t.note ? 'fill-current' : 'fill-creme2'" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg>
-              </div>
-              <blockquote class="flex-1 text-noir leading-relaxed mb-6">«&nbsp;{{ t.texte }}&nbsp;»</blockquote>
-              <figcaption class="flex items-center gap-3">
-                <span :class="['flex items-center justify-center w-11 h-11 rounded-full font-display font-bold text-lg', COULEURS_AVATAR[i % COULEURS_AVATAR.length]]" aria-hidden="true">{{ t.prenom.charAt(0) }}</span>
-                <span>
-                  <span class="block font-bold text-foret">{{ t.prenom }}</span>
-                  <span v-if="t.quartier" class="block text-sm text-gris">{{ t.quartier }}</span>
-                </span>
-              </figcaption>
-            </figure>
+            <CarteTemoignage :temoignage="t" :rang="i" />
           </li>
         </ul>
 

@@ -1,22 +1,30 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import PhotoAFournir from '../ui/PhotoAFournir.vue'
-import { PHOTOS } from '@/config/photos'
+import { PHOTOS_FRISE, TITRES_FRISE, type PhotosFrise } from '@/config/photos'
 import { LIVRAISON_ANNONCE } from '@/config/contact'
+import { valeursSiteConnues } from '@/services/contenuSite'
 import { vApparition } from '@/directives/apparition'
 
-// Le chemin des vivres en 5 étapes : rendre la chaîne visible pour justifier la qualité et le prix
+// Le chemin des vivres en 5 étapes : rendre la chaîne visible pour justifier la qualité et le prix.
+// Photos : celles publiées depuis l'admin (écran « Site public », onglet « Photos »), sinon celles du code. Elles ne
+// reçoivent leur adresse qu'une fois les valeurs du site connues (5 s au plus) : place réservée, une seule photo
+// téléchargée par étape. Avec « apercu » (écran « Site public ») : les photos passées en propriété, tout de suite, sans ancre.
+const props = defineProps<{ photos?: PhotosFrise; apercu?: boolean }>()
+const photos = computed(() => props.photos ?? PHOTOS_FRISE.value)
+const attente = computed(() => !props.apercu && !valeursSiteConnues.value)
+
 const etapes = computed(() => [
-  { icone: 'production', titre: 'Production', texte: 'Nous sélectionnons les produits locaux auprès de producteurs du Bénin : riz, maïs, gari, tomates…', photo: PHOTOS.fermeProduction },
-  { icone: 'recolte', titre: 'Récolte et tri', texte: 'Les produits frais sont choisis et triés pour ne garder que ce que nous servirions chez nous.', photo: PHOTOS.fermeRecolte },
-  { icone: 'preparation', titre: 'Préparation', texte: 'Votre pack est composé selon la taille de votre foyer, vérifié puis emballé.', photo: PHOTOS.fermePreparation },
-  { icone: 'livraison', titre: 'Livraison', texte: `${LIVRAISON_ANNONCE.value}, chez vous à Cotonou et Abomey-Calavi ; le livreur vous appelle avant d'arriver.`, photo: PHOTOS.fermeLivraison },
-  { icone: 'reception', titre: 'Réception', texte: 'Vous payez à la livraison, et nous suivons votre alimentation mois après mois.', photo: PHOTOS.fermeReception },
+  { icone: 'production', titre: TITRES_FRISE.fermeProduction, texte: 'Nous sélectionnons les produits locaux auprès de producteurs du Bénin : riz, maïs, gari, tomates…', photo: photos.value.fermeProduction },
+  { icone: 'recolte', titre: TITRES_FRISE.fermeRecolte, texte: 'Les produits frais sont choisis et triés pour ne garder que ce que nous servirions chez nous.', photo: photos.value.fermeRecolte },
+  { icone: 'preparation', titre: TITRES_FRISE.fermePreparation, texte: 'Votre pack est composé selon la taille de votre foyer, vérifié puis emballé.', photo: photos.value.fermePreparation },
+  { icone: 'livraison', titre: TITRES_FRISE.fermeLivraison, texte: `${LIVRAISON_ANNONCE.value}, chez vous à Cotonou et Abomey-Calavi ; le livreur vous appelle avant d'arriver.`, photo: photos.value.fermeLivraison },
+  { icone: 'reception', titre: TITRES_FRISE.fermeReception, texte: 'Vous payez à la livraison, et nous suivons votre alimentation mois après mois.', photo: photos.value.fermeReception },
 ] as const)
 </script>
 
 <template>
-  <section id="ferme" class="py-20 bg-creme">
+  <section :id="apercu ? undefined : 'ferme'" :class="[apercu ? 'py-8' : 'py-20', 'bg-creme']">
     <div class="max-w-[1160px] mx-auto px-6">
       <div class="text-center max-w-2xl mx-auto mb-12">
         <span class="text-xs font-bold tracking-wider text-foret uppercase bg-savane/10 px-3 py-1 rounded-full">Notre engagement</span>
@@ -49,7 +57,7 @@ const etapes = computed(() => [
             <h3 class="text-lg font-bold text-foret mb-1.5">{{ etape.titre }}</h3>
             <p class="text-sm text-gris leading-relaxed mb-3">{{ etape.texte }}</p>
             <div class="w-full max-w-48 md:max-w-60 md:mt-auto rounded-2xl overflow-hidden">
-              <PhotoAFournir :photo="etape.photo" tailles="(min-width: 768px) 18vw, 60vw" compact />
+              <PhotoAFournir :photo="etape.photo" tailles="(min-width: 768px) 18vw, 60vw" compact :attente="attente" />
             </div>
           </div>
         </li>

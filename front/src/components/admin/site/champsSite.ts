@@ -5,16 +5,21 @@ import { INFOS_PAR_DEFAUT, reseauxDe } from '@/config/contact'
 import { FORMULES_DU_CODE, SLUGS_VITRINE, TAILLES_FOYER, TEXTES_FORMULES_DU_CODE } from '@/config/formules'
 import { FAQ_PAR_DEFAUT } from '@/config/faq'
 import { cartesDuCode } from '@/config/actualites'
+import { PHOTOS, TITRES_FRISE } from '@/config/photos'
+import { TEMOIGNAGES_PAR_DEFAUT } from '@/config/temoignages'
+import { adresseCloudinary } from '@/services/images'
 import {
   BANDEAU_VIDE, annonceLivraison, copierInfos, formaterHoraires, formaterNumero, fusionnerInfos, normaliserNumero,
   JOURS_SEMAINE, REGLES_FORMULE, fusionnerTextesFormules, lirePrix,
   ICONES_ACTUALITE, ID_CONTENU, VARIABLES_TEXTE, REGLES_ACTUALITE, REGLES_FAQ, accoladeInconnue, fusionnerActualites, fusionnerFaq, lienActualiteValide,
   lienFaqValide,
-  type BandeauSite, type CarteActualite, type IconeActualite, type InfosSite, type LienContenu, type PrixSite,
-  type QuestionFaq, type TextesFormules,
+  EMPLACEMENTS_FRISE, PUBLIC_ID_SITE, REGLES_PHOTO, REGLES_TEMOIGNAGE, fusionnerPhotos, fusionnerTemoignages, jourCotonou, noteValide,
+  photoDuCode, urlPhotoValide,
+  type BandeauSite, type CarteActualite, type EmplacementFrise, type IconeActualite, type InfosSite, type LienContenu, type PhotoSite,
+  type PhotosSite, type PrixSite, type QuestionFaq, type TemoignageSite, type TextesFormules,
 } from '@/services/valeursSite'
 
-export type CleContenu = 'infos' | 'bandeau' | 'formules' | 'faq' | 'actualites'
+export type CleContenu = 'infos' | 'bandeau' | 'formules' | 'faq' | 'actualites' | 'photos' | 'temoignages'
 
 export interface Version { _id: string; publieLe: string; publiePar: { nom: string } }
 export interface ContenuEcran<T> { valeurs: T; updatedAt: string; versions: Version[] }
@@ -24,6 +29,8 @@ export interface ContenusSite {
   formules: ContenuEcran<TextesFormules> | null
   faq: ContenuEcran<QuestionFaq[]> | null
   actualites: ContenuEcran<CarteActualite[]> | null
+  photos: ContenuEcran<PhotosSite> | null
+  temoignages: ContenuEcran<TemoignageSite[]> | null
 }
 // Réponse de GET /api/admin/site : contenus publiés et prix de vente de la base (lecture seule ici, lot B)
 export interface ReponseSite { contenus: ContenusSite; prix: PrixSite }
@@ -32,13 +39,18 @@ export const lireReponseSite = (d: { contenus?: Partial<ContenusSite>; prix?: un
   contenus: {
     infos: d?.contenus?.infos ?? null, bandeau: d?.contenus?.bandeau ?? null, formules: d?.contenus?.formules ?? null,
     faq: d?.contenus?.faq ?? null, actualites: d?.contenus?.actualites ?? null,
+    photos: d?.contenus?.photos ?? null, temoignages: d?.contenus?.temoignages ?? null,
   },
   prix: lirePrix(SLUGS_VITRINE, d?.prix),
 })
 
 export const TITRES_CONTENUS: Record<CleContenu, string> = {
   infos: 'Infos pratiques', bandeau: 'Bandeau d\'annonce', formules: 'Formules', faq: 'Questions fréquentes', actualites: 'Actualités',
+  photos: 'Photos de la frise', temoignages: 'Témoignages',
 }
+
+// Ligne d'une version (« Voir ») : libellé, valeur, et pour les photos une miniature
+export interface LigneVersion { libelle: string; valeur: string; image?: string }
 
 interface Champ<T> { id: string; libelle: string; lire: (v: T) => string }
 
@@ -103,6 +115,8 @@ const AUTRES_ERREURS: Record<string, string> = {
 // FAQ et actualités : « Question 3 : réponse : … » ou « Carte 2 : titre : … », d'après les identifiants du formulaire.
 export function champDeLErreur(cle: CleContenu, message: string, ids: readonly string[] = []): string {
   if (cle === 'faq' || cle === 'actualites') return champErreurListe(cle, message, ids)
+  if (cle === 'temoignages') return champErreurTemoignage(message, ids)
+  if (cle === 'photos') return champErreurPhoto(message)
   const champs: { id: string; libelle: string }[] = cle === 'infos' ? CHAMPS_INFOS : cle === 'bandeau' ? CHAMPS_BANDEAU : CHAMPS_FORMULES
   const libelles = [...champs, ...(cle === 'infos' ? Object.entries(AUTRES_ERREURS).map(([libelle, id]) => ({ id, libelle })) : [])]
   // « Essentiel : accroche : … », ou « Essentiel : repas, chiffres… » pour les formats des formules
@@ -298,16 +312,18 @@ const CHAMPS_CARTE: ChampElement<CarteActualite>[] = [
   { libelle: 'lien', lire: c => lireLien(c.lien) },
 ]
 
-// Ce qui change entre deux listes, élément par élément (même identifiant) : ajouts, champs modifiés, suppressions, ordre
+// Ce qui change entre deux listes, élément par élément (même identifiant) : ajouts, champs modifiés, suppressions, ordre.
+// `masculin` accorde « ajouté », « supprimé » (témoignage) ; sinon « ajoutée », « supprimée » (question, carte).
 function changementsListe<T extends { id: string }>(
-  avant: T[], apres: T[], element: string, titre: (e: T) => string, champs: ChampElement<T>[],
+  avant: T[], apres: T[], element: string, titre: (e: T) => string, champs: ChampElement<T>[], masculin = false,
 ): Changement[] {
   const liste: Changement[] = []
+  const accord = masculin ? '' : 'e'
   const anciens = new Map(avant.map(e => [e.id, e]))
   apres.forEach((e, i) => {
     const ancien = anciens.get(e.id)
     if (!ancien) {
-      liste.push({ libelle: `${element} ${i + 1} ajoutée`, avant: '—', apres: titre(e) })
+      liste.push({ libelle: `${element} ${i + 1} ajouté${accord}`, avant: '—', apres: titre(e) })
       return
     }
     for (const c of champs) {
@@ -317,7 +333,7 @@ function changementsListe<T extends { id: string }>(
     }
   })
   const ids = new Set(apres.map(e => e.id))
-  for (const e of avant) if (!ids.has(e.id)) liste.push({ libelle: `${element} supprimée`, avant: titre(e), apres: '—' })
+  for (const e of avant) if (!ids.has(e.id)) liste.push({ libelle: `${element} supprimé${accord}`, avant: titre(e), apres: '—' })
   const communs = (l: T[]) => l.filter(e => anciens.has(e.id) && ids.has(e.id)).map(e => e.id).join('|')
   if (communs(avant) !== communs(apres)) {
     const ordre = (l: T[]) => l.map((e, i) => `${i + 1}. ${titre(e)}`).join(' · ')
@@ -345,7 +361,7 @@ export const lignesActualites = (liste: CarteActualite[]) => (liste.length
 // --- Contrôles avant l'envoi, avec les messages du serveur (« Question 3 : réponse : 700 caractères au plus. ») ---
 type Probleme = { champ: string; message: string } | null
 const LISTE_VARIABLES = VARIABLES_TEXTE.map(v => `{${v.nom}}`).join(', ')
-export const idElement = (cle: 'faq' | 'actualites', id: string, champ: string) => `${cle}.${id}.${champ}`
+export const idElement = (cle: 'faq' | 'actualites' | 'temoignages', id: string, champ: string) => `${cle}.${id}.${champ}`
 
 // Variables acceptées dans les réponses et les résumés seulement ; ailleurs, aucune accolade
 function controlerTexte(valeur: string, regle: { min: number; max: number }, variables: boolean): string | null {
@@ -437,3 +453,155 @@ function champErreurListe(cle: 'faq' | 'actualites', message: string, ids: reado
   const champ = CHAMPS_MESSAGE[trouve[2]!.trim().toLocaleLowerCase('fr-FR')] ?? (cle === 'faq' ? 'question' : 'titre')
   return idElement(cle, id, champ)
 }
+
+// ------------------------------------------------------------------
+// Photos de la frise et témoignages (lot D, docs-internes/admin/CONTRAT-site-public-D.md)
+// Messages repris du serveur : « Photo « Production » : description : 10 caractères au moins. »,
+// « Témoignage 2 : date de l'accord, pas avant le 01/01/2026. »
+// ------------------------------------------------------------------
+
+const dateCourte = (jour: string) => jour.split('-').reverse().join('/') // « 2026-10-04 » -> « 04/10/2026 »
+export const nomPhoto = (cle: EmplacementFrise) => `Photo « ${TITRES_FRISE[cle]} »`
+export const idPhoto = (cle: EmplacementFrise, champ: 'url' | 'alt' | 'droits') => `photos.${cle}.${champ}`
+
+// --- Photos ---
+export const photosPubliees = (contenu: ContenusSite['photos'] | undefined): PhotosSite => fusionnerPhotos(contenu?.valeurs)
+export const copierPhotos = (p: PhotosSite): PhotosSite =>
+  Object.fromEntries(EMPLACEMENTS_FRISE.map(cle => [cle, { ...p[cle] }])) as PhotosSite
+
+// Valeurs envoyées : les 5 emplacements ; sans photo envoyée, les champs vides (l'emplacement garde la photo du code)
+export const photosAEnvoyer = (f: PhotosSite): PhotosSite => Object.fromEntries(EMPLACEMENTS_FRISE.map(cle => {
+  const p = f[cle]
+  return [cle, p.url ? { url: p.url, publicId: p.publicId, alt: nettoyer(p.alt), droits: p.droits === true } : photoDuCode()]
+})) as PhotosSite
+
+const MESSAGE_DROITS = 'cochez la case des droits (photo prise par l\'équipe Ahitché, ou fournie avec l\'accord écrit de son auteur et des personnes visibles).'
+export function controlerPhotos(f: PhotosSite): Probleme {
+  for (const cle of EMPLACEMENTS_FRISE) {
+    const p = f[cle]
+    if (!p.url) continue
+    const nom = nomPhoto(cle)
+    if (!PUBLIC_ID_SITE.test(p.publicId) || !urlPhotoValide(p.url, p.publicId)) {
+      return { champ: idPhoto(cle, 'url'), message: `${nom} : adresse refusée ; envoyez la photo depuis cet écran.` }
+    }
+    const alt = idPhoto(cle, 'alt')
+    if (/[<>]/.test(p.alt)) return { champ: alt, message: `${nom} : description : les caractères < et > ne sont pas acceptés.` }
+    const n = Array.from(p.alt).length
+    if (!n) return { champ: alt, message: `${nom} : description obligatoire (ce que montre la photo, lue aux personnes malvoyantes).` }
+    if (n < REGLES_PHOTO.alt.min) return { champ: alt, message: `${nom} : description : ${REGLES_PHOTO.alt.min} caractères au moins.` }
+    if (n > REGLES_PHOTO.alt.max) return { champ: alt, message: `${nom} : description : ${REGLES_PHOTO.alt.max} caractères au plus.` }
+    if (!p.droits) return { champ: idPhoto(cle, 'droits'), message: `${nom} : ${MESSAGE_DROITS}` }
+  }
+  return null
+}
+
+// Erreur du serveur : « Photo « Livraison » : … » -> champ de cet emplacement (description, droits, sinon la photo elle-même)
+function champErreurPhoto(message: string): string {
+  const trouve = /^Photo « ([^»]+) » : (.*)$/s.exec(message)
+  const cle = trouve ? EMPLACEMENTS_FRISE.find(c => TITRES_FRISE[c] === trouve[1]) : undefined
+  if (!trouve || !cle) return ''
+  const suite = trouve[2]!
+  return idPhoto(cle, suite.startsWith('description') ? 'alt' : suite.startsWith('cochez la case des droits') ? 'droits' : 'url')
+}
+
+// Ce qui change, emplacement par emplacement (la photo elle-même, puis sa description)
+const lirePhotoChange = (p: PhotoSite, cote: 'avant' | 'apres') =>
+  (!p.url ? 'photo du code' : cote === 'avant' ? 'photo publiée' : 'autre photo, envoyée depuis l\'admin')
+export function ecartsPhotos(avant: PhotosSite, apres: PhotosSite): Changement[] {
+  const liste: Changement[] = []
+  for (const cle of EMPLACEMENTS_FRISE) {
+    const a = avant[cle]
+    const b = apres[cle]
+    if (a.url !== b.url) liste.push({ libelle: `${nomPhoto(cle)} : photo`, avant: lirePhotoChange(a, 'avant'), apres: lirePhotoChange(b, 'apres') })
+    const altAvant = a.url ? a.alt : '—'
+    const altApres = b.url ? b.alt : '—'
+    if (altAvant !== altApres) liste.push({ libelle: `${nomPhoto(cle)} : description`, avant: altAvant, apres: altApres })
+  }
+  return liste
+}
+
+// Lignes d'une version (« Voir »), avec la miniature de chaque emplacement
+export const lignesPhotos = (v: PhotosSite): LigneVersion[] => EMPLACEMENTS_FRISE.map((cle, i) => {
+  const p = v[cle]
+  const code = PHOTOS[cle]
+  return {
+    libelle: `Étape ${i + 1} · ${TITRES_FRISE[cle]}`,
+    valeur: p.url ? `Photo envoyée depuis l'admin. Description : ${p.alt}` : 'Photo du code',
+    image: p.url ? adresseCloudinary(p.url, 400, code.ratio) : code.fichier ? `${code.fichier}-400.webp` : undefined,
+  }
+})
+
+// --- Témoignages ---
+export const temoignagesPublies = (contenu: ContenusSite['temoignages'] | undefined): TemoignageSite[] =>
+  fusionnerTemoignages(TEMOIGNAGES_PAR_DEFAUT, contenu ? contenu.valeurs : null)
+export const copierTemoignages = (liste: TemoignageSite[]): TemoignageSite[] => liste.map(t => ({ ...t }))
+
+export const temoignagesAEnvoyer = (liste: TemoignageSite[]): TemoignageSite[] => liste.map(t => ({
+  id: t.id, prenom: nettoyer(t.prenom), quartier: nettoyer(t.quartier), note: t.note, texte: nettoyer(t.texte),
+  accordLe: t.accordLe, visible: t.visible === true,
+}))
+
+// Jour « AAAA-MM-JJ » qui existe au calendrier
+function jourValide(jour: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) return false
+  const [a, m, j] = jour.split('-').map(Number) as [number, number, number]
+  const d = new Date(Date.UTC(a, m - 1, j))
+  return d.getUTCFullYear() === a && d.getUTCMonth() === m - 1 && d.getUTCDate() === j
+}
+
+const CHAMPS_TEXTE_TEMOIGNAGE = [['prenom', 'prénom'], ['quartier', 'quartier']] as const
+export function controlerTemoignages(liste: TemoignageSite[], aujourdhui = jourCotonou()): Probleme {
+  if (liste.length > REGLES_TEMOIGNAGE.max) return { champ: '', message: `Témoignages : ${REGLES_TEMOIGNAGE.max} au plus.` }
+  const ids = controlerIds(liste, 'Témoignage')
+  if (ids) return ids
+  for (const [i, t] of liste.entries()) {
+    const nom = `Témoignage ${i + 1}`
+    const champ = (c: string) => idElement('temoignages', t.id, c)
+    for (const [c, libelle] of CHAMPS_TEXTE_TEMOIGNAGE) {
+      const erreur = controlerTexte(t[c], REGLES_TEMOIGNAGE[c], false)
+      if (erreur) return { champ: champ(c), message: `${nom} : ${libelle} : ${erreur}` }
+    }
+    if (!noteValide(t.note)) return { champ: champ('note'), message: `${nom} : note : choisissez de 1 à 5 étoiles.` }
+    const texte = controlerTexte(t.texte, REGLES_TEMOIGNAGE.texte, false)
+    if (texte) return { champ: champ('texte'), message: `${nom} : texte : ${texte}` }
+    const accord = champ('accordLe')
+    if (!t.accordLe) return { champ: accord, message: `${nom} : date de l'accord obligatoire (jour où la personne a validé le texte et accepté sa publication).` }
+    if (!jourValide(t.accordLe)) return { champ: accord, message: `${nom} : date de l'accord : date au format AAAA-MM-JJ attendue.` }
+    if (t.accordLe < REGLES_TEMOIGNAGE.accordMin) return { champ: accord, message: `${nom} : date de l'accord, pas avant le ${dateCourte(REGLES_TEMOIGNAGE.accordMin)}.` }
+    if (t.accordLe > aujourdhui) return { champ: accord, message: `${nom} : date de l'accord dans le futur (nous sommes le ${dateCourte(aujourdhui)} à Cotonou).` }
+  }
+  return null
+}
+
+// Erreur du serveur : « Témoignage 2 : date de l'accord, pas avant… » -> temoignages.<id du 2e>.accordLe ;
+// champ non reconnu : le prénom (sa carte s'ouvre) ; sans numéro : en haut du formulaire
+const CHAMPS_TEMOIGNAGE_MESSAGE: [string, string][] = [
+  ['date de l\'accord', 'accordLe'], ['prénom', 'prenom'], ['quartier', 'quartier'], ['note', 'note'], ['texte', 'texte'],
+  ['« afficher sur le site »', 'visible'],
+]
+function champErreurTemoignage(message: string, ids: readonly string[]): string {
+  const trouve = /^Témoignage (\d+) : (.*)$/s.exec(message)
+  const id = trouve ? ids[Number(trouve[1]) - 1] : undefined
+  if (!trouve || !id) return ''
+  const suite = trouve[2]!.toLocaleLowerCase('fr-FR')
+  const champ = CHAMPS_TEMOIGNAGE_MESSAGE.find(([libelle]) => suite.startsWith(libelle))?.[1] ?? 'prenom'
+  return idElement('temoignages', id, champ)
+}
+
+const CHAMPS_TEMOIGNAGE: ChampElement<TemoignageSite>[] = [
+  { libelle: 'prénom', lire: t => t.prenom },
+  { libelle: 'quartier', lire: t => t.quartier || 'aucun' },
+  { libelle: 'note', lire: t => `${t.note} sur 5` },
+  { libelle: 'texte', lire: t => t.texte },
+  { libelle: 'date de l\'accord', lire: t => dateLisible(t.accordLe) },
+  { libelle: 'affiché sur le site', lire: t => (t.visible ? 'oui' : 'non (masqué)') },
+]
+export const ecartsTemoignages = (avant: TemoignageSite[], apres: TemoignageSite[]) =>
+  changementsListe(avant, apres, 'Témoignage', t => t.prenom || 'sans prénom', CHAMPS_TEMOIGNAGE, true)
+
+export const lignesTemoignages = (liste: TemoignageSite[]): LigneVersion[] => (liste.length
+  ? liste.map((t, i) => ({
+      libelle: `Témoignage ${i + 1}${t.visible ? '' : ' (masqué)'}`,
+      valeur: `${t.prenom}${t.quartier ? `, ${t.quartier}` : ''} · ${t.note} sur 5 · accord du ${dateLisible(t.accordLe)} — « ${t.texte} »`,
+    }))
+  : [{ libelle: 'Témoignages', valeur: 'aucun témoignage (seuls les avis des clients s\'affichent)' }])

@@ -4,13 +4,14 @@ import Swal from 'sweetalert2'
 import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2 } from 'lucide-vue-next'
 import { STYLE_SWAL } from './champsSite'
 
-// Liste de cartes repliables des onglets « Questions fréquentes » et « Actualités » : ouvrir, monter, descendre,
-// supprimer (confirmé), ajouter. Chaque déplacement est annoncé aux lecteurs d'écran et le focus suit l'élément.
-// Les champs d'un élément sont fournis par l'onglet (emplacement « panneau »). Publication : SitePublic.vue.
+// Liste de cartes repliables des onglets « Questions fréquentes », « Actualités » et « Témoignages » : ouvrir, monter,
+// descendre, supprimer (confirmé), ajouter. Chaque déplacement est annoncé aux lecteurs d'écran et le focus suit
+// l'élément. Les champs d'un élément sont fournis par l'onglet (emplacement « panneau »). Publication : SitePublic.vue.
 const liste = defineModel<T[]>('liste', { required: true })
 const props = defineProps<{
-  prefixe: 'faq' | 'actualites'
-  nom: string // « question », « carte » (féminin)
+  prefixe: 'faq' | 'actualites' | 'temoignages'
+  nom: string // « question », « carte » (féminin), « témoignage » (avec masculin)
+  masculin?: boolean
   max: number
   lectureSeule: boolean
   champErreur: string // Champ en erreur (« faq.<id>.reponse ») : sa carte s'ouvre
@@ -25,6 +26,10 @@ const idPanneau = (id: string) => `site-${props.prefixe}-panneau-${id}`
 const idAjout = `site-${props.prefixe}-ajouter`
 const nomMajuscule = props.nom.charAt(0).toUpperCase() + props.nom.slice(1)
 const titreDe = (e: T) => props.titre(e).trim() || `${nomMajuscule} sans titre`
+// Accords : « la question », « une carte », « déplacée » ; « le témoignage », « un témoignage », « déplacé »
+const le = props.masculin ? 'le' : 'la'
+const un = props.masculin ? 'un' : 'une'
+const accord = props.masculin ? '' : 'e'
 
 watch(() => props.champErreur, champ => {
   const id = champ.split('.')[1]
@@ -39,7 +44,7 @@ async function deplacer(i: number, sens: -1 | 1) {
   copie[i] = copie[j]!
   copie[j] = element
   liste.value = copie
-  annonce.value = `${nomMajuscule} « ${titreDe(element)} » déplacée en position ${j + 1} sur ${copie.length}.`
+  annonce.value = `${nomMajuscule} « ${titreDe(element)} » déplacé${accord} en position ${j + 1} sur ${copie.length}.`
   await nextTick()
   // Le bouton utilisé reste actif, sauf en bout de liste : le focus passe alors sur l'autre
   const actif = document.getElementById(idBouton(sens < 0 ? 'monter' : 'descendre', element.id)) as HTMLButtonElement | null
@@ -53,13 +58,13 @@ async function supprimer(i: number) {
   if (!element) return
   const choix = await Swal.fire({
     ...STYLE_SWAL,
-    title: `Supprimer la ${props.nom} ${i + 1} ?`,
+    title: `Supprimer ${le} ${props.nom} ${i + 1} ?`,
     text: `« ${titreDe(element)} » disparaîtra du site à la prochaine publication.`,
     showCancelButton: true, confirmButtonText: 'Supprimer', cancelButtonText: 'Annuler', focusCancel: true,
   })
   if (!choix.isConfirmed) return
   liste.value = liste.value.filter(e => e.id !== element.id)
-  annonce.value = `${nomMajuscule} supprimée. ${liste.value.length} restante${liste.value.length > 1 ? 's' : ''}.`
+  annonce.value = `${nomMajuscule} supprimé${accord}. ${liste.value.length} restant${accord}${liste.value.length > 1 ? 's' : ''}.`
   await nextTick()
   document.getElementById(idAjout)?.focus()
 }
@@ -69,7 +74,7 @@ async function ajouter() {
   const element = props.creer(liste.value.map(e => e.id))
   liste.value = [...liste.value, element]
   ouverts.value[element.id] = true
-  annonce.value = `${nomMajuscule} ajoutée en position ${liste.value.length}.`
+  annonce.value = `${nomMajuscule} ajouté${accord} en position ${liste.value.length}.`
   await nextTick()
   const panneau = document.getElementById(idPanneau(element.id))
   panneau?.querySelector<HTMLElement>('input[type="text"], textarea')?.focus()
@@ -102,13 +107,13 @@ const boutonAction = 'cursor-pointer inline-flex items-center justify-center gap
             <slot name="badge" :element="e" />
           </div>
           <div v-if="!lectureSeule" class="flex flex-wrap gap-2">
-            <button :id="idBouton('monter', e.id)" type="button" :disabled="i === 0" :class="boutonAction" :aria-label="`Monter la ${nom} ${i + 1} : ${titreDe(e)}`" @click="deplacer(i, -1)">
+            <button :id="idBouton('monter', e.id)" type="button" :disabled="i === 0" :class="boutonAction" :aria-label="`Monter ${le} ${nom} ${i + 1} : ${titreDe(e)}`" @click="deplacer(i, -1)">
               <ArrowUp class="w-4 h-4" aria-hidden="true" /> Monter
             </button>
-            <button :id="idBouton('descendre', e.id)" type="button" :disabled="i === liste.length - 1" :class="boutonAction" :aria-label="`Descendre la ${nom} ${i + 1} : ${titreDe(e)}`" @click="deplacer(i, 1)">
+            <button :id="idBouton('descendre', e.id)" type="button" :disabled="i === liste.length - 1" :class="boutonAction" :aria-label="`Descendre ${le} ${nom} ${i + 1} : ${titreDe(e)}`" @click="deplacer(i, 1)">
               <ArrowDown class="w-4 h-4" aria-hidden="true" /> Descendre
             </button>
-            <button type="button" :class="boutonAction" :aria-label="`Supprimer la ${nom} ${i + 1} : ${titreDe(e)}`" @click="supprimer(i)">
+            <button type="button" :class="boutonAction" :aria-label="`Supprimer ${le} ${nom} ${i + 1} : ${titreDe(e)}`" @click="supprimer(i)">
               <Trash2 class="w-4 h-4" aria-hidden="true" /> Supprimer
             </button>
           </div>
@@ -123,7 +128,7 @@ const boutonAction = 'cursor-pointer inline-flex items-center justify-center gap
     </ol>
     <div v-if="!lectureSeule">
       <button :id="idAjout" type="button" :disabled="liste.length >= max" class="cursor-pointer inline-flex items-center justify-center gap-1.5 min-h-11 px-4 w-full sm:w-auto rounded-xl border border-foret text-foret text-sm font-bold hover:bg-foret/5 disabled:opacity-50 disabled:cursor-not-allowed" @click="ajouter">
-        <Plus class="w-4 h-4" aria-hidden="true" /> Ajouter une {{ nom }}
+        <Plus class="w-4 h-4" aria-hidden="true" /> Ajouter {{ un }} {{ nom }}
       </button>
       <p class="mt-1 text-xs">{{ liste.length }} sur {{ max }} au plus.</p>
     </div>
