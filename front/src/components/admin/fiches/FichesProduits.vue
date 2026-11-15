@@ -8,7 +8,7 @@ import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
-import { reduireImage, photoOptimisee } from '@/services/images'
+import { nomFichierPhoto, reduireImage, photoOptimisee } from '@/services/images'
 import CarteFiche from '@/components/fiches/CarteFiche.vue'
 
 // Fiches produits : la publicité du bandeau « À découvrir » de l'espace client. Une fiche = un produit vendu du
@@ -71,6 +71,7 @@ const ouvert = ref(false)
 const enregistrement = ref(false)
 const televersement = ref(false)
 const erreurFormulaire = ref('')
+const erreurPhoto = ref('') // Échec d'envoi de la photo : affiché sous le champ photo
 const champProduit = ref<HTMLSelectElement | null>(null)
 let declencheur: HTMLElement | null = null // Bouton qui a ouvert la fenêtre : il reprend le focus à la fermeture
 
@@ -87,6 +88,7 @@ async function ouvrir(f?: Fiche) {
     : formulaireVide()
   nomProduitActuel.value = f?.produit.nom ?? ''
   erreurFormulaire.value = ''
+  erreurPhoto.value = ''
   ouvert.value = true
   await nextTick()
   champProduit.value?.focus()
@@ -103,21 +105,20 @@ async function choisirPhoto(event: Event) {
   input.value = '' // Permet de reprendre le même fichier après une erreur
   if (!fichier) return
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(fichier.type)) {
-    erreurFormulaire.value = 'Photo au format JPEG, PNG ou WebP.'
+    erreurPhoto.value = 'Photo au format JPEG, PNG ou WebP.'
     return
   }
-  erreurFormulaire.value = ''
+  erreurPhoto.value = ''
   televersement.value = true
   try {
     // Photo de téléphone (3 à 5 Mo) réduite dans le navigateur avant l'envoi : connexions lentes
     const image = await reduireImage(fichier)
-    const nom = image.type === 'image/webp' ? 'photo.webp' : image.type === 'image/jpeg' ? 'photo.jpg' : fichier.name
     const donnees = new FormData()
-    donnees.append('photo', image, nom)
+    donnees.append('photo', image, nomFichierPhoto(image, fichier))
     const { url, publicId } = (await api.post('/api/admin/fiches/photo', donnees)).data
     form.value.photo = { url, publicId }
   } catch (err) {
-    erreurFormulaire.value = messageErreur(err, "La photo n'a pas pu être envoyée. Réessayez.")
+    erreurPhoto.value = messageErreur(err, "La photo n'a pas pu être envoyée. Réessayez.")
   } finally {
     televersement.value = false
   }
@@ -316,11 +317,12 @@ const boutonCarte = 'cursor-pointer inline-flex items-center justify-center gap-
                     <Loader2 v-if="televersement" class="w-4 h-4 animate-spin" aria-hidden="true" />
                     <ImagePlus v-else class="w-4 h-4" aria-hidden="true" />
                     {{ televersement ? 'Envoi…' : form.photo ? 'Changer la photo' : 'Choisir une photo' }}
-                    <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="choisirPhoto" />
+                    <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" :aria-describedby="erreurPhoto ? 'erreur-photo-fiche' : undefined" @change="choisirPhoto" />
                   </label>
-                  <button v-if="form.photo && !televersement" type="button" @click="form.photo = null" class="cursor-pointer min-h-11 text-xs font-semibold text-red-700 text-left">Retirer la photo</button>
+                  <button v-if="form.photo && !televersement" type="button" @click="form.photo = null; erreurPhoto = ''" class="cursor-pointer min-h-11 text-xs font-semibold text-red-700 text-left">Retirer la photo</button>
                 </div>
               </div>
+              <p v-if="erreurPhoto" id="erreur-photo-fiche" role="alert" class="mt-2 p-3 rounded-xl bg-red-50 text-red-800 text-xs font-semibold">{{ erreurPhoto }}</p>
               <p class="text-xs mt-1">Une vraie photo du produit, prise par l'équipe ou fournie par le fournisseur avec son accord. Elle est réduite avant l'envoi.</p>
             </div>
 

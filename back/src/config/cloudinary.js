@@ -60,22 +60,26 @@ const uploadJustificatif = multer({
 // Photos des compléments (vitrine publique) : image seulement, 5 Mo maximum, ramenée à 1000 px au plus.
 // Le navigateur réduit déjà la photo avant l'envoi (connexions lentes) ; l'affichage passe par f_auto,q_auto.
 // Même réglage pour les photos des fiches produits (bandeau de l'espace client), dans le dossier « fiches ».
+// Photos de la frise de l'accueil (écran « Site public ») : dossier « site », ramenées à 1600 px au plus (le site les
+// affiche jusqu'à 1200 px de large, srcset 400, 800 et 1200).
 const FORMATS_PHOTO = ['image/jpeg', 'image/png', 'image/webp'];
-const uploadPhotoDans = (dossier) => multer({
+const uploadPhotoDans = (dossier, cote = 1000) => multer({
   storage: stockageCloudinary(async () => ({
     folder: dossier,
     resource_type: 'image',
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-    transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
+    transformation: [{ width: cote, height: cote, crop: 'limit' }]
   })),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, FORMATS_PHOTO.includes(file.mimetype))
 });
 const uploadPhotoProduit = uploadPhotoDans('complements');
 const uploadPhotoFiche = uploadPhotoDans('fiches');
+const uploadPhotoSite = uploadPhotoDans('site', 1600);
 
 module.exports = upload;
 module.exports.uploadJustificatif = uploadJustificatif;
 module.exports.uploadPhotoProduit = uploadPhotoProduit;
 module.exports.uploadPhotoFiche = uploadPhotoFiche;
+module.exports.uploadPhotoSite = uploadPhotoSite;
 module.exports.cloudinary = cloudinary;

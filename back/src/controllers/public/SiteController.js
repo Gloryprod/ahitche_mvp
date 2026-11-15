@@ -6,8 +6,9 @@ const { texteLlms } = require('../../services/llmsService');
 
 // Contenus du site publiés depuis l'admin (écran « Site public »), lus par toutes les pages publiques.
 // null = jamais publié : le site garde les valeurs du code. Seuls les champs du contrat sortent (ni versions, ni auteur) :
-// les valeurs sont repassées par la validation à la lecture. Le bandeau est filtré ici, à l'heure de Cotonou, et la FAQ
-// ne garde que les questions affichées (sans le champ « visible »).
+// les valeurs sont repassées par la validation à la lecture. Le bandeau est filtré ici, à l'heure de Cotonou, la FAQ
+// ne garde que les questions affichées (sans le champ « visible ») et les témoignages que ceux affichés (prénom, quartier,
+// note, texte : ni date de l'accord, ni « visible »).
 // Les prix de la vitrine viennent de la base (prix de vente de « Formules et prix »), jamais de ces contenus.
 
 // Téléphone : une publication apparaît en 1 minute (6 au plus si la réponse en cache est resservie pendant l'actualisation)
@@ -30,6 +31,7 @@ async function lirePublies(cles, maintenant = new Date()) {
 }
 
 // GET /api/public/site -> { infos, bandeau, formules: <valeurs> | null, faq: [...] | null, actualites: [...] | null,
+//   photos: { [emplacement]: { url, publicId, alt, droits } } | null, temoignages: [{ prenom, quartier, note, texte }] | null,
 //   prix: { [slug]: number | null } }
 async function contenusPublies(req, res) {
   try {

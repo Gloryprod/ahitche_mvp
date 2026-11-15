@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useToast } from 'vue-toastification'
 import Swal from 'sweetalert2'
@@ -11,28 +12,35 @@ import { appliquerInfos } from '@/config/contact'
 import { PRODUITS_INCLUS, appliquerFormules } from '@/config/formules'
 import { appliquerFaq } from '@/config/faq'
 import { appliquerActualites } from '@/config/actualites'
+import { appliquerPhotos } from '@/config/photos'
+import { appliquerTemoignages } from '@/config/temoignages'
 import { messageErreur } from '@/services/erreurs'
 import BandeauAnnonce from '@/components/layout/BandeauAnnonce.vue'
 import OngletFormules from './OngletFormules.vue'
 import OngletFaq from './OngletFaq.vue'
 import OngletActualites from './OngletActualites.vue'
+import OngletPhotos from './OngletPhotos.vue'
+import OngletTemoignages from './OngletTemoignages.vue'
 import HistoriqueVersions from './HistoriqueVersions.vue'
 import {
   JOURS_SEMAINE, annonceLivraison, formaterHoraires, formaterNumero, lienBandeauValide, valeursVariables, type BandeauSite,
-  type CarteActualite, type InfosSite, type QuestionFaq, type TextesFormules,
+  type CarteActualite, type EmplacementFrise, type InfosSite, type PhotosSite, type QuestionFaq, type TemoignageSite, type TextesFormules,
 } from '@/services/valeursSite'
 import {
   CHAMPS_BANDEAU, CHAMPS_FORMULES, CHAMPS_INFOS, STYLE_SWAL, TITRES_CONTENUS, actualitesAEnvoyer, actualitesEnFormulaire, actualitesPubliees,
   bandeauAEnvoyer, bandeauPublie, champDeLErreur, changements, controlerActualites, controlerFaq, controlerFormules, dateHeure, ecartsActualites,
   ecartsFaq, faqAEnvoyer, faqEnFormulaire, faqPubliee, formulesAEnvoyer, formulesPubliees, infosAEnvoyer, infosPubliees, lignesActualites, lignesFaq,
   lireReponseSite, periodeBandeau,
-  type CarteFormulaire, type Changement, type CleContenu, type ContenuEcran, type ContenusSite, type QuestionFormulaire, type ReponseSite, type Version,
+  controlerPhotos, controlerTemoignages, copierPhotos, copierTemoignages, ecartsPhotos, ecartsTemoignages, lignesPhotos, lignesTemoignages,
+  photosAEnvoyer, photosPubliees, temoignagesAEnvoyer, temoignagesPublies,
+  type CarteFormulaire, type Changement, type CleContenu, type ContenuEcran, type ContenusSite, type LigneVersion, type QuestionFormulaire,
+  type ReponseSite, type Version,
 } from './champsSite'
 
-// « Site public » (docs-internes/admin/CONTRAT-site-public-A.md, -B.md et -C.md), section « site » : lecture admin et
+// « Site public » (docs-internes/admin/CONTRAT-site-public-A.md à -D.md), section « site » : lecture admin et
 // coordinateur, publication admin seulement (le serveur fait foi). Lot A : infos pratiques et bandeau d'annonce ;
 // lot B : textes des cartes des formules (le prix, lui, se modifie dans « Formules et prix ») ; lot C : questions
-// fréquentes et actualités. Chaque onglet :
+// fréquentes et actualités ; lot D : photos de la frise de l'accueil et témoignages. Chaque onglet :
 // formulaire prérempli (valeurs publiées, sinon celles du code), aperçu en direct, publication confirmée et
 // historique des 10 dernières versions.
 
@@ -57,7 +65,10 @@ const bandeau = reactive<BandeauSite>(bandeauPublie(undefined))
 const formules = reactive<TextesFormules>(formulesPubliees(undefined))
 const faq = ref<QuestionFormulaire[]>([])
 const actualites = ref<CarteFormulaire[]>([])
-const rempli = { infos: false, bandeau: false, formules: false, faq: false, actualites: false }
+const photos = reactive<PhotosSite>(photosPubliees(undefined))
+const temoignages = ref<TemoignageSite[]>([])
+const televersement = ref<EmplacementFrise | ''>('') // Photo en cours d'envoi : publication des photos impossible
+const rempli = { infos: false, bandeau: false, formules: false, faq: false, actualites: false, photos: false, temoignages: false }
 // Infos pratiques du site : variables de la FAQ et des actualités, réseaux de la carte « Suivez-nous » du code
 const infosDuSite = computed(() => infosPubliees(contenusSite.value?.infos))
 const variables = computed(() => valeursVariables(infosDuSite.value, PRODUITS_INCLUS.length))
@@ -67,16 +78,14 @@ function remplir(cle: CleContenu, contenus: ContenusSite) {
   else if (cle === 'bandeau') Object.assign(bandeau, bandeauPublie(contenus.bandeau))
   else if (cle === 'formules') Object.assign(formules, formulesPubliees(contenus.formules))
   else if (cle === 'faq') faq.value = faqEnFormulaire(faqPubliee(contenus.faq))
+  else if (cle === 'photos') Object.assign(photos, copierPhotos(photosPubliees(contenus.photos)))
+  else if (cle === 'temoignages') temoignages.value = copierTemoignages(temoignagesPublies(contenus.temoignages))
   else actualites.value = actualitesEnFormulaire(actualitesPubliees(contenus.actualites, infosPubliees(contenus.infos)))
   rempli[cle] = true
 }
 watch(contenusSite, contenus => {
   if (!contenus) return
-  if (!rempli.infos) remplir('infos', contenus)
-  if (!rempli.bandeau) remplir('bandeau', contenus)
-  if (!rempli.formules) remplir('formules', contenus)
-  if (!rempli.faq) remplir('faq', contenus)
-  if (!rempli.actualites) remplir('actualites', contenus)
+  for (const cle of Object.keys(rempli) as CleContenu[]) if (!rempli[cle]) remplir(cle, contenus)
 }, { immediate: true })
 
 const jamaisPublie = (cle: CleContenu) => !!contenusSite.value && !contenusSite.value[cle]
@@ -93,8 +102,14 @@ const envoiFaq = computed(() => faqAEnvoyer(faq.value))
 const envoiActualites = computed(() => actualitesAEnvoyer(actualites.value))
 const changementsFaq = computed(() => ecartsFaq(faqPubliee(contenusSite.value?.faq), envoiFaq.value))
 const changementsActualites = computed(() => ecartsActualites(actualitesPubliees(contenusSite.value?.actualites, infosDuSite.value), envoiActualites.value))
+const photosDuSite = computed(() => photosPubliees(contenusSite.value?.photos))
+const envoiPhotos = computed(() => photosAEnvoyer(photos))
+const envoiTemoignages = computed(() => temoignagesAEnvoyer(temoignages.value))
+const changementsPhotos = computed(() => ecartsPhotos(photosAEnvoyer(photosDuSite.value), envoiPhotos.value))
+const changementsTemoignages = computed(() => ecartsTemoignages(temoignagesPublies(contenusSite.value?.temoignages), envoiTemoignages.value))
 const listeChangementsDe = (cle: CleContenu) => ({
   infos: changementsInfos, bandeau: changementsBandeau, formules: changementsFormules, faq: changementsFaq, actualites: changementsActualites,
+  photos: changementsPhotos, temoignages: changementsTemoignages,
 }[cle].value)
 const aChange = (cle: CleContenu) => listeChangementsDe(cle).length > 0
 
@@ -122,6 +137,8 @@ const erreurs = reactive<Record<CleContenu, { champ: string; message: string }>>
   formules: { champ: '', message: '' },
   faq: { champ: '', message: '' },
   actualites: { champ: '', message: '' },
+  photos: { champ: '', message: '' },
+  temoignages: { champ: '', message: '' },
 })
 // Une erreur affichée disparaît dès que le formulaire change (elle reviendra à la prochaine publication si besoin)
 watch(() => JSON.stringify(infos), () => { erreurs.infos = { champ: '', message: '' } })
@@ -129,6 +146,8 @@ watch(() => JSON.stringify(bandeau), () => { erreurs.bandeau = { champ: '', mess
 watch(() => JSON.stringify(formules), () => { erreurs.formules = { champ: '', message: '' } })
 watch(() => JSON.stringify(faq.value), () => { erreurs.faq = { champ: '', message: '' } })
 watch(() => JSON.stringify(actualites.value), () => { erreurs.actualites = { champ: '', message: '' } })
+watch(() => JSON.stringify(photos), () => { erreurs.photos = { champ: '', message: '' } })
+watch(() => JSON.stringify(temoignages.value), () => { erreurs.temoignages = { champ: '', message: '' } })
 const idChamp = (id: string) => `champ-site-${id.replace(/\./g, '-')}`
 const erreurDe = (cle: CleContenu, champ: string) => (erreurs[cle].champ === champ ? erreurs[cle].message : '')
 const attributsErreur = (cle: CleContenu, champ: string) => (erreurDe(cle, champ)
@@ -136,7 +155,8 @@ const attributsErreur = (cle: CleContenu, champ: string) => (erreurDe(cle, champ
   : {})
 
 // Identifiants des éléments du formulaire, pour retrouver le champ d'une erreur « Question 3 : … »
-const idsDe = (cle: CleContenu) => (cle === 'faq' ? faq.value : cle === 'actualites' ? actualites.value : []).map(e => e.id)
+const idsDe = (cle: CleContenu) => (cle === 'faq' ? faq.value : cle === 'actualites' ? actualites.value : cle === 'temoignages' ? temoignages.value : [])
+  .map(e => e.id)
 
 async function signaler(cle: CleContenu, message: string, champ = champDeLErreur(cle, message, idsDe(cle))) {
   erreurs[cle] = { champ, message }
@@ -157,6 +177,8 @@ function controler(cle: CleContenu): { champ: string; message: string } | null {
   if (cle === 'formules') return controlerFormules(envoiFormules.value)
   if (cle === 'faq') return controlerFaq(envoiFaq.value)
   if (cle === 'actualites') return controlerActualites(envoiActualites.value)
+  if (cle === 'photos') return controlerPhotos(envoiPhotos.value)
+  if (cle === 'temoignages') return controlerTemoignages(envoiTemoignages.value)
   const b = envoiBandeau.value
   if (b.lien && !lienBandeauValide(b.lien)) return { champ: 'lien', message: 'Lien du bandeau : un chemin du site (ex. /blog) ou une adresse https://wa.me/…' }
   if (b.debut && b.fin && b.fin < b.debut) return { champ: 'fin', message: 'Fin du bandeau : ne peut pas précéder le début.' }
@@ -171,10 +193,13 @@ const listeChangements = (liste: Changement[]) => `<ul style="text-align:left;fo
 
 // Cache public du serveur (60 s, puis 300 s de reprise) : une nouvelle version met quelques minutes à s'afficher partout
 const AVIS_CACHE = 'Le site affiche la nouvelle version d\'ici quelques minutes.'
-const nouvelleVersion = reactive<Record<CleContenu, boolean>>({ infos: false, bandeau: false, formules: false, faq: false, actualites: false })
+const nouvelleVersion = reactive<Record<CleContenu, boolean>>({
+  infos: false, bandeau: false, formules: false, faq: false, actualites: false, photos: false, temoignages: false,
+})
 
 // Met à jour l'écran (et le site de cet onglet) avec la réponse du serveur ; le message du serveur est affiché tel quel
-type ContenuRecu = ContenuEcran<InfosSite> | ContenuEcran<BandeauSite> | ContenuEcran<TextesFormules> | ContenuEcran<QuestionFaq[]> | ContenuEcran<CarteActualite[]> | null
+type ContenuRecu = ContenuEcran<InfosSite> | ContenuEcran<BandeauSite> | ContenuEcran<TextesFormules> | ContenuEcran<QuestionFaq[]>
+  | ContenuEcran<CarteActualite[]> | ContenuEcran<PhotosSite> | ContenuEcran<TemoignageSite[]> | null
 function enregistrerReponse(cle: CleContenu, contenu: ContenuRecu, message: string) {
   const avant = versions(cle)[0]?._id
   const publiee = !!contenu?.versions?.[0] && contenu.versions[0]._id !== avant
@@ -189,6 +214,8 @@ function enregistrerReponse(cle: CleContenu, contenu: ContenuRecu, message: stri
   if (cle === 'formules' && contenus.formules) appliquerFormules(contenus.formules.valeurs, actuel.prix)
   if (cle === 'faq' && contenus.faq) appliquerFaq(contenus.faq.valeurs)
   if (cle === 'actualites' && contenus.actualites) appliquerActualites(contenus.actualites.valeurs)
+  if (cle === 'photos' && contenus.photos) appliquerPhotos(contenus.photos.valeurs)
+  if (cle === 'temoignages' && contenus.temoignages) appliquerTemoignages(contenus.temoignages.valeurs)
   if (publiee) {
     nouvelleVersion[cle] = true
     toast.success(`${message} ${AVIS_CACHE}`)
@@ -200,10 +227,11 @@ function enregistrerReponse(cle: CleContenu, contenu: ContenuRecu, message: stri
 const envoi = ref<CleContenu | ''>('')
 const OBJETS_PUBLICATION: Record<CleContenu, string> = {
   infos: 'les infos pratiques', bandeau: 'le bandeau d\'annonce', formules: 'les textes des formules', faq: 'les questions fréquentes', actualites: 'les actualités',
+  photos: 'les photos de la frise', temoignages: 'les témoignages',
 }
 
 async function publier(cle: CleContenu) {
-  if (!ecriture.value || envoi.value) return
+  if (!ecriture.value || envoi.value || (cle === 'photos' && televersement.value)) return
   erreurs[cle] = { champ: '', message: '' }
   const probleme = controler(cle)
   if (probleme) return signaler(cle, probleme.message, probleme.champ)
@@ -218,7 +246,10 @@ async function publier(cle: CleContenu) {
   if (!choix.isConfirmed) return
   envoi.value = cle
   try {
-    const valeurs = { infos: envoiInfos, bandeau: envoiBandeau, formules: envoiFormules, faq: envoiFaq, actualites: envoiActualites }[cle].value
+    const valeurs = {
+      infos: envoiInfos, bandeau: envoiBandeau, formules: envoiFormules, faq: envoiFaq, actualites: envoiActualites, photos: envoiPhotos,
+      temoignages: envoiTemoignages,
+    }[cle].value
     const { data: r } = await api.put(`/api/admin/site/${cle}`, { valeurs })
     enregistrerReponse(cle, r.contenu, r.message)
   } catch (err) {
@@ -229,7 +260,11 @@ async function publier(cle: CleContenu) {
 }
 
 // --- Historique : voir une version, y revenir ---
-interface VersionDetaillee { valeurs: InfosSite | BandeauSite | TextesFormules | QuestionFaq[] | CarteActualite[]; publieLe: string; publiePar: { nom: string } }
+interface VersionDetaillee {
+  valeurs: InfosSite | BandeauSite | TextesFormules | QuestionFaq[] | CarteActualite[] | PhotosSite | TemoignageSite[]
+  publieLe: string
+  publiePar: { nom: string }
+}
 const cacheVersions = new Map<string, VersionDetaillee>()
 async function chargerVersion(cle: CleContenu, id: string): Promise<VersionDetaillee> {
   const cleCache = `${cle}:${id}`
@@ -244,7 +279,15 @@ async function chargerVersion(cle: CleContenu, id: string): Promise<VersionDetai
 function enContenu<T>(valeurs: unknown): ContenuEcran<T> {
   return { valeurs: valeurs as T, updatedAt: '', versions: [] }
 }
-function comparerVersion(cle: CleContenu, valeurs: VersionDetaillee['valeurs']): { lignes: { libelle: string; valeur: string }[]; liste: Changement[] } {
+function comparerVersion(cle: CleContenu, valeurs: VersionDetaillee['valeurs']): { lignes: LigneVersion[]; liste: Changement[] } {
+  if (cle === 'photos') {
+    const v = photosPubliees(enContenu<PhotosSite>(valeurs))
+    return { lignes: lignesPhotos(v), liste: ecartsPhotos(photosDuSite.value, v) }
+  }
+  if (cle === 'temoignages') {
+    const v = temoignagesPublies(enContenu<TemoignageSite[]>(valeurs))
+    return { lignes: lignesTemoignages(v), liste: ecartsTemoignages(temoignagesPublies(contenusSite.value?.temoignages), v) }
+  }
   if (cle === 'infos') {
     const v = infosPubliees(enContenu<InfosSite>(valeurs))
     return { lignes: CHAMPS_INFOS.map(c => ({ libelle: c.libelle, valeur: c.lire(v) })), liste: changements(CHAMPS_INFOS, infosPubliees(contenusSite.value?.infos), v) }
@@ -265,7 +308,7 @@ function comparerVersion(cle: CleContenu, valeurs: VersionDetaillee['valeurs']):
   return { lignes: CHAMPS_FORMULES.map(c => ({ libelle: c.libelle, valeur: c.lire(v) })), liste: changements(CHAMPS_FORMULES, formulesPubliees(contenusSite.value?.formules), v) }
 }
 
-const fenetre = reactive({ ouverte: false, cle: 'infos' as CleContenu, version: null as Version | null, chargement: false, erreur: '', lignes: [] as { libelle: string; valeur: string }[] })
+const fenetre = reactive({ ouverte: false, cle: 'infos' as CleContenu, version: null as Version | null, chargement: false, erreur: '', lignes: [] as LigneVersion[] })
 let declencheur: HTMLElement | null = null
 const boutonFermer = ref<HTMLButtonElement | null>(null)
 
@@ -359,6 +402,12 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
       </button>
       <button id="onglet-actualites" type="button" role="tab" :aria-selected="onglet === 'actualites'" aria-controls="panneau-actualites" :class="boutonOnglet(onglet === 'actualites')" @click="onglet = 'actualites'">
         Actualités
+      </button>
+      <button id="onglet-photos" type="button" role="tab" :aria-selected="onglet === 'photos'" aria-controls="panneau-photos" :class="boutonOnglet(onglet === 'photos')" @click="onglet = 'photos'">
+        Photos
+      </button>
+      <button id="onglet-temoignages" type="button" role="tab" :aria-selected="onglet === 'temoignages'" aria-controls="panneau-temoignages" :class="boutonOnglet(onglet === 'temoignages')" @click="onglet = 'temoignages'">
+        Témoignages
       </button>
     </div>
 
@@ -672,6 +721,61 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
         <HistoriqueVersions cle="actualites" :versions="versions('actualites')" :ecriture="ecriture" :occupe="envoi !== ''" @voir="voir('actualites', $event)" @revenir="revenir('actualites', $event)" />
       </section>
 
+      <!-- ============ PHOTOS DE LA FRISE ============ -->
+      <section v-show="onglet === 'photos'" id="panneau-photos" role="tabpanel" aria-labelledby="onglet-photos" class="space-y-4">
+        <form class="bg-white rounded-2xl p-4 space-y-5 min-w-0" novalidate aria-labelledby="titre-photos" @submit.prevent="publier('photos')">
+          <div class="space-y-1">
+            <h2 id="titre-photos" class="font-bold text-noir text-base">Photos de la frise</h2>
+            <p v-if="jamaisPublie('photos')" class="text-xs p-2.5 rounded-xl bg-creme text-noir">Valeurs actuelles du site (jamais modifiées depuis l'admin)</p>
+            <p v-else-if="versions('photos')[0]" class="text-xs">Publié le {{ dateHeure(versions('photos')[0]!.publieLe) }} par {{ versions('photos')[0]!.publiePar.nom || 'un administrateur' }}.</p>
+            <p class="text-xs">Les 5 photos de la section « De la ferme à votre porte » de l'accueil. La photo du haut de l'accueil reste fixe : c'est elle qui s'affiche en premier sur téléphone.</p>
+          </div>
+          <p v-if="erreurs.photos.message && !erreurs.photos.champ" id="erreur-haut-photos" role="alert" tabindex="-1" class="p-3 rounded-xl bg-red-50 text-red-800 text-xs font-semibold">{{ erreurs.photos.message }}</p>
+
+          <OngletPhotos v-model:photos="photos" v-model:televersement="televersement" :publiees="photosDuSite" :erreur="erreurs.photos" :lecture-seule="!ecriture" />
+
+          <div v-if="ecriture" class="pt-3 border-t border-creme2 space-y-2">
+            <button type="submit" :disabled="envoi !== '' || televersement !== '' || !aChange('photos')" :class="[bouton, 'w-full sm:w-auto bg-foret text-white hover:bg-savane px-5 text-sm']">
+              <Send class="w-4 h-4" aria-hidden="true" /> {{ envoi === 'photos' ? 'Publication…' : 'Publier' }}
+            </button>
+            <p v-if="nouvelleVersion.photos" role="status" class="text-xs text-foret font-semibold">{{ AVIS_CACHE }}</p>
+            <p class="text-xs">{{ televersement ? 'Envoi d\'une photo en cours…' : aChange('photos') ? `${listeChangementsDe('photos').length} changement(s) à publier.` : 'Aucun changement par rapport au site.' }}</p>
+            <p class="text-xs text-noir font-semibold">Uniquement des photos prises par l'équipe Ahitché, ou fournies avec l'accord écrit de leur auteur et des personnes visibles ; le site change dès la publication.</p>
+          </div>
+        </form>
+
+        <HistoriqueVersions cle="photos" :versions="versions('photos')" :ecriture="ecriture" :occupe="envoi !== '' || televersement !== ''" @voir="voir('photos', $event)" @revenir="revenir('photos', $event)" />
+      </section>
+
+      <!-- ============ TÉMOIGNAGES ============ -->
+      <section v-show="onglet === 'temoignages'" id="panneau-temoignages" role="tabpanel" aria-labelledby="onglet-temoignages" class="space-y-4">
+        <form class="bg-white rounded-2xl p-4 space-y-5 min-w-0" novalidate aria-labelledby="titre-temoignages" @submit.prevent="publier('temoignages')">
+          <div class="space-y-1">
+            <h2 id="titre-temoignages" class="font-bold text-noir text-base">Témoignages</h2>
+            <p v-if="jamaisPublie('temoignages')" class="text-xs p-2.5 rounded-xl bg-creme text-noir">Valeurs actuelles du site (jamais modifiées depuis l'admin)</p>
+            <p v-else-if="versions('temoignages')[0]" class="text-xs">Publié le {{ dateHeure(versions('temoignages')[0]!.publieLe) }} par {{ versions('temoignages')[0]!.publiePar.nom || 'un administrateur' }}.</p>
+            <p class="text-xs">Section « Ce que disent nos clients » de l'accueil : ces témoignages s'affichent après les avis publiés depuis les espaces clients. Six au plus.</p>
+          </div>
+          <p v-if="erreurs.temoignages.message && !erreurs.temoignages.champ" id="erreur-haut-temoignages" role="alert" tabindex="-1" class="p-3 rounded-xl bg-red-50 text-red-800 text-xs font-semibold">{{ erreurs.temoignages.message }}</p>
+
+          <OngletTemoignages v-model:temoignages="temoignages" :erreur="erreurs.temoignages" :lecture-seule="!ecriture" />
+
+          <div v-if="ecriture" class="pt-3 border-t border-creme2 space-y-2">
+            <button type="submit" :disabled="envoi !== '' || !aChange('temoignages')" :class="[bouton, 'w-full sm:w-auto bg-foret text-white hover:bg-savane px-5 text-sm']">
+              <Send class="w-4 h-4" aria-hidden="true" /> {{ envoi === 'temoignages' ? 'Publication…' : 'Publier' }}
+            </button>
+            <p v-if="nouvelleVersion.temoignages" role="status" class="text-xs text-foret font-semibold">{{ AVIS_CACHE }}</p>
+            <p class="text-xs">{{ aChange('temoignages') ? `${listeChangementsDe('temoignages').length} changement(s) à publier.` : 'Aucun changement par rapport au site.' }}</p>
+          </div>
+          <p class="text-xs text-noir font-semibold">
+            Uniquement des avis réels, dont la personne a validé le texte et accepté la publication (date de l'accord obligatoire). Les avis des clients se gèrent dans
+            <RouterLink to="/dashboard/admin/avis" class="inline-flex items-center min-h-11 text-savane underline underline-offset-2 hover:text-foret">« Avis clients »</RouterLink>.
+          </p>
+        </form>
+
+        <HistoriqueVersions cle="temoignages" :versions="versions('temoignages')" :ecriture="ecriture" :occupe="envoi !== ''" @voir="voir('temoignages', $event)" @revenir="revenir('temoignages', $event)" />
+      </section>
+
     </template>
 
     <!-- Une ancienne version -->
@@ -689,7 +793,10 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
         <dl v-else class="divide-y divide-creme2">
           <div v-for="l in fenetre.lignes" :key="l.libelle" class="py-2">
             <dt class="text-xs font-bold text-noir">{{ l.libelle }}</dt>
-            <dd class="text-noir break-words">{{ l.valeur }}</dd>
+            <dd class="text-noir break-words">
+              <img v-if="l.image" :src="l.image" alt="" width="160" height="120" loading="lazy" decoding="async" class="mb-1.5 w-40 aspect-[4/3] rounded-xl object-cover bg-creme2" />
+              {{ l.valeur }}
+            </dd>
           </div>
         </dl>
         <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">

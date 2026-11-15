@@ -64,6 +64,13 @@ app.use('/api/public', publicRoutes);
 // Erreurs non gérées : transmises au suivi des erreurs, puis réponse ci-dessous
 if (process.env.SENTRY_DSN) Sentry.setupExpressErrorHandler(app);
 
+// Refus de multer (téléversements), par code d'erreur
+const MOTIFS_MULTER = {
+  LIMIT_UNEXPECTED_FILE: 'un seul fichier attendu, dans le champ prévu',
+  LIMIT_FILE_COUNT: 'trop de fichiers',
+  STREAM_DESTROYED: 'envoi interrompu',
+};
+
 // Erreurs non gérées par les routes (téléversement, CORS…) : message en français, jamais de page HTML ni de détail technique
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
@@ -75,7 +82,8 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ message: 'Requête illisible.' });
   }
   if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ message: 'Fichier trop lourd.' });
-  if (err.name === 'MulterError') return res.status(400).json({ message: 'Fichier refusé : ' + err.message });
+  // Autres refus de multer : son message est en anglais (« Unexpected file field »), remplacé par un motif en français
+  if (err.name === 'MulterError') return res.status(400).json({ message: `Fichier refusé : ${MOTIFS_MULTER[err.code] || 'envoi invalide'}.` });
   if (/CORS/.test(err.message || '')) return res.status(403).json({ message: 'Origine non autorisée.' });
   console.error('Erreur non gérée :', err.message || err.error?.message || JSON.stringify(err));
   // Échec du stockage des fichiers (Cloudinary) : le fichier n'a pas été enregistré
