@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue'
-import { Search, Plus, Edit2, Trash2, Eye, X, Scale, SlidersHorizontal, FlaskConical, Factory } from 'lucide-vue-next'
+import { Search, Plus, Edit2, Trash2, Eye, X, Scale, SlidersHorizontal, FlaskConical, Factory, Upload } from 'lucide-vue-next'
+import axios from 'axios'
 import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
+import { peutValiderImport, type ReponseImport } from '@/services/importEntrees'
 import { useQuery, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/vue-query'
 import Swal from 'sweetalert2'
 import { useFournisseurs } from '@/composables/useFournisseurs'
@@ -38,7 +40,7 @@ interface PaginatedLotsResponse {
   aConfirmer: number
 }
 
-type Volet = '' | 'formulaire' | 'detail' | 'comptage' | 'correction' | 'essai' | 'transformation'
+type Volet = '' | 'formulaire' | 'detail' | 'comptage' | 'correction' | 'essai' | 'transformation' | 'import'
 
 // --- ÉTATS ---
 const page = ref(1)
@@ -178,15 +180,19 @@ const ouvrirCorrection = (lot: LotStockFifo) => { correction.value = { sens: 'ne
 const ouvrirEssai = () => { essai.value = { productId: '', quantite: null, commentaire: '' }; ouvrir('essai') }
 const ouvrirTransformation = () => { transformation.value = { matiereId: '', quantiteMatiere: null, produitId: '', quantiteObtenue: null, date: aujourdHui(), numeroLot: '', commentaire: '' }; ouvrir('transformation') }
 
+const rafraichirListes = () => {
+  queryClient.invalidateQueries({ queryKey: ['lotsStock'] })
+  queryClient.invalidateQueries({ queryKey: ['globalInventory'] })
+  queryClient.invalidateQueries({ queryKey: ['mouvementsStock'] })
+}
+
 // Envoi commun : message du serveur, rafraîchissement des listes, fermeture du volet
 const envoyer = async (action: () => Promise<{ data: { message?: string } }>, messageParDefaut: string) => {
   isSubmitting.value = true
   try {
     const { data: corps } = await action()
     showNotification(corps.message || messageParDefaut, 'success')
-    queryClient.invalidateQueries({ queryKey: ['lotsStock'] })
-    queryClient.invalidateQueries({ queryKey: ['globalInventory'] })
-    queryClient.invalidateQueries({ queryKey: ['mouvementsStock'] })
+    rafraichirListes()
     closePanels()
   } catch (err) {
     showNotification(messageErreur(err, "Une erreur est survenue lors de l'enregistrement"), 'error')
@@ -227,6 +233,58 @@ const envoyerCorrection = () => envoyer(() => api.post(`/api/admin/stock/lots/${
 const envoyerEssai = () => envoyer(() => api.post('/api/admin/stock/essais', essai.value), 'Essai enregistré.')
 const envoyerTransformation = () => envoyer(() => api.post('/api/admin/stock/transformations', transformation.value), 'Transformation enregistrée.')
 
+// --- IMPORT GROUPÉ (le texte collé n'est jamais écrit dans la console : fournisseurs, montants) ---
+const texteImport = ref('')
+const texteVerifie = ref<string | null>(null) // Texte de la dernière vérification
+const apercuImport = ref<ReponseImport | null>(null)
+const erreurImport = ref('')
+const importEnCours = ref(false)
+const validationPossible = computed(() => peutValiderImport(apercuImport.value, texteImport.value, texteVerifie.value))
+const lignesEnErreur = computed(() => apercuImport.value?.lignes.filter((l) => l.statut === 'erreur').length ?? 0)
+const texteModifie = computed(() => texteVerifie.value !== null && texteImport.value !== texteVerifie.value)
+
+const ouvrirImport = () => {
+  texteImport.value = ''
+  texteVerifie.value = null
+  apercuImport.value = null
+  erreurImport.value = ''
+  ouvrir('import')
+}
+
+const envoyerImport = async (appliquer: boolean) => {
+  const texte = texteImport.value
+  importEnCours.value = true
+  erreurImport.value = ''
+  try {
+    const { data: reponse } = await api.post<ReponseImport>('/api/admin/stock/lots/import', { texte, appliquer })
+    if (appliquer) {
+      showNotification(reponse.message || `Import terminé : ${reponse.resume.lotsCrees} lot(s) créé(s).`, 'success')
+      rafraichirListes()
+      closePanels()
+      return
+    }
+    apercuImport.value = reponse
+    texteVerifie.value = texte
+  } catch (err) {
+    // Refus ligne par ligne (tout ou rien) : l'aperçu montre les lignes en cause ; sinon erreur globale (en-têtes, limites…)
+    const corps = axios.isAxiosError<Partial<ReponseImport>>(err) ? err.response?.data : undefined
+    if (Array.isArray(corps?.lignes) && corps.resume) {
+      apercuImport.value = corps as ReponseImport
+      texteVerifie.value = texte
+    } else {
+      apercuImport.value = null
+      texteVerifie.value = null
+    }
+    erreurImport.value = messageErreur(err, "La vérification de l'import a échoué. Réessayez dans un instant.")
+  } finally {
+    importEnCours.value = false
+  }
+}
+
+const libelleStatut = { ok: 'Prête', avertissement: 'À vérifier', erreur: 'Erreur' }
+const classeStatut = { ok: 'bg-foret/10 text-foret', avertissement: 'bg-amber-50 text-amber-800', erreur: 'bg-red-50 text-red-800' }
+const exempleImport = 'reference_produit;quantite;valeur_fcfa;date_reception;fournisseur;numero_piece;conditionnement\nP03;80;96000;2026-11-10;Nom du fournisseur;FAC-001;10 cartons de 8 kg'
+
 // Une perte ou une péremption retire toujours du stock
 watch(() => correction.value.raison, (r) => { if (r !== 'Erreur de saisie') correction.value.sens = 'negative' })
 
@@ -252,7 +310,8 @@ const titreVolet = computed(() => ({
   comptage: 'Compter le lot',
   correction: 'Corriger le lot',
   essai: 'Essai (sortie de stock)',
-  transformation: 'Transformation'
+  transformation: 'Transformation',
+  import: 'Importer des lignes'
 }[volet.value]))
 
 const champ = 'w-full px-3 py-2 bg-[#f9f9fb] border border-gray-200 rounded-lg focus:outline-none focus:border-foret text-noir'
@@ -274,6 +333,9 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
       <div v-if="ecriture" class="flex flex-wrap gap-2">
         <button @click="openCreateMode" class="cursor-pointer flex items-center gap-1.5 px-4 py-2 bg-foret text-white text-xs font-bold rounded-xl hover:bg-opacity-95 shadow-sm">
           <Plus class="w-3.5 h-3.5 stroke-3" /> Nouvelle entrée
+        </button>
+        <button @click="ouvrirImport" class="cursor-pointer flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-noir text-xs font-bold rounded-xl hover:bg-gray-50">
+          <Upload class="w-3.5 h-3.5" /> Importer des lignes
         </button>
         <button @click="ouvrirTransformation" class="cursor-pointer flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-noir text-xs font-bold rounded-xl hover:bg-gray-50">
           <Factory class="w-3.5 h-3.5" /> Transformation
@@ -304,7 +366,7 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
       <!-- TABLEAU DES LOTS -->
-      <div :class="[volet ? 'lg:col-span-2' : 'lg:col-span-3', 'bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden']">
+      <div :class="[volet && volet !== 'import' ? 'lg:col-span-2' : 'lg:col-span-3', 'bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden']">
         <div v-if="isLoading" class="text-sm font-medium text-gris p-8 text-center">Chargement des lots…</div>
         <div v-else-if="isError" class="p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-100">
           Erreur : {{ error?.message || "Impossible de charger les lots." }}
@@ -363,8 +425,8 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
         </div>
       </div>
 
-      <!-- VOLET LATÉRAL (au-dessus du tableau sur téléphone) -->
-      <div v-if="volet" class="order-first lg:order-none bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 animate-fadeIn lg:sticky lg:top-6">
+      <!-- VOLET LATÉRAL (au-dessus du tableau sur téléphone ; l'import prend toute la largeur, au-dessus) -->
+      <div v-if="volet" :class="[volet === 'import' ? 'lg:col-span-3' : 'lg:order-none lg:sticky lg:top-6', 'order-first min-w-0 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 animate-fadeIn']">
         <div class="flex items-center justify-between border-b pb-2.5">
           <h3 class="font-bold text-noir text-sm">{{ titreVolet }}<span v-if="selectedLot && volet !== 'formulaire'" class="block font-mono text-[11px] text-gris">{{ selectedLot.numeroLot }} · {{ nomProduit(selectedLot) }}</span></h3>
           <button @click="closePanels" class="cursor-pointer p-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-gris" aria-label="Fermer"><X class="w-3.5 h-3.5" /></button>
@@ -577,6 +639,75 @@ const etiquette = 'block mb-1.5 font-bold text-noir text-[10px] uppercase'
             <input id="transfo-commentaire" v-model="transformation.commentaire" type="text" placeholder="Ex : mouture au moulin de…" :class="champ" />
           </div>
           <button type="submit" :disabled="isSubmitting" class="cursor-pointer w-full py-2.5 bg-foret text-white text-xs font-bold rounded-xl disabled:opacity-50">Enregistrer la transformation</button>
+        </form>
+
+        <!-- IMPORT GROUPÉ : coller, vérifier (simulation), puis valider (tout ou rien) -->
+        <form v-if="volet === 'import'" @submit.prevent="envoyerImport(false)" class="space-y-4">
+          <div class="space-y-1.5 text-[11px]">
+            <p>Collez un tableau dont la première ligne donne les en-têtes. Séparateur : point-virgule, tabulation (copié d'Excel) ou tableau Markdown.</p>
+            <p>Obligatoires : <span class="font-mono text-noir">reference_produit, quantite, valeur_fcfa, date_reception, fournisseur</span>. Laissez <span class="font-mono">quantite</span> vide et renseignez <span class="font-mono">a_confirmer</span> pour un lot à compter.</p>
+            <p>Facultatives : <span class="font-mono">prix_achat_unitaire_fcfa, numero_piece, lot_fournisseur, conditionnement, a_confirmer, ligne_budgetaire, commentaire</span>, et <span class="font-mono">creer_depense</span> (oui ou non ; oui par défaut).</p>
+            <p class="font-bold text-noir">Exemple :</p>
+            <pre class="p-2 rounded-lg bg-creme font-mono text-[10px] text-noir whitespace-pre-wrap break-all">{{ exempleImport }}</pre>
+          </div>
+          <div>
+            <label :class="etiquette" for="import-texte">Lignes à importer</label>
+            <textarea id="import-texte" v-model="texteImport" rows="8" spellcheck="false" :class="[champ, 'font-mono text-[11px]']" :aria-describedby="erreurImport ? 'import-erreur' : undefined" required></textarea>
+          </div>
+
+          <p v-if="erreurImport" id="import-erreur" role="alert" class="p-3 rounded-xl border bg-red-50 text-red-700 border-red-200 font-semibold">{{ erreurImport }}</p>
+
+          <button type="submit" :disabled="importEnCours || !texteImport.trim()" class="cursor-pointer w-full sm:w-auto px-6 py-2.5 bg-white border border-foret text-foret text-xs font-bold rounded-xl hover:bg-foret/5 disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ importEnCours ? 'Vérification…' : 'Vérifier' }}
+          </button>
+
+          <section v-if="apercuImport" aria-labelledby="import-apercu-titre" class="space-y-3">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h4 id="import-apercu-titre" class="font-bold text-noir text-sm">Aperçu</h4>
+              <p class="text-[11px]" aria-live="polite">
+                <strong class="font-mono text-noir">{{ formatPrix(apercuImport.resume.totalFcfa) }}</strong> ·
+                {{ apercuImport.resume.lotsCrees }} lot(s) à créer · {{ apercuImport.resume.lignes }} ligne(s)
+                <span v-if="lignesEnErreur" class="text-red-700 font-bold"> · {{ lignesEnErreur }} en erreur</span>
+              </p>
+            </div>
+            <div v-defilable="'Aperçu de l\'import'" class="overflow-x-auto border border-gray-100 rounded-xl">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-gray-50/70 border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gris">
+                    <!-- Statut et messages d'abord : ce qu'il faut corriger reste visible sur téléphone -->
+                    <th scope="col" class="py-2 px-3">Ligne</th>
+                    <th scope="col" class="py-2 px-3">Statut</th>
+                    <th scope="col" class="py-2 px-3">Messages</th>
+                    <th scope="col" class="py-2 px-3">Produit</th>
+                    <th scope="col" class="py-2 px-3 text-right">Quantité</th>
+                    <th scope="col" class="py-2 px-3 text-right">Valeur</th>
+                    <th scope="col" class="py-2 px-3">Lot</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50 text-noir">
+                  <tr v-for="l in apercuImport.lignes" :key="l.ligne" class="align-top">
+                    <td class="py-2 px-3 font-mono">{{ l.ligne }}</td>
+                    <td class="py-2 px-3"><span :class="[classeStatut[l.statut], 'px-2 py-0.5 rounded font-bold whitespace-nowrap']">{{ libelleStatut[l.statut] }}</span></td>
+                    <td class="py-2 px-3 min-w-[12rem]">
+                      <ul v-if="l.messages.length" class="space-y-0.5"><li v-for="(m, i) in l.messages" :key="i">{{ m }}</li></ul>
+                      <span v-else class="text-gris">—</span>
+                    </td>
+                    <td class="py-2 px-3 font-bold whitespace-nowrap">{{ l.produit || '—' }}</td>
+                    <td class="py-2 px-3 text-right font-mono whitespace-nowrap">{{ l.quantite ?? 'à compter' }}</td>
+                    <td class="py-2 px-3 text-right font-mono whitespace-nowrap">{{ formatPrix(l.valeur) }}</td>
+                    <td class="py-2 px-3 font-mono whitespace-nowrap">{{ l.numeroLot || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p v-if="texteModifie" class="p-2 rounded-lg bg-amber-50 text-amber-900 text-[11px]">Le texte a changé depuis la vérification : cliquez de nouveau sur « Vérifier ».</p>
+            <p v-else-if="lignesEnErreur" class="p-2 rounded-lg bg-red-50 text-red-800 text-[11px]">Corrigez les lignes en erreur, puis vérifiez de nouveau. Rien n'est enregistré tant qu'une ligne est en erreur.</p>
+
+            <button type="button" @click="envoyerImport(true)" :disabled="!validationPossible || importEnCours" class="cursor-pointer w-full py-2.5 bg-foret text-white text-xs font-bold rounded-xl hover:bg-opacity-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              {{ importEnCours ? 'Import en cours…' : 'Valider l\'import' }}
+            </button>
+          </section>
         </form>
 
         <!-- FICHE DU LOT -->

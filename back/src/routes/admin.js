@@ -26,6 +26,7 @@ const compteurC = require('../controllers/admin/CompteurController');
 const siteC = require('../controllers/admin/SiteController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
+const { limiteTentatives } = require('../middlewares/limiteTentatives');
 const uploadC  = require('../controllers/admin/UploadController');
 // Importation du middleware Multer/Cloudinary
 const upload = require('../config/cloudinary');
@@ -171,6 +172,10 @@ router.post('/upload', upload.single('image'), uploadC.uploadImage);
 router.route('/stock/lots')
   .get(stockC.obtenirLotsStock)
   .post(stockC.enregistrerEntreeStock);
+// Import groupé (jusqu'à 200 lots par appel) : 60 appels par compte en 10 minutes
+router.post('/stock/lots/import', limiteTentatives({
+  nom: 'importStock', minutes: 10, maxParCompte: 60, maxParIp: 120, compteDe: (req) => String(req.user?.id ?? ''), message: "Trop d'imports à la suite."
+}), stockC.importerEntreesStock);
 
 router.route('/stock/lots/:id')
   .put(stockC.modifierLotStock)

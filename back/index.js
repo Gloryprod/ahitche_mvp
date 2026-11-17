@@ -46,6 +46,8 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Import groupé des entrées de stock : 100 Ko de texte, qui en JSON (tabulations, guillemets échappés) dépassent 100 Ko
+app.use('/api/admin/stock/lots/import', express.json({ limit: '256kb' }));
 app.use(express.json());
 
 app.use(cookieParser());
