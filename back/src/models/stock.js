@@ -61,10 +61,11 @@ const mvtStockSchema = new mongoose.Schema({
     ref: 'Product',
     required: true
   },
+  // Vide seulement pour une sortie sans lot (livraison avec stock incomplet : voir ManqueStock)
   lotId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'LotStockFifo',
-    required: true
+    default: null
   },
   type: {
     type: String,
@@ -90,7 +91,32 @@ const mvtStockSchema = new mongoose.Schema({
   deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
+// 3. Manque à combler : quantité livrée sans lot (livraison validée par l'admin avec un stock incomplet).
+// Stock du produit = lots − quantiteRestante des manques ouverts ; chaque entrée suivante comble les manques
+// du plus ancien au plus récent (services/stockService.js, comblerManques) et consigne le coût du lot utilisé.
+const manqueStockSchema = new mongoose.Schema({
+  product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  quantiteInitiale: { type: Number, required: true, min: 0 },
+  quantiteRestante: { type: Number, required: true, min: 0 }, // 0 : manque comblé
+  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
+  reference: { type: String, trim: true, default: '' }, // Référence CMD-… de la commande livrée
+  creePar: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  // Coût de la part livrée sans lot, au prix du lot qui la comble (null : lot sans prix) ; sert aux marges
+  couts: [{
+    _id: false,
+    lotId: { type: mongoose.Schema.Types.ObjectId, ref: 'LotStockFifo', required: true },
+    quantite: { type: Number, required: true, min: 0 },
+    cout: { type: Number, default: null },
+    date: { type: Date, default: Date.now }
+  }],
+  dateComblement: { type: Date, default: null }
+}, { timestamps: true });
+
+// Manques ouverts d'un produit, du plus ancien au plus récent
+manqueStockSchema.index({ product: 1, quantiteRestante: 1, createdAt: 1 });
+
 const LotStockFifo = mongoose.model('LotStockFifo', lotStockFifoSchema);
 const MouvementStock = mongoose.model('MouvementStock', mvtStockSchema);
+const ManqueStock = mongoose.model('ManqueStock', manqueStockSchema);
 
-module.exports = { LotStockFifo, MouvementStock, FOURNISSEUR_INTERNE, TYPES_MOUVEMENT, RAISONS_CORRECTION };
+module.exports = { LotStockFifo, MouvementStock, ManqueStock, FOURNISSEUR_INTERNE, TYPES_MOUVEMENT, RAISONS_CORRECTION };

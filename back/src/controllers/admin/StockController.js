@@ -4,7 +4,7 @@ const Product = require('../../models/product');
 const { trouverFournisseur } = require('../../services/fournisseurService');
 const { echapperRegex, lireNombre } = require('../../utils/texte');
 const { rattacherDepenseAchat, mettreAJourDepenseAchat, annulerDepenseAchat } = require('../../services/depenseStockService');
-const { consommerStockFIFO, genererNumeroLot, nomResponsable } = require('../../services/stockService');
+const { consommerStockFIFO, genererNumeroLot, nomResponsable, comblerManques, texteComblements } = require('../../services/stockService');
 const { journaliser } = require('../../services/journalService');
 const BudgetLine = require('../../models/budgetLine');
 
@@ -65,6 +65,7 @@ async function obtenirLotsStock(req, res) {
  * Le lot se rattache à la dépense de sa pièce ; sans dépense existante, il la crée (sauf creerDepense = false).
  */
 async function enregistrerEntreeStock(req, res) {
+  const session = await mongoose.startSession();
   try {
     const { productId, fournisseurId, dateReception } = req.body;
     const quantite = nombreOuVide(req.body.quantiteRecue);
@@ -123,32 +124,42 @@ async function enregistrerEntreeStock(req, res) {
     if (ligneBudgetaire && !await BudgetLine.exists({ code: ligneBudgetaire, deletedAt: null })) {
       return res.status(400).json({ message: `La ligne budgétaire ${ligneBudgetaire} n'existe pas.` });
     }
-    const { depense, creee } = await rattacherDepenseAchat(req, lot, { creerDepense: req.body.creerDepense !== false, ligneBudgetaire });
-    await lot.save();
+    // Tout ou rien : lot, dépense, mouvement d'entrée et comblement des manques du produit
+    const responsable = await nomResponsable(req);
+    session.startTransaction();
+    const { depense, creee } = await rattacherDepenseAchat(req, lot, { creerDepense: req.body.creerDepense !== false, ligneBudgetaire, session });
+    await lot.save({ session });
 
+    let comblements = [];
     if (quantite !== null) {
-      await MouvementStock.create({
+      await MouvementStock.create([{
         product: produit._id,
         lotId: lot._id,
         type: 'entree',
         quantite,
         motif: `Réception de marchandise auprès de ${lot.fournisseur}${lot.numeroPiece ? ` (pièce ${lot.numeroPiece})` : ''}`,
-        responsable: await nomResponsable(req)
-      });
+        responsable
+      }], { session });
+      comblements = await comblerManques(produit._id, lot, session, responsable);
     }
+    const combles = texteComblements(comblements, produit.unit);
     await journaliser(req, {
       action: 'Création', entite: 'Lot de stock', entiteId: lot._id,
-      resume: `Entrée ${lot.numeroLot} : ${produit.name}, ${quantite === null ? `à compter (${aConfirmer})` : `${quantite} ${produit.unit}`}${depense ? (creee ? ', dépense créée' : `, rattachée à la dépense de la pièce ${lot.numeroPiece}`) : ''}`
-    });
+      resume: `Entrée ${lot.numeroLot} : ${produit.name}, ${quantite === null ? `à compter (${aConfirmer})` : `${quantite} ${produit.unit}`}${combles}${depense ? (creee ? ', dépense créée' : `, rattachée à la dépense de la pièce ${lot.numeroPiece}`) : ''}`
+    }, session);
+    await session.commitTransaction();
 
     const message = depense && !creee
-      ? `Entrée enregistrée, rattachée à la dépense existante de la pièce ${lot.numeroPiece}.`
-      : "Entrée enregistrée avec succès !";
-    return res.status(201).json({ message, lot, depenseRattachee: !!depense, depenseCreee: creee });
+      ? `Entrée enregistrée, rattachée à la dépense existante de la pièce ${lot.numeroPiece}${combles}.`
+      : (combles ? `Entrée enregistrée${combles}.` : "Entrée enregistrée avec succès !");
+    return res.status(201).json({ message, lot, depenseRattachee: !!depense, depenseCreee: creee, comblements });
   } catch (error) {
+    if (session.inTransaction()) await session.abortTransaction();
     if (error.code === 11000) return res.status(400).json({ message: "Ce numéro de lot existe déjà." });
     console.error("Erreur enregistrerEntreeStock:", error);
     return res.status(500).json({ message: "Erreur serveur." });
+  } finally {
+    session.endSession();
   }
 }
 
@@ -261,35 +272,44 @@ async function supprimerLotStock(req, res) {
  * Lot à compter : la quantité comptée entre en stock ; le prix unitaire se déduit de la valeur facturée.
  */
 async function compterLot(req, res) {
+  const session = await mongoose.startSession();
   try {
     const quantite = nombreOuVide(req.body.quantite);
     if (!(quantite > 0)) return res.status(400).json({ message: "Indiquez la quantité comptée." });
 
-    const lot = await LotStockFifo.findOne({ _id: req.params.id, deletedAt: null }).populate('product', 'name unit');
-    if (!lot) return res.status(404).json({ message: "Lot introuvable." });
-    if (lot.quantiteInitiale !== null) return res.status(400).json({ message: "Ce lot est déjà compté : utilisez « Corriger »." });
+    const responsable = await nomResponsable(req);
+    session.startTransaction();
+    const lot = await LotStockFifo.findOne({ _id: req.params.id, deletedAt: null }).populate('product', 'name unit').session(session);
+    if (!lot) { await session.abortTransaction(); return res.status(404).json({ message: "Lot introuvable." }); }
+    if (lot.quantiteInitiale !== null) { await session.abortTransaction(); return res.status(400).json({ message: "Ce lot est déjà compté : utilisez « Corriger »." }); }
 
     const avant = { aConfirmer: lot.aConfirmer };
     lot.quantiteInitiale = quantite;
     lot.quantiteRestante = quantite;
     if (lot.valeurFcfa !== null) lot.prixAchatUnitaire = Math.round((lot.valeurFcfa / quantite) * 100) / 100;
     lot.aConfirmer = '';
-    await lot.save();
+    await lot.save({ session });
 
-    await MouvementStock.create({
+    await MouvementStock.create([{
       product: lot.product._id, lotId: lot._id, type: 'entree', quantite, raison: 'Comptage',
       motif: `Comptage du lot ${lot.numeroLot}${texte(req.body.commentaire) ? ` : ${texte(req.body.commentaire)}` : ''}`,
-      responsable: await nomResponsable(req)
-    });
+      responsable
+    }], { session });
+    const comblements = await comblerManques(lot.product._id, lot, session, responsable);
+    const combles = texteComblements(comblements, lot.product.unit);
     await journaliser(req, {
       action: 'Validation', entite: 'Lot de stock', entiteId: lot._id,
-      resume: `Lot ${lot.numeroLot} compté : ${quantite} ${lot.product.unit}${lot.prixAchatUnitaire !== null ? `, soit ${lot.prixAchatUnitaire} FCFA l'unité` : ''}`,
+      resume: `Lot ${lot.numeroLot} compté : ${quantite} ${lot.product.unit}${lot.prixAchatUnitaire !== null ? `, soit ${lot.prixAchatUnitaire} FCFA l'unité` : ''}${combles}`,
       avant, apres: { quantiteInitiale: quantite, prixAchatUnitaire: lot.prixAchatUnitaire }
-    });
-    return res.status(200).json({ message: "Comptage enregistré.", lot });
+    }, session);
+    await session.commitTransaction();
+    return res.status(200).json({ message: `Comptage enregistré${combles}.`, lot, comblements });
   } catch (error) {
+    if (session.inTransaction()) await session.abortTransaction();
     console.error("Erreur compterLot:", error);
     return res.status(500).json({ message: "Erreur lors du comptage." });
+  } finally {
+    session.endSession();
   }
 }
 
@@ -298,6 +318,7 @@ async function compterLot(req, res) {
  * { sens: 'positive' | 'negative', quantite, raison: Perte | Péremption | Erreur de saisie, commentaire }
  */
 async function corrigerLot(req, res) {
+  const session = await mongoose.startSession();
   try {
     const { sens } = req.body;
     const quantite = nombreOuVide(req.body.quantite);
@@ -310,31 +331,41 @@ async function corrigerLot(req, res) {
       return res.status(400).json({ message: "Une perte ou une péremption retire du stock." });
     }
 
-    const lot = await LotStockFifo.findOne({ _id: req.params.id, deletedAt: null }).populate('product', 'name unit');
-    if (!lot) return res.status(404).json({ message: "Lot introuvable." });
-    if (lot.quantiteRestante === null) return res.status(400).json({ message: "Lot à compter : enregistrez d'abord le comptage." });
+    const responsable = await nomResponsable(req);
+    session.startTransaction();
+    const lot = await LotStockFifo.findOne({ _id: req.params.id, deletedAt: null }).populate('product', 'name unit').session(session);
+    const refus = async (statut, message) => { await session.abortTransaction(); return res.status(statut).json({ message }); };
+    if (!lot) return refus(404, "Lot introuvable.");
+    if (lot.quantiteRestante === null) return refus(400, "Lot à compter : enregistrez d'abord le comptage.");
     if (sens === 'negative' && quantite > lot.quantiteRestante) {
-      return res.status(400).json({ message: `Il ne reste que ${lot.quantiteRestante} ${lot.product.unit} dans ce lot.` });
+      return refus(400, `Il ne reste que ${lot.quantiteRestante} ${lot.product.unit} dans ce lot.`);
     }
 
     const avant = lot.quantiteRestante;
     lot.quantiteRestante = Math.round((avant + (sens === 'positive' ? quantite : -quantite)) * 1000) / 1000;
-    await lot.save();
+    await lot.save({ session });
     const commentaire = texte(req.body.commentaire);
-    await MouvementStock.create({
+    await MouvementStock.create([{
       product: lot.product._id, lotId: lot._id, type: `correction_${sens}`, quantite, raison,
       motif: `${raison}${commentaire ? ` : ${commentaire}` : ''}`,
-      responsable: await nomResponsable(req)
-    });
+      responsable
+    }], { session });
+    // Correction positive : la quantité ajoutée comble d'abord les manques du produit
+    const comblements = sens === 'positive' ? await comblerManques(lot.product._id, lot, session, responsable) : [];
+    const combles = texteComblements(comblements, lot.product.unit);
     await journaliser(req, {
       action: 'Modification', entite: 'Lot de stock', entiteId: lot._id,
-      resume: `Correction du lot ${lot.numeroLot} (${raison}) : ${sens === 'positive' ? '+' : '−'}${quantite} ${lot.product.unit}`,
+      resume: `Correction du lot ${lot.numeroLot} (${raison}) : ${sens === 'positive' ? '+' : '−'}${quantite} ${lot.product.unit}${combles}`,
       avant: { quantiteRestante: avant }, apres: { quantiteRestante: lot.quantiteRestante }
-    });
-    return res.status(200).json({ message: "Correction enregistrée.", lot });
+    }, session);
+    await session.commitTransaction();
+    return res.status(200).json({ message: `Correction enregistrée${combles}.`, lot, comblements });
   } catch (error) {
+    if (session.inTransaction()) await session.abortTransaction();
     console.error("Erreur corrigerLot:", error);
     return res.status(500).json({ message: "Erreur lors de la correction." });
+  } finally {
+    session.endSession();
   }
 }
 
@@ -421,13 +452,15 @@ async function enregistrerTransformation(req, res) {
       transformationId, rendement, responsable,
       motif: `Transformation de ${quantiteMatiere} ${matiere.unit} de ${matiere.name} (rendement ${Math.round(rendement * 100)} %)`
     }], { session });
+    const comblements = await comblerManques(produit._id, lot, session, responsable);
+    const combles = texteComblements(comblements, produit.unit);
     await journaliser(req, {
       action: 'Création', entite: 'Lot de stock', entiteId: lot._id,
-      resume: `Transformation : ${quantiteMatiere} ${matiere.unit} de ${matiere.name} → ${quantiteObtenue} ${produit.unit} de ${produit.name} (lot ${lot.numeroLot}, rendement ${Math.round(rendement * 100)} %)`
+      resume: `Transformation : ${quantiteMatiere} ${matiere.unit} de ${matiere.name} → ${quantiteObtenue} ${produit.unit} de ${produit.name} (lot ${lot.numeroLot}, rendement ${Math.round(rendement * 100)} %)${combles}`
     }, session);
 
     await session.commitTransaction();
-    return res.status(201).json({ message: "Transformation enregistrée.", lot, rendement });
+    return res.status(201).json({ message: `Transformation enregistrée${combles}.`, lot, rendement, comblements });
   } catch (error) {
     if (session.inTransaction()) await session.abortTransaction();
     if (/Stock insuffisant/.test(error.message)) return res.status(400).json({ message: error.message });
