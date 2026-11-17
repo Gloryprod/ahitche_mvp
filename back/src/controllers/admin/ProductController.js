@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Product = require('../../models/product');
 const { TYPES_PRODUIT, TYPES_VENDUS, STATUTS_PRODUIT, PACKS } = require('../../models/product');
-const { LotStockFifo } = require('../../models/stock');
+const { LotStockFifo, ManqueStock } = require('../../models/stock');
 const { echapperRegex, lireNombre } = require('../../utils/texte');
 const { journaliser } = require('../../services/journalService');
 const { ACCES } = require('../../config/roles');
@@ -172,6 +172,10 @@ async function deleteProduct(req, res) {
     });
     if (lotsActifs) {
       return res.status(400).json({ message: `Ce produit a encore ${lotsActifs} lot(s) en stock : sortez, corrigez ou archivez ce stock avant de le retirer du catalogue.` });
+    }
+    // Manque à combler : une fois le produit retiré, aucune entrée ne pourrait plus le combler
+    if (await ManqueStock.exists({ product: req.params.id, quantiteRestante: { $gt: 0 } })) {
+      return res.status(400).json({ message: "Ce produit a un stock négatif à combler (livraison sans stock) : enregistrez d'abord l'entrée qui le comble." });
     }
     const deletedProduct = await Product.findOneAndUpdate({ _id: req.params.id, deletedAt: null }, { deletedAt: new Date() }, { returnDocument: 'after' });
     if (!deletedProduct) return res.status(404).json({ message: "Produit introuvable." });

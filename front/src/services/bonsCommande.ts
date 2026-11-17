@@ -77,6 +77,10 @@ export const formatFcfa = (n: number | null | undefined): string =>
 export const formatQuantite = (n: number | null | undefined): string =>
   n === null || n === undefined ? '—' : n.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
 
+// Stock net d'un produit : négatif après une livraison sans stock (manque à combler), écrit avec le vrai signe « − »
+export const formatStock = (n: number | null | undefined): string =>
+  typeof n === 'number' && n < 0 ? `−${formatQuantite(-n)}` : formatQuantite(n)
+
 // Date du serveur (ou saisie « AAAA-MM-JJ ») en « JJ/MM/AAAA », à l'heure du Bénin
 export const dateFr = (d: string | null | undefined): string =>
   d ? new Date(d).toLocaleDateString('fr-FR', { timeZone: 'Africa/Porto-Novo' }) : ''

@@ -2,7 +2,7 @@ const Order = require('../../models/order');
 const Formule = require('../../models/formules');
 const OrderProductSnapshot = require('../../models/orderProductSnapshot');
 const mongoose = require('mongoose');
-const { consommerStockFIFO } = require('../../services/stockService');
+const { consommerStockFIFO, quantiteEnLots, creerManque, nomResponsable } = require('../../services/stockService');
 const { genererReferenceCommande } = require('../../services/orderReferenceService');
 const { STATUTS } = require('../../models/order');
 const User = require('../../models/user');
@@ -181,6 +181,11 @@ async function getAllOrders(req, res) {
 // Erreur métier : message affiché tel quel à l'équipe (400)
 class ErreurStatut extends Error {}
 
+const arrondi3 = (n) => Math.round(n * 1000) / 1000;
+// « Riz local −3 kg, Huile 0,5 L » (journal et messages d'une livraison avec stock incomplet)
+const listeManques = (manques) => manques
+  .map(m => `${m.nom} −${m.manque.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} ${m.unite}`).join(', ');
+
 async function updateOrderStatus(req, res) {
   const { statut, referencePaiement, notePaiement } = req.body;
 
@@ -194,6 +199,7 @@ async function updateOrderStatus(req, res) {
   // Transaction : changement de statut et sortie de stock FIFO réussissent ou échouent ensemble
   const session = await mongoose.startSession();
   session.startTransaction();
+  let livraisonAvecManques = null;
 
   try {
     const order = await Order.findById(req.params.id).session(session);
@@ -259,8 +265,49 @@ async function updateOrderStatus(req, res) {
       if (!orderProducts.length && !demandesALivrer) {
         throw new ErreurStatut("Impossible de valider une commande sans produits associés.");
       }
+      // Stock incomplet : quantité qui manque par produit (lignes du même produit additionnées)
+      const parProduit = new Map();
       for (const item of orderProducts) {
-        await consommerStockFIFO(item.productId, item.quantity, `Livraison de la commande ${order.reference}`, session);
+        const cle = String(item.productId);
+        const ligne = parProduit.get(cle) || { productId: item.productId, nom: item.name, unite: item.unit, quantite: 0 };
+        ligne.quantite += item.quantity;
+        parProduit.set(cle, ligne);
+      }
+      const manques = [];
+      for (const p of parProduit.values()) {
+        p.disponible = await quantiteEnLots(p.productId, session);
+        const manque = arrondi3(p.quantite - p.disponible);
+        if (manque > 0) manques.push({ productId: p.productId, nom: p.nom, unite: p.unite, manque });
+      }
+
+      const motif = `Livraison de la commande ${order.reference}`;
+      if (!manques.length) {
+        // Stock suffisant : sortie FIFO ligne par ligne, comme avant (livrerMalgreManque ignoré)
+        for (const item of orderProducts) {
+          await consommerStockFIFO(item.productId, item.quantity, motif, session);
+        }
+      } else {
+        if (req.body.livrerMalgreManque !== true) {
+          throw Object.assign(new ErreurStatut(`Stock incomplet pour livrer ${order.reference} : ${listeManques(manques)}.`), { code: 409, manques });
+        }
+        if (req.user.role !== 'admin') {
+          throw Object.assign(new ErreurStatut("Stock incomplet : demandez à l'admin de valider cette livraison."), { code: 403, manques });
+        }
+        // Livrer quand même (admin) : les lots disponibles sortent en FIFO, le reste devient un manque à combler
+        const responsable = await nomResponsable(req);
+        const enManque = new Map(manques.map(m => [String(m.productId), m.manque]));
+        for (const [cle, p] of parProduit) {
+          const manque = enManque.get(cle) || 0;
+          const aPrelever = manque ? p.disponible : p.quantite;
+          if (aPrelever > 0) await consommerStockFIFO(p.productId, aPrelever, motif, session);
+          if (manque) await creerManque(p.productId, manque, order, session, { responsable, creePar: req.user.id });
+        }
+        await journaliser(req, {
+          action: 'Modification', entite: 'Stock', entiteId: order._id,
+          resume: `Livraison ${order.reference} avec stock incomplet : ${listeManques(manques)}`,
+          apres: { manques: manques.map(m => ({ productId: String(m.productId), nom: m.nom, manque: m.manque })) }
+        }, session);
+        livraisonAvecManques = manques;
       }
     }
 
@@ -274,8 +321,11 @@ async function updateOrderStatus(req, res) {
 
     await session.commitTransaction();
     return res.status(200).json({
-      message: `Commande ${order.reference} : ${statut}.`,
-      order: updatedOrder
+      message: livraisonAvecManques
+        ? `Commande ${order.reference} : ${statut}, avec un stock à combler (${listeManques(livraisonAvecManques)}).`
+        : `Commande ${order.reference} : ${statut}.`,
+      order: updatedOrder,
+      ...(livraisonAvecManques ? { manques: livraisonAvecManques } : {})
     });
 
   } catch (error) {
@@ -283,7 +333,7 @@ async function updateOrderStatus(req, res) {
     await session.abortTransaction();
 
     if (error instanceof ErreurStatut) {
-      return res.status(error.code || 400).json({ message: error.message });
+      return res.status(error.code || 400).json({ message: error.message, ...(error.manques ? { manques: error.manques } : {}) });
     }
     // Rupture de stock signalée par le service FIFO
     if (error.message?.includes("Stock insuffisant")) {

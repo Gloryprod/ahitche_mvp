@@ -1,4 +1,6 @@
 const { LotStockFifo } = require('../../models/stock');
+const Product = require('../../models/product');
+const { manquesParProduit } = require('../../services/stockService');
 const { TYPES_PACK, calculerCompositionPack } = require('../../services/compositionService');
 const Parametres = require('../../models/parametres');
 
@@ -119,7 +121,7 @@ async function simulerAchats(req, res) {
     const packs = TYPES_PACK.map(t => ({ type: t, nombre: Math.min(Math.floor(nombrePositif(quantites[t])), 10000) })).filter(p => p.nombre > 0);
     if (!packs.length) return res.status(400).json({ message: "Indiquez au moins une commande à simuler." });
 
-    const [prixReels, stock] = await Promise.all([prixAchatReels(), stockDisponible()]);
+    const [prixReels, stock, manques] = await Promise.all([prixAchatReels(), stockDisponible(), manquesParProduit()]);
     const besoins = new Map();
 
     for (const { type, nombre } of packs) {
@@ -133,11 +135,21 @@ async function simulerAchats(req, res) {
       }
     }
 
+    // Produits à combler hors des packs simulés (extras livrés sans stock) : le manque reste à acheter
+    const horsPacks = [...manques.keys()].filter(id => !besoins.has(id));
+    if (horsPacks.length) {
+      for (const p of await Product.find({ _id: { $in: horsPacks }, deletedAt: null }).select('name unit priceUnit').lean()) {
+        besoins.set(String(p._id), { produit: p.name, unite: p.unit, besoin: 0, prixCatalogue: p.priceUnit ?? null });
+      }
+    }
+
     const lignes = [...besoins.entries()].map(([id, l]) => {
-      const disponible = stock.get(id) || 0;
+      // Stock net (lots − manques à combler) : un manque s'ajoute au besoin d'achat
+      const manque = manques.get(id) || 0;
+      const disponible = Math.round(((stock.get(id) || 0) - manque) * 1000) / 1000;
       const aAcheter = Math.max(0, l.besoin - disponible);
       const prix = prixReels.get(id) ?? l.prixCatalogue; // null : prix à renseigner
-      return { ...l, besoin: Math.round(l.besoin * 100) / 100, disponible, aAcheter: Math.round(aAcheter * 100) / 100, prixEstime: prix === null ? null : arrondir(prix), coutEstime: prix === null ? null : arrondir(aAcheter * prix) };
+      return { ...l, besoin: Math.round(l.besoin * 100) / 100, disponible, manque, aAcheter: Math.round(aAcheter * 100) / 100, prixEstime: prix === null ? null : arrondir(prix), coutEstime: prix === null ? null : arrondir(aAcheter * prix) };
     }).sort((a, b) => (b.coutEstime ?? 0) - (a.coutEstime ?? 0) || a.produit.localeCompare(b.produit, 'fr'));
 
     return res.status(200).json({

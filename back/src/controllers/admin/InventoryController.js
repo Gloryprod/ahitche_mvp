@@ -7,7 +7,7 @@ const { FAMILLES } = require('../../models/product');
 const BudgetLine = require('../../models/budgetLine');
 const { trouverFournisseur } = require('../../services/fournisseurService');
 const { depenseDeLaPiece } = require('../../services/depenseStockService');
-const { genererNumeroLot, nomResponsable } = require('../../services/stockService');
+const { genererNumeroLot, nomResponsable, comblerManques, texteComblements, manquesParProduit } = require('../../services/stockService');
 const { journaliser } = require('../../services/journalService');
 const { echapperRegex, lireNombre } = require('../../utils/texte');
 const { lireDate } = require('../../utils/dates');
@@ -53,7 +53,7 @@ async function obtenirInventaireGlobal(req, res) {
       return res.status(400).json({ message: "Famille invalide : P, V, MP ou EMB." });
     }
 
-    const [produits, etatStock] = await Promise.all([
+    const [produits, etatStock, manques] = await Promise.all([
       Product.find({ deletedAt: null, ...(famille ? { type: TYPE_PAR_FAMILLE[famille] } : {}) })
         .select('reference name unit type seuilAlerte').lean(),
       // Stock restant par produit ; les lots à compter (quantité vide) et à vérifier sont signalés à part
@@ -85,7 +85,8 @@ async function obtenirInventaireGlobal(req, res) {
             }
           }
         }
-      ])
+      ]),
+      manquesParProduit()
     ]);
 
     const parProduit = new Map(etatStock.map(e => [String(e._id), e]));
@@ -93,7 +94,9 @@ async function obtenirInventaireGlobal(req, res) {
     const inventaire = produits.map(p => {
       const e = parProduit.get(String(p._id)) || {};
       const seuil = p.seuilAlerte ?? null; // Dans l'unité du produit ; vide = pas d'alerte (seuil à renseigner)
-      const stockTotal = arrondi3(e.stockTotal || 0);
+      // Stock net : lots − manques à combler (livraisons validées avec un stock incomplet) ; peut être négatif
+      const manque = manques.get(String(p._id)) || 0;
+      const stockTotal = arrondi3((e.stockTotal || 0) - manque);
       return {
         productId: p._id,
         reference: p.reference || null,
@@ -102,6 +105,7 @@ async function obtenirInventaireGlobal(req, res) {
         type: p.type,
         famille: FAMILLES[p.type] || null,
         stockTotal,
+        manque,
         nbLotsActifs: e.nbLotsActifs || 0,
         lotsACompter: e.lotsACompter || 0,
         lotsAConfirmer: e.lotsAConfirmer || 0,
@@ -574,6 +578,7 @@ async function receptionnerBon(req, res) {
     const motif = `Réception du bon ${bon.numeroBon}${bon.numeroFacture ? ` (facture ${bon.numeroFacture})` : ''}`;
 
     const lots = [];
+    const comblements = [];
     for (const d of demandes) {
       const ligne = bon.lignes.id(d.ligneId);
       if (!ligne) throw new ErreurMetier(400, `La ligne ${d.ligneId} n'appartient pas au bon ${bon.numeroBon}.`);
@@ -614,9 +619,11 @@ async function receptionnerBon(req, res) {
         commentaire: `Bon ${bon.numeroBon}, ligne « ${ligne.designation} »`
       }], { session });
       await MouvementStock.create([{ product: produit._id, lotId: lot._id, type: 'entree', quantite: d.quantiteRecue, motif, responsable }], { session });
+      const comblementsLot = await comblerManques(produit._id, lot, session, responsable);
+      comblements.push(...comblementsLot.map(c => ({ ...c, productId: produit._id, numeroLot: lot.numeroLot })));
       await journaliser(req, {
         action: 'Création', entite: 'Lot de stock', entiteId: lot._id,
-        resume: `Entrée ${lot.numeroLot} : ${produit.name}, ${d.quantiteRecue} ${produit.unit} (${motif})${depense ? `, rattachée à la dépense de la pièce ${bon.numeroFacture}` : ''}`
+        resume: `Entrée ${lot.numeroLot} : ${produit.name}, ${d.quantiteRecue} ${produit.unit} (${motif})${texteComblements(comblementsLot, produit.unit)}${depense ? `, rattachée à la dépense de la pièce ${bon.numeroFacture}` : ''}`
       }, session);
 
       Object.assign(ligne, { quantiteRecue: d.quantiteRecue, lotFournisseur: d.lotFournisseur, numeroLot, lotId: lot._id });
@@ -634,8 +641,9 @@ async function receptionnerBon(req, res) {
     }, session);
 
     await session.commitTransaction();
-    const message = `${lots.length} lot(s) entré(s) en stock, bon « ${bon.statut} ».${sansDepense ? ` Aucune dépense ne porte la pièce ${bon.numeroFacture} : les lots restent sans dépense rattachée.` : ''}`;
-    return res.status(201).json({ message, bon: await peuplerBon(PurchaseOrder.findById(bon._id)), lots });
+    const combles = comblements.length ? ` Manques comblés : ${[...new Set(comblements.map(c => c.reference))].join(', ')}.` : '';
+    const message = `${lots.length} lot(s) entré(s) en stock, bon « ${bon.statut} ».${combles}${sansDepense ? ` Aucune dépense ne porte la pièce ${bon.numeroFacture} : les lots restent sans dépense rattachée.` : ''}`;
+    return res.status(201).json({ message, bon: await peuplerBon(PurchaseOrder.findById(bon._id)), lots, comblements });
   } catch (error) {
     if (session.inTransaction()) {
       try { await session.abortTransaction(); } catch { /* transaction déjà annulée par le serveur */ }

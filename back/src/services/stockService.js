@@ -1,4 +1,4 @@
-const { LotStockFifo, MouvementStock } = require('../models/stock');
+const { LotStockFifo, MouvementStock, ManqueStock } = require('../models/stock');
 const User = require('../models/user');
 const { echapperRegex } = require('../utils/texte');
 
@@ -92,8 +92,82 @@ async function consommerStockFIFO(productId, quantiteA_Sortir, motifSortie, sess
   return { cout, prelevements };
 }
 
+// Quantité disponible dans les lots d'un produit (lots à compter exclus), arrondie à 3 décimales
+async function quantiteEnLots(productId, session = null) {
+  return arrondi3((await lotsFifo(productId, session)).reduce((s, l) => s + l.quantiteRestante, 0));
+}
+
+// Manques ouverts par produit : Map(productId → quantité restant à combler). Sert au stock net (lots − manques).
+async function manquesParProduit(productIds = null) {
+  const manques = await ManqueStock.aggregate([
+    { $match: { quantiteRestante: { $gt: 0 }, ...(productIds ? { product: { $in: productIds } } : {}) } },
+    { $group: { _id: '$product', quantite: { $sum: '$quantiteRestante' } } }
+  ]);
+  return new Map(manques.map(m => [String(m._id), arrondi3(m.quantite)]));
+}
+
+// Livraison avec stock incomplet (validée par l'admin) : la part sans lot devient un manque à combler,
+// avec une sortie sans lot pour la traçabilité
+async function creerManque(productId, quantite, order, session, { responsable, creePar } = {}) {
+  const [manque] = await ManqueStock.create([{
+    product: productId, quantiteInitiale: quantite, quantiteRestante: quantite,
+    orderId: order._id, reference: order.reference, creePar
+  }], { session });
+  await MouvementStock.create([{
+    product: productId, lotId: null, type: 'sortie', quantite,
+    motif: `Livraison de la commande ${order.reference} (sans stock : manque à combler)`,
+    ...(responsable ? { responsable } : {})
+  }], { session });
+  return manque;
+}
+
+/**
+ * Comble les manques ouverts du produit avec la quantité que le lot vient de recevoir, du plus ancien au plus récent.
+ * Appelée après chaque entrée (entrée en stock, comptage, correction positive, production interne, réception de bon),
+ * dans la transaction de l'entrée. Retire la quantité du lot (enregistré ici), crée un mouvement par comblement et
+ * consigne le coût sur le manque. Un lot à compter (quantité vide) ne comble rien.
+ * @returns {Array<{ reference, quantite }>} comblements effectués
+ */
+async function comblerManques(productId, lot, session, responsable) {
+  if (!(lot.quantiteRestante > 0)) return [];
+  const manques = await ManqueStock.find({ product: productId, quantiteRestante: { $gt: 0 } })
+    .sort({ createdAt: 1, _id: 1 })
+    .session(session);
+  const comblements = [];
+  for (const manque of manques) {
+    if (!(lot.quantiteRestante > 0)) break;
+    const quantite = arrondi3(Math.min(lot.quantiteRestante, manque.quantiteRestante));
+    lot.quantiteRestante = arrondi3(lot.quantiteRestante - quantite);
+    manque.quantiteRestante = arrondi3(manque.quantiteRestante - quantite);
+    const cout = coutPrelevement(lot, quantite);
+    manque.couts.push({ lotId: lot._id, quantite, cout: cout === null ? null : Math.round(cout * 100) / 100 });
+    if (manque.quantiteRestante === 0) manque.dateComblement = new Date();
+    await manque.save({ session });
+    await MouvementStock.create([{
+      product: productId, lotId: lot._id, type: 'sortie', quantite,
+      motif: `Manque de la livraison ${manque.reference} comblé (Prélevé sur le Lot ${lot.numeroLot})`,
+      ...(responsable ? { responsable } : {})
+    }], { session });
+    comblements.push({ reference: manque.reference, quantite });
+  }
+  if (comblements.length) await lot.save({ session });
+  return comblements;
+}
+
+// Fin de phrase du journal et du message : « , dont 3 kg pour combler CMD-001, CMD-004 »
+function texteComblements(comblements, unite = '') {
+  if (!comblements.length) return '';
+  const total = arrondi3(comblements.reduce((s, c) => s + c.quantite, 0));
+  return `, dont ${total.toLocaleString('fr-FR')}${unite ? ` ${unite}` : ''} pour combler ${[...new Set(comblements.map(c => c.reference))].join(', ')}`;
+}
+
 module.exports = {
   consommerStockFIFO,
+  quantiteEnLots,
+  manquesParProduit,
+  creerManque,
+  comblerManques,
+  texteComblements,
   lotsFifo,
   genererNumeroLot,
   nomResponsable
