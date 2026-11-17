@@ -158,7 +158,7 @@ async function comblerManques(productId, lot, session, responsable) {
 function texteComblements(comblements, unite = '') {
   if (!comblements.length) return '';
   const total = arrondi3(comblements.reduce((s, c) => s + c.quantite, 0));
-  return `, dont ${total}${unite ? ` ${unite}` : ''} pour combler ${[...new Set(comblements.map(c => c.reference))].join(', ')}`;
+  return `, dont ${total.toLocaleString('fr-FR')}${unite ? ` ${unite}` : ''} pour combler ${[...new Set(comblements.map(c => c.reference))].join(', ')}`;
 }
 
 module.exports = {
