@@ -7,10 +7,11 @@ function detecterSeparateur(premiereLigne) {
   return pointsVirgules >= virgules ? ';' : ',';
 }
 
-// Découpe un texte CSV en lignes de cellules (gère les guillemets et les retours à la ligne entre guillemets)
-function lireCsv(texte) {
+// Découpe un texte CSV en lignes de cellules (gère les guillemets et les retours à la ligne entre guillemets).
+// Séparateur facultatif (import des entrées de stock : « ; », tabulation ou « | ») ; sinon « ; » ou « , » détecté.
+function lireCsv(texte, separateurImpose = null) {
   const contenu = String(texte).replace(/^﻿/, '');
-  const separateur = detecterSeparateur(contenu.split(/\r?\n/, 1)[0] || '');
+  const separateur = separateurImpose || detecterSeparateur(contenu.split(/\r?\n/, 1)[0] || '');
   const lignes = [];
   let ligne = [], cellule = '', entreGuillemets = false;
 

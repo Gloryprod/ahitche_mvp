@@ -3,9 +3,11 @@ const { LotStockFifo, MouvementStock, FOURNISSEUR_INTERNE } = require('../../mod
 const Product = require('../../models/product');
 const { trouverFournisseur } = require('../../services/fournisseurService');
 const { echapperRegex, lireNombre } = require('../../utils/texte');
-const { rattacherDepenseAchat, mettreAJourDepenseAchat, annulerDepenseAchat } = require('../../services/depenseStockService');
+const { mettreAJourDepenseAchat, annulerDepenseAchat } = require('../../services/depenseStockService');
 const { consommerStockFIFO, genererNumeroLot, nomResponsable, comblerManques, texteComblements } = require('../../services/stockService');
+const { enregistrerEntree, importerEntrees, MAX_OCTETS } = require('../../services/entreeStockService');
 const { journaliser } = require('../../services/journalService');
+const { ACCES } = require('../../config/roles');
 const BudgetLine = require('../../models/budgetLine');
 
 // Motifs d'une correction saisie à la main (Q 6.5) ; « Comptage » est réservé à la confirmation d'un lot à compter
@@ -124,28 +126,11 @@ async function enregistrerEntreeStock(req, res) {
     if (ligneBudgetaire && !await BudgetLine.exists({ code: ligneBudgetaire, deletedAt: null })) {
       return res.status(400).json({ message: `La ligne budgétaire ${ligneBudgetaire} n'existe pas.` });
     }
-    // Tout ou rien : lot, dépense, mouvement d'entrée et comblement des manques du produit
+    // Tout ou rien : lot, dépense, mouvement d'entrée et comblement des manques du produit (services/entreeStockService.js)
     const responsable = await nomResponsable(req);
     session.startTransaction();
-    const { depense, creee } = await rattacherDepenseAchat(req, lot, { creerDepense: req.body.creerDepense !== false, ligneBudgetaire, session });
-    await lot.save({ session });
-
-    let comblements = [];
-    if (quantite !== null) {
-      await MouvementStock.create([{
-        product: produit._id,
-        lotId: lot._id,
-        type: 'entree',
-        quantite,
-        motif: `Réception de marchandise auprès de ${lot.fournisseur}${lot.numeroPiece ? ` (pièce ${lot.numeroPiece})` : ''}`,
-        responsable
-      }], { session });
-      comblements = await comblerManques(produit._id, lot, session, responsable);
-    }
-    const combles = texteComblements(comblements, produit.unit);
-    await journaliser(req, {
-      action: 'Création', entite: 'Lot de stock', entiteId: lot._id,
-      resume: `Entrée ${lot.numeroLot} : ${produit.name}, ${quantite === null ? `à compter (${aConfirmer})` : `${quantite} ${produit.unit}`}${combles}${depense ? (creee ? ', dépense créée' : `, rattachée à la dépense de la pièce ${lot.numeroPiece}`) : ''}`
+    const { depense, creee, comblements, combles } = await enregistrerEntree(req, lot, {
+      produit, responsable, creerDepense: req.body.creerDepense !== false, ligneBudgetaire
     }, session);
     await session.commitTransaction();
 
@@ -158,6 +143,34 @@ async function enregistrerEntreeStock(req, res) {
     if (error.code === 11000) return res.status(400).json({ message: "Ce numéro de lot existe déjà." });
     console.error("Erreur enregistrerEntreeStock:", error);
     return res.status(500).json({ message: "Erreur serveur." });
+  } finally {
+    session.endSession();
+  }
+}
+
+/**
+ * 2 bis. IMPORT GROUPÉ D'ENTRÉES (POST /api/admin/stock/lots/import)  { texte, appliquer }
+ * Tableau collé (« ; », tabulation ou Markdown) : aperçu ligne par ligne, puis tout ou rien (services/entreeStockService.js).
+ */
+async function importerEntreesStock(req, res) {
+  if (!ACCES.stock.ecriture.includes(req.user.role)) {
+    return res.status(403).json({ message: 'Votre rôle permet seulement de consulter cette section.' });
+  }
+  const { texte: tableau, appliquer } = req.body ?? {};
+  if (typeof tableau !== 'string' || !tableau.trim()) return res.status(400).json({ message: "Collez le tableau à importer, en-têtes compris." });
+  if (typeof appliquer !== 'boolean') return res.status(400).json({ message: "« appliquer » doit valoir true ou false." });
+  if (Buffer.byteLength(tableau, 'utf8') > MAX_OCTETS) return res.status(400).json({ message: "Texte trop long : 100 Ko au plus par import." });
+
+  const session = await mongoose.startSession();
+  try {
+    const { statut, corps } = await importerEntrees(req, tableau, appliquer, session);
+    return res.status(statut).json(corps);
+  } catch (error) {
+    if (session.inTransaction()) await session.abortTransaction();
+    if (error.code === 11000) return res.status(400).json({ message: "Un numéro de lot vient d'être utilisé : relancez la vérification." });
+    // Sans le message de l'erreur, qui peut citer une valeur collée (fournisseur, montant)
+    console.error("Erreur importerEntreesStock:", error.name, error.code ?? '', (error.stack || '').split('\n').slice(1, 4).join(' | '));
+    return res.status(500).json({ message: "Erreur lors de l'import des entrées." });
   } finally {
     session.endSession();
   }
@@ -475,6 +488,7 @@ async function enregistrerTransformation(req, res) {
 module.exports = {
   obtenirLotsStock,
   enregistrerEntreeStock,
+  importerEntreesStock,
   modifierLotStock,
   supprimerLotStock,
   compterLot,

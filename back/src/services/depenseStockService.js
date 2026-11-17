@@ -42,6 +42,17 @@ async function rattacherDepenseAchat(req, lot, { creerDepense = true, ligneBudge
 
   const montant = montantLot(lot);
   if (montant === null) return { depense: null, creee: false };
+  const depense = await creerDepenseAchat(req, {
+    montant, ligneBudgetaire, libelle: await libelleAchat(lot), partenaireId: lot.fournisseurId, lotStockId: lot._id, numeroPiece: lot.numeroPiece,
+    resume: `Dépense créée par l'entrée de stock ${lot.numeroLot} : ${montant} FCFA à payer à ${lot.fournisseur}`
+  }, session);
+  lot.depenseId = depense._id;
+  return { depense, creee: true };
+}
+
+// Dépense d'achat « prévue », journalisée. lotStockId vide : dépense d'une pièce de plusieurs lots (import groupé),
+// qu'une modification d'un seul lot ne doit pas ramener au montant de ce lot (mettreAJourDepenseAchat).
+async function creerDepenseAchat(req, { montant, ligneBudgetaire = '', libelle, partenaireId = null, lotStockId = null, numeroPiece = '', resume }, session = null) {
   const taux = await tauxCourant();
   // Imputation : ligne du budget de la convention (achat financé par la subvention), sinon exploitation
   const ligne = ligneBudgetaire ? await BudgetLine.findOne({ code: ligneBudgetaire, deletedAt: null }).session(session).lean() : null;
@@ -50,18 +61,17 @@ async function rattacherDepenseAchat(req, lot, { creerDepense = true, ligneBudge
     : { categorie: 'Exploitation', typeExploitation: 'Achat stock' };
   const [depense] = await Expense.create([{
     ...imputation,
-    libelle: await libelleAchat(lot),
-    partenaireId: lot.fournisseurId || null,
-    lotStockId: lot._id,
-    numeroPiece: lot.numeroPiece || '',
+    libelle,
+    partenaireId: partenaireId || null,
+    lotStockId,
+    numeroPiece: numeroPiece || '',
     montantPrevuFcfa: montant,
     montantPrevuUsd: arrondir2(montant / taux),
     tauxApplique: taux,
     creePar: req.user.id
   }], { session });
-  lot.depenseId = depense._id;
-  await journaliser(req, { action: 'Création', entite: 'Dépense', entiteId: depense._id, resume: `Dépense créée par l'entrée de stock ${lot.numeroLot} : ${montant} FCFA à payer à ${lot.fournisseur}` }, session);
-  return { depense, creee: true };
+  await journaliser(req, { action: 'Création', entite: 'Dépense', entiteId: depense._id, resume }, session);
+  return depense;
 }
 
 // Après modification du lot : seule la dépense créée par ce lot suit (une dépense déjà effectuée,
@@ -91,4 +101,4 @@ async function annulerDepenseAchat(req, lot) {
   await journaliser(req, { action: 'Suppression', entite: 'Dépense', entiteId: depense._id, resume: `Dépense prévue du lot ${lot.numeroLot} supprimée avec le lot` });
 }
 
-module.exports = { rattacherDepenseAchat, mettreAJourDepenseAchat, annulerDepenseAchat, depenseDeLaPiece, montantLot };
+module.exports = { rattacherDepenseAchat, creerDepenseAchat, mettreAJourDepenseAchat, annulerDepenseAchat, depenseDeLaPiece, montantLot };
