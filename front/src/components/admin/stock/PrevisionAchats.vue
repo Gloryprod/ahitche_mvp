@@ -4,12 +4,13 @@ import { ShoppingCart, FileText, Info } from 'lucide-vue-next'
 import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
 import { genererSimulationPDF, fcfaPDF } from '@/services/pdfSimulateurs'
+import { formatStock } from '@/services/bonsCommande'
 
 // Prévision d'achats pour N commandes (section Stock, gestionnaires compris) : besoins par produit,
 // stock disponible, quantité et coût d'achat estimé. Aucune marge ni prix de vente n'y figure.
 
 interface PrevisionAchats {
-  lignes: { produit: string; unite: string; besoin: number; disponible: number; aAcheter: number; prixEstime: number | null; coutEstime: number | null }[]
+  lignes: { produit: string; unite: string; besoin: number; disponible: number; manque: number; aAcheter: number; prixEstime: number | null; coutEstime: number | null }[]
   coutTotal: number
   produitsARacheter: number
   prixManquants: number
@@ -53,7 +54,7 @@ function exporter() {
   ], [{
     titre: 'Besoins et achats',
     entetes: ['Produit', 'Besoin', 'En stock', 'À acheter', 'Coût estimé'],
-    lignes: a.lignes.map(l => [l.produit, `${formatNombre(l.besoin)} ${l.unite}`, formatNombre(l.disponible), formatNombre(l.aAcheter), fcfaPDF(l.coutEstime)]),
+    lignes: a.lignes.map(l => [l.produit, `${formatNombre(l.besoin)} ${l.unite}`, `${formatNombre(l.disponible)}${l.manque ? ` (manque ${formatNombre(l.manque)})` : ''}`, formatNombre(l.aAcheter), fcfaPDF(l.coutEstime)]),
     pied: ['Total', '', '', `${a.produitsARacheter} produit(s)`, fcfaPDF(a.coutTotal)],
   }])
 }
@@ -65,7 +66,7 @@ const champ = 'mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme te
   <div class="space-y-4 animate-fadeIn text-sm text-noir">
     <div class="bg-white p-4 rounded-2xl space-y-2">
       <h1 class="font-display font-bold text-xl flex items-center gap-2"><ShoppingCart class="w-5 h-5 text-foret" /> Prévision d'achats</h1>
-      <p class="text-xs text-gris flex items-start gap-1.5"><Info class="w-3.5 h-3.5 shrink-0 mt-0.5" /> Indiquez le nombre de commandes prévues par formule : le calcul donne les quantités à acheter, compte tenu du stock disponible (les lots à compter ne sont pas comptés).</p>
+      <p class="text-xs text-gris flex items-start gap-1.5"><Info class="w-3.5 h-3.5 shrink-0 mt-0.5" /> Indiquez le nombre de commandes prévues par formule : le calcul donne les quantités à acheter, compte tenu du stock disponible (les lots à compter ne sont pas comptés) ; un manque à combler (livraison partie sans stock) s’ajoute à la quantité à acheter.</p>
     </div>
 
     <section class="bg-white rounded-2xl border border-creme2 p-4 space-y-4">
@@ -91,7 +92,10 @@ const champ = 'mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme te
               <tr v-for="l in prevision.lignes" :key="l.produit" :class="!l.aAcheter ? 'text-gris' : ''">
                 <td class="py-2 pr-2 font-semibold">{{ l.produit }}</td>
                 <td class="py-2 pr-2 text-right whitespace-nowrap">{{ formatNombre(l.besoin) }} {{ l.unite }}</td>
-                <td class="py-2 pr-2 text-right">{{ formatNombre(l.disponible) }}</td>
+                <td class="py-2 pr-2 text-right whitespace-nowrap" :class="l.disponible < 0 ? 'text-red-700 font-bold' : ''">
+                  {{ formatStock(l.disponible) }}
+                  <span v-if="l.manque" class="block text-[10px] font-semibold text-red-700">manque {{ formatNombre(l.manque) }} {{ l.unite }}</span>
+                </td>
                 <td class="py-2 pr-2 text-right font-bold">{{ formatNombre(l.aAcheter) }}</td>
                 <td class="py-2 text-right whitespace-nowrap">{{ formatFCFA(l.coutEstime) }}</td>
               </tr>

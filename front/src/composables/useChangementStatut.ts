@@ -1,6 +1,9 @@
 import Swal from 'sweetalert2'
 import api from '@/stores/api'
 import { TRANSITIONS, ETAPE_SUIVANTE, type StatutCommande } from '@/config/commandes'
+import { useAuthStore } from '@/stores/auth'
+import { lireManques, type ManqueStock } from '@/services/erreurs'
+import { formatQuantite } from '@/services/bonsCommande'
 
 interface CommandeCiblee {
   id: string
@@ -17,11 +20,15 @@ const STYLE_SWAL = {
 /**
  * Changement de statut guidé, partagé par les écrans Commandes et Logistique.
  * Le passage en « Livrée » demande la référence Mobile Money, ou une note pour Espèces / Acompte.
+ * Stock incomplet (409) : l'admin peut « Livrer quand même » (même demande, paiement saisi compris) ; les autres voient
+ * les produits manquants sans pouvoir forcer.
  * Renvoie le message du serveur, ou null si l'utilisateur a abandonné.
  */
 export function useChangementStatut() {
+  const { isAdmin } = useAuthStore()
+
   async function changerVers(commande: CommandeCiblee, statut: StatutCommande): Promise<string | null> {
-    const corps: Record<string, string> = { statut }
+    const corps: Record<string, string | boolean> = { statut }
 
     if (statut === 'Livrée') {
       const mobileMoney = commande.modePaiement === 'Mobile Money'
@@ -53,8 +60,53 @@ export function useChangementStatut() {
       if (!confirmation.isConfirmed) return null
     }
 
-    const response = await api.patch(`/api/admin/orders/${commande.id}/status`, corps)
-    return response.data.message
+    for (;;) {
+      try {
+        const response = await api.patch(`/api/admin/orders/${commande.id}/status`, corps)
+        return response.data.message
+      } catch (err) {
+        const refus = lireManques(err, isAdmin.value && !corps.livrerMalgreManque)
+        if (!refus) throw err
+        if (!(await confirmerManques(refus.message, refus.manques, refus.peutForcer))) return null
+        corps.livrerMalgreManque = true
+      }
+    }
+  }
+
+  // Liste construite en DOM (textContent) : les noms de produits ne sont jamais interprétés comme du HTML
+  async function confirmerManques(message: string, manques: ManqueStock[], peutForcer: boolean) {
+    const bloc = document.createElement('div')
+    bloc.className = 'text-left text-sm text-noir space-y-3'
+    const texte = (contenu: string, classe: string) => {
+      const p = document.createElement('p')
+      p.className = classe
+      p.textContent = contenu
+      bloc.append(p)
+    }
+    texte(message, 'font-semibold')
+    const liste = document.createElement('ul')
+    liste.className = 'list-disc pl-5 space-y-1'
+    for (const m of manques) {
+      const li = document.createElement('li')
+      li.textContent = `${m.nom} : il manque ${formatQuantite(m.manque)} ${m.unite} dans le stock`
+      liste.append(li)
+    }
+    bloc.append(liste)
+    if (peutForcer) texte('Le stock de ces produits passera en négatif, puis sera comblé par les prochaines entrées.', 'text-gris')
+    else if (!/admin/i.test(message)) texte("Demandez à l'admin de valider cette livraison.", 'font-semibold')
+
+    const choix = await Swal.fire({
+      ...STYLE_SWAL,
+      title: 'Stock incomplet',
+      icon: 'warning',
+      html: bloc,
+      showConfirmButton: peutForcer,
+      confirmButtonText: 'Livrer quand même',
+      showCancelButton: true,
+      cancelButtonText: peutForcer ? 'Annuler' : 'Fermer',
+      focusCancel: true,
+    })
+    return choix.isConfirmed
   }
 
   // Choix libre parmi les passages autorisés (écran Commandes)

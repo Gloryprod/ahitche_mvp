@@ -12,6 +12,7 @@ import { useTauxChange } from '@/composables/useTauxChange'
 import { useToast } from 'vue-toastification'
 import type { Commande, ProductItem } from '@/type'
 import { ACTIONS_RAPIDES, entreeMenu } from '@/config/menuAdmin'
+import { formatStock } from '@/services/bonsCommande'
 import {
   AlertTriangle,
   Bell,
@@ -33,7 +34,7 @@ interface InventoryItem {
   productId: string
   nom: string
   unite: string
-  stockTotal: number
+  stockTotal: number // Net : négatif après une livraison sans stock (manque à combler)
   nbLotsActifs: number
   seuilAlerte: number | null // Vide : pas d'alerte
   enAlerte: boolean
@@ -99,7 +100,9 @@ const inventaireRaw = computed((): InventoryItem[] => {
   return inventaireData?.value || []
 })
 
-const stockAlerts = computed(() => inventaireRaw.value.filter(item => item.enAlerte))
+// Un stock négatif a sa propre alerte : il n'est pas compté une seconde fois parmi les ruptures proches
+const stockAlerts = computed(() => inventaireRaw.value.filter(item => item.enAlerte && item.stockTotal >= 0))
+const stocksNegatifs = computed(() => inventaireRaw.value.filter(item => item.stockTotal < 0))
 
 // Taux USD/FCFA en vigueur (section Finances), affiché seulement aux rôles qui y ont accès
 const toast = useToast()
@@ -471,6 +474,20 @@ const openWhatsApp = (phone: string, clientName: string, formula: string, daysRe
       <!-- 2. BANNIÈRES D'ALERTES -->
       <div class="space-y-2">
         
+        <!-- Alerte Stock négatif (livraisons sans stock suffisant, comblées par les prochaines entrées) -->
+        <div v-if="stocksNegatifs.length > 0" class="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 flex items-center justify-between gap-2.5">
+          <div class="flex items-center gap-2.5">
+            <AlertTriangle class="w-4 h-4 text-red-700 shrink-0" aria-hidden="true" />
+            <p class="leading-tight">
+              <strong>Stock négatif à combler : {{ stocksNegatifs.length }} produit(s)</strong> —
+              <span v-for="(item, idx) in stocksNegatifs" :key="item.productId">
+                {{ item.nom }} ({{ formatStock(item.stockTotal) }} {{ item.unite }})<span v-if="idx < stocksNegatifs.length - 1">, </span>
+              </span>.
+            </p>
+          </div>
+          <router-link to="/dashboard/admin/inventaire" class="text-[11px] font-bold text-red-700 underline shrink-0">Voir stock →</router-link>
+        </div>
+
         <!-- Alerte Stock Bas -->
         <div v-if="stockAlerts.length > 0" class="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 flex items-center justify-between gap-2.5">
           <div class="flex items-center gap-2.5">

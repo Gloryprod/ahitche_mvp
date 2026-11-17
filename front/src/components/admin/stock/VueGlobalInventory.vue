@@ -5,7 +5,7 @@ import api from '@/stores/api'
 import { useQuery, keepPreviousData } from '@tanstack/vue-query'
 import type { TypeProduit } from '@/type'
 import { FAMILLES_PRODUIT, familleDe, type CodeFamille } from '@/config/produits'
-import { formatFcfa, formatQuantite } from '@/services/bonsCommande'
+import { formatFcfa, formatQuantite, formatStock } from '@/services/bonsCommande'
 
 // Inventaire : tous les produits actifs du catalogue, même à 0, triés par famille (P, V, MP, EMB) puis référence.
 // Le filtre par famille se fait ici, sur la liste chargée une fois (pas de nouvelle requête à chaque pastille).
@@ -16,7 +16,8 @@ interface InventoryItem {
   unite: string
   type: TypeProduit
   famille: CodeFamille | null
-  stockTotal: number
+  stockTotal: number // Net : lots − manques à combler, négatif après une livraison sans stock
+  manque?: number // Manques ouverts (livrés sans stock), comblés par les prochaines entrées
   nbLotsActifs: number
   lotsACompter: number // Lots dont la quantité n'est pas encore comptée : stock incomplet
   lotsAConfirmer: number
@@ -74,11 +75,13 @@ const filteredInventory = computed(() => {
 // Valeur de la liste affichée (famille et recherche appliquées)
 const valeurAffichee = computed(() => filteredInventory.value.reduce((s, i) => s + (i.valeurFcfa || 0), 0))
 const totalACompter = computed(() => (inventaireRaw.value ?? []).reduce((n, i) => n + (i.lotsAConfirmer || 0), 0))
-const totalAlertes = computed(() => (inventaireRaw.value ?? []).filter(item => item.enAlerte).length)
+const totalAlertes = computed(() => (inventaireRaw.value ?? []).filter(item => item.enAlerte && item.stockTotal >= 0).length)
+const totalNegatifs = computed(() => (inventaireRaw.value ?? []).filter(item => item.stockTotal < 0).length)
 
 // Ligne à 0 (aucun lot, même à compter) : grisée
 const estVide = (i: InventoryItem) => i.stockTotal === 0 && !i.lotsACompter
 const alerte = (i: InventoryItem) => {
+  if (i.stockTotal < 0) return { texte: 'Stock négatif à combler', badge: true }
   if (i.enAlerte) return { texte: i.stockTotal === 0 ? 'Rupture' : 'Seuil atteint', badge: true }
   if (i.seuilAlerte === null) return { texte: 'Seuil à renseigner', badge: false }
   return { texte: 'Correct', badge: false }
@@ -106,6 +109,11 @@ const libelleFamille = (i: InventoryItem) => familleDe(i.type)?.libelle ?? ''
     <div v-if="totalAlertes > 0" class="bg-red-50 text-red-800 border border-red-200 p-4 rounded-xl flex items-start gap-2.5 font-semibold">
       <AlertTriangle class="w-4 h-4 text-red-700 shrink-0 mt-0.5" aria-hidden="true" />
       <span>Attention : {{ totalAlertes }} produit(s) au seuil d'alerte ou en dessous, à réapprovisionner auprès des fournisseurs.</span>
+    </div>
+
+    <div v-if="totalNegatifs > 0" class="bg-red-50 text-red-800 border border-red-200 p-4 rounded-xl flex items-start gap-2.5 font-semibold">
+      <AlertTriangle class="w-4 h-4 text-red-700 shrink-0 mt-0.5" aria-hidden="true" />
+      <span>Stock négatif à combler : {{ totalNegatifs }} produit(s) livré(s) sans stock suffisant. Les prochaines entrées comblent d'abord ce manque.</span>
     </div>
 
     <RouterLink v-if="totalACompter > 0" to="/dashboard/admin/saveStock" class="block bg-amber-50 text-amber-900 border border-amber-200 p-4 rounded-xl font-semibold">
@@ -174,8 +182,9 @@ const libelleFamille = (i: InventoryItem) => familleDe(i.type)?.libelle ?? ''
                 <td class="py-2.5 px-2">
                   <span class="inline-block px-1.5 py-0.5 rounded bg-creme2 text-noir font-bold text-[10px]" :title="libelleFamille(item)">{{ codeFamille(item) ?? '?' }}</span>
                 </td>
-                <td class="py-2.5 px-2 text-right font-mono font-bold whitespace-nowrap">
-                  {{ formatQuantite(item.stockTotal) }} <span class="font-body font-medium text-[10px]">{{ item.unite }}</span>
+                <td class="py-2.5 px-2 text-right font-mono font-bold whitespace-nowrap" :class="item.stockTotal < 0 ? 'text-red-700' : ''">
+                  {{ formatStock(item.stockTotal) }} <span class="font-body font-medium text-[10px]">{{ item.unite }}</span>
+                  <span v-if="item.manque" class="block font-body font-medium text-[10px] text-red-700">manque {{ formatQuantite(item.manque) }} {{ item.unite }}</span>
                 </td>
                 <td class="py-2.5 px-2 text-center font-mono">{{ item.nbLotsActifs }}</td>
                 <td class="py-2.5 px-2 text-center font-mono" :class="item.lotsACompter ? 'text-amber-800 font-bold' : ''">{{ item.lotsACompter || '—' }}</td>
@@ -202,9 +211,10 @@ const libelleFamille = (i: InventoryItem) => familleDe(i.type)?.libelle ?? ''
               <span v-if="alerte(item).badge" class="shrink-0 px-2 py-0.5 rounded-full font-bold text-[10px] bg-red-50 text-red-800 border border-red-200 uppercase tracking-wide">{{ alerte(item).texte }}</span>
             </div>
             <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-              <div class="flex flex-wrap gap-x-1"><dt>Stock :</dt><dd class="font-mono font-bold" :class="estVide(item) ? 'text-gris' : 'text-noir'">{{ formatQuantite(item.stockTotal) }} {{ item.unite }}</dd></div>
+              <div class="flex flex-wrap gap-x-1"><dt>Stock :</dt><dd class="font-mono font-bold" :class="item.stockTotal < 0 ? 'text-red-700' : estVide(item) ? 'text-gris' : 'text-noir'">{{ formatStock(item.stockTotal) }} {{ item.unite }}</dd></div>
               <div class="flex flex-wrap gap-x-1"><dt>Valeur :</dt><dd class="font-mono text-noir">{{ formatFcfa(item.valeurFcfa) }}</dd></div>
               <div class="flex flex-wrap gap-x-1"><dt>Lots :</dt><dd class="text-noir">{{ item.nbLotsActifs }}</dd></div>
+              <div v-if="item.manque" class="col-span-2 flex flex-wrap gap-x-1"><dt>Manque à combler :</dt><dd class="font-mono font-bold text-red-700">{{ formatQuantite(item.manque) }} {{ item.unite }}</dd></div>
               <div class="flex flex-wrap gap-x-1"><dt>À compter :</dt><dd :class="item.lotsACompter ? 'text-amber-800 font-bold' : 'text-noir'">{{ item.lotsACompter || '—' }}</dd></div>
               <div class="col-span-2 flex flex-wrap gap-x-1">
                 <dt>Alerte :</dt>
