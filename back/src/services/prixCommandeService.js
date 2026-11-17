@@ -10,10 +10,7 @@ const { prixDeVente } = require('./formuleService');
 // D-06 : Mobile Money ou espèces (l'acompte reste lisible sur les anciennes commandes).
 const MODES_PAIEMENT_ACCEPTES = ['Mobile Money', 'Espèces'];
 
-const nombre = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : NaN;
-};
+const { lireNombre: nombre } = require('../utils/texte'); // décimal strict (« 0x10 » refusé), NaN sinon
 
 /**
  * @param {object} p

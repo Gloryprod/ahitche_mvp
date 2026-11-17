@@ -39,7 +39,8 @@ function lireNombre(valeur) {
   const texte = String(valeur ?? '').replace(/[\s  ]/g, '').replace(/(FCFA|USD|\$|F)$/i, '');
   if (texte === '') return 0;
   const normalise = texte.includes(',') && !texte.includes('.') ? texte.replace(',', '.') : texte.replace(/,/g, '');
-  return Number(normalise);
+  // Décimal seulement (notation 1.5E+05 d'Excel admise) : « 0x10 », « 0b1 » ou « Infinity » -> NaN
+  return /^-?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(normalise) ? Number(normalise) : NaN;
 }
 
 // Tableau de lignes -> texte CSV pour Excel (séparateur « ; », BOM UTF-8 pour les accents)

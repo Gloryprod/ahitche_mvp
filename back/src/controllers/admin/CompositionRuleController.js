@@ -1,9 +1,9 @@
 const CompositionRule = require('../../models/compositionRule');
 const { journaliser } = require('../../services/journalService');
-const { echapperRegex } = require('../../utils/texte');
+const { echapperRegex, lireNombre } = require('../../utils/texte');
 
 // Multiplicateur facultatif (D-14 : simple libellé) : vide -> null ; invalide -> NaN
-const multiplicateur = (v) => (v === undefined || v === null || v === '' ? null : Number(v) >= 0 ? Number(v) : NaN);
+const multiplicateur = (v) => (v === undefined || v === null || v === '' ? null : lireNombre(v) >= 0 ? lireNombre(v) : NaN);
 
 // 1. Récupérer toutes les règles (Paginées et Filtrées)
 async function getAllRules(req, res) {

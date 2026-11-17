@@ -10,6 +10,10 @@ const ClotureMois = require('../../models/clotureMois');
 const { LotStockFifo, FOURNISSEUR_INTERNE } = require('../../models/stock');
 const { journaliser, masquerPrixVip, tauxCourant, TAUX_CONVENTION } = require('../../services/journalService');
 const { ACCES } = require('../../config/roles');
+const { lireNombre: lireDecimal } = require('../../utils/texte');
+
+// Montant facultatif : vide = 0, sinon décimal strict (« 0x10 » et « 1e2 » refusés)
+const montantOuZero = (v) => (v === undefined || v === null || (typeof v === 'string' && v.trim() === '') ? 0 : lireDecimal(v));
 const { lireCsv, lireNombre, ecrireCsv } = require('../../utils/csv');
 const { ficheJustificatif, lienSigne, supprimerFichier, DUREE_LIEN_SECONDES } = require('../../services/justificatifService');
 const { moisProjet, bornesMois, MOIS_CONVENTION, etatPieces, appliquerValiditeAudit, estMoisClos } = require('../../services/financeService');
@@ -56,7 +60,7 @@ async function obtenirTaux(req, res) {
 // POST /api/admin/finances/taux  { tauxUsdFcfa }
 async function enregistrerTaux(req, res) {
   try {
-    const taux = Number(req.body.tauxUsdFcfa);
+    const taux = lireDecimal(req.body.tauxUsdFcfa);
     if (!Number.isFinite(taux) || taux <= 0 || taux > 10000) return res.status(400).json({ message: "Taux USD/FCFA invalide." });
 
     const ancien = await tauxCourant();
@@ -132,12 +136,12 @@ async function listerLignes(req, res) {
 }
 
 function lireLigne(body) {
-  const categorie = body.categorieAd === '' || body.categorieAd === null || body.categorieAd === undefined ? null : Number(body.categorieAd);
+  const categorie = body.categorieAd === '' || body.categorieAd === null || body.categorieAd === undefined ? null : lireDecimal(body.categorieAd);
   const ligne = {
     code: texte(body.code, 20),
     libelle: texte(body.libelle),
-    montantPrevuUsd: Number(body.montantPrevuUsd ?? 0),
-    montantPrevuFcfa: Number(body.montantPrevuFcfa ?? 0),
+    montantPrevuUsd: montantOuZero(body.montantPrevuUsd),
+    montantPrevuFcfa: montantOuZero(body.montantPrevuFcfa),
     categorieAd: categorie,
     passation: texte(body.passation, 120)
   };
@@ -313,8 +317,8 @@ async function lireDepense(body, taux) {
     depense.partenaireId = body.partenaireId;
   } else depense.partenaireId = null;
 
-  const fcfa = Number(body.montantPrevuFcfa ?? 0);
-  const usd = Number(body.montantPrevuUsd ?? 0);
+  const fcfa = montantOuZero(body.montantPrevuFcfa);
+  const usd = montantOuZero(body.montantPrevuUsd);
   if (!montantValide(fcfa) || !montantValide(usd) || (fcfa === 0 && usd === 0)) return { erreur: "Indiquez un montant prévu (FCFA ou USD)." };
   depense.montantPrevuFcfa = Math.round(fcfa || usd * taux);
   depense.montantPrevuUsd = arrondir(usd || fcfa / taux, 2);
@@ -363,7 +367,7 @@ async function creerDepensePayee(req, res) {
     if (!datePaiement) return res.status(400).json({ message: "Indiquez la date de paiement (AAAA-MM-JJ)." });
     // Montant payé : nombre (ou texte numérique) fini, contrôlé APRÈS l'arrondi au franc (0,4 FCFA donnerait 0)
     const saisi = typeof body.montantReelFcfa === 'number' || (typeof body.montantReelFcfa === 'string' && body.montantReelFcfa.trim() !== '')
-      ? Number(body.montantReelFcfa) : NaN;
+      ? lireDecimal(body.montantReelFcfa) : NaN;
     const reel = Number.isFinite(saisi) ? Math.round(saisi) : NaN;
     if (!(reel > 0)) return res.status(400).json({ message: "Indiquez le montant payé en FCFA (1 FCFA au moins, arrondi au franc)." });
     if (!MODES_PAIEMENT_DEPENSE.includes(body.modePaiement)) return res.status(400).json({ message: "Mode de paiement invalide." });
@@ -469,8 +473,8 @@ async function effectuerDepense(req, res) {
       return res.status(400).json({ message: "Joignez au moins un justificatif (PDF ou image) avant de marquer la dépense effectuée." });
     }
 
-    const fcfa = Number(req.body.montantReelFcfa ?? 0);
-    const usd = Number(req.body.montantReelUsd ?? 0);
+    const fcfa = montantOuZero(req.body.montantReelFcfa);
+    const usd = montantOuZero(req.body.montantReelUsd);
     if (!montantValide(fcfa) || !montantValide(usd) || (fcfa === 0 && usd === 0)) return res.status(400).json({ message: "Indiquez le montant réellement payé." });
 
     const datePaiement = req.body.datePaiement ? new Date(req.body.datePaiement) : new Date();
