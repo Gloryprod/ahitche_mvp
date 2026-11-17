@@ -195,13 +195,14 @@ async function importerEntrees(req, texte, appliquer, session) {
     for (const r of membres) {
       if (r._fiche && partenaire && String(r._fiche._id) !== String(partenaire)) avertir(r, `Pièce ${piece} : fournisseur différent ${existante ? 'de celui de la dépense existante' : `de la ligne ${premiere.ligne}`}.`);
       if (r._v.ligne_budgetaire && r._v.ligne_budgetaire !== ligneRef && (existante || r !== premiere)) avertir(r, `Pièce ${piece} : ligne budgétaire différente de celle de la dépense (${ligneRef || 'exploitation'}).`);
+      if (r.statut === 'erreur') continue; // rien n'est créé pour une ligne refusée
       if (existante) r.messages.push(`Rattachée à la dépense existante de la pièce ${piece}.`);
       else if (!premiere._creer) r.messages.push("Sans dépense.");
       else r.messages.push(membres.length > 1 ? `Une seule dépense pour la pièce ${piece} (${membres.length} lots).` : "Dépense créée.");
     }
     if (!existante && premiere._creer && membres.length > 1) depensesACreer.push({ piece, membres });
   }
-  for (const r of lignes) if (!r._v.numero_piece) r.messages.push(r._creer ? "Dépense créée." : "Sans dépense.");
+  for (const r of lignes) if (!r._v.numero_piece && r.statut !== 'erreur') r.messages.push(r._creer ? "Dépense créée." : "Sans dépense.");
 
   // 3. Numéros de lot : genererNumeroLot (lots existants ce jour-là, archivés compris), puis lignes précédentes du collage
   const suivants = new Map();
@@ -241,6 +242,7 @@ async function importerEntrees(req, texte, appliquer, session) {
     }, session);
   }
   const responsable = await nomResponsable(req);
+  let comblees = 0;
   for (const r of lignes) {
     const v = r._v;
     const lot = new LotStockFifo({
@@ -260,7 +262,7 @@ async function importerEntrees(req, texte, appliquer, session) {
       commentaire: v.commentaire || ''
     });
     const { combles } = await enregistrerEntree(req, lot, { produit: r._produit, responsable, creerDepense: r._creer, ligneBudgetaire: v.ligne_budgetaire || '', journal: false }, session);
-    if (combles) r.messages.push(`Entrée${combles}.`);
+    if (combles) { r.messages.push(`Entrée${combles}.`); comblees++; }
   }
   // Une seule ligne de journal pour les lots, sans montant ni texte collé (les dépenses créées ont la leur)
   await journaliser(req, { action: 'Import', entite: 'Lot de stock', resume: `Import de ${pluriel(lignes.length, 'lot')} (${pluriel(pieces.length, 'pièce')})` }, session);
@@ -270,7 +272,7 @@ async function importerEntrees(req, texte, appliquer, session) {
   return {
     statut: appliquer ? 201 : 200,
     corps: {
-      message: appliquer ? `${pluriel(lignes.length, 'lot')} importé${lignes.length > 1 ? 's' : ''}.` : `Vérification terminée : ${pluriel(lignes.length, 'lot')} prêt${lignes.length > 1 ? 's' : ''} à importer.`,
+      message: appliquer ? `${pluriel(lignes.length, 'lot')} importé${lignes.length > 1 ? 's' : ''}.${comblees ? ` Manques comblés sur ${pluriel(comblees, 'lot')}.` : ''}` : `Vérification terminée : ${pluriel(lignes.length, 'lot')} prêt${lignes.length > 1 ? 's' : ''} à importer.`,
       lignes: sortie(),
       resume
     }
