@@ -293,6 +293,8 @@ const PACKS_CONFIG = [
 ]
 
 // Exécution parallèle des requêtes pour chaque formule
+const estAbsente = (erreur: unknown) => axios.isAxiosError(erreur) && erreur.response?.status === 404
+
 const formulaQueries = useQueries({
   queries: PACKS_CONFIG.map(pack => ({
     queryKey: ['packDetails', pack.key],
@@ -301,6 +303,8 @@ const formulaQueries = useQueries({
       return response.data
     },
     staleTime: 1000 * 60 * 5, // Cache 5 minutes
+    // Formule absente ou inactive en base (404) : inutile de réessayer, la ligne est retirée du tableau
+    retry: (echecs: number, erreur: unknown) => !estAbsente(erreur) && echecs < 3,
     // Après les commandes : ces détails servent aux marges et aux cycles de relance (calculés une fois arrivés)
     enabled: computed(() => voirMarges.value && commandesChargees.value)
   }))
@@ -332,9 +336,10 @@ const grossMargins = computed(() => {
       launchPrice,
       realCost,
       margin,
-      hasData: !!data
+      hasData: !!data,
+      absente: estAbsente(query?.error)
     }
-  })
+  }).filter(ligne => !ligne.absente)
 })
 
 // Refresh global

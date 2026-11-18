@@ -1,5 +1,6 @@
 const Parametres = require('../../models/parametres');
 const { journaliser } = require('../../services/journalService');
+const { lireNombre } = require('../../utils/texte');
 
 // Champs modifiables : chemin -> borne maximale (null : pas de borne)
 const CHAMPS = {
@@ -37,7 +38,7 @@ async function modifierParametres(req, res) {
     for (const [chemin, max] of Object.entries(CHAMPS)) {
       const v = lire(req.body, chemin);
       if (v === undefined) continue;
-      const n = v === null || v === '' ? null : Number(v);
+      const n = v === null || v === '' ? null : lireNombre(v);
       if (n !== null && (!Number.isFinite(n) || n < 0 || (max !== null && n > max))) {
         return res.status(400).json({ message: `Valeur invalide pour « ${chemin} ».` });
       }

@@ -37,10 +37,12 @@ function lireCsv(texte, separateurImpose = null) {
 
 // "1 234 567,50" ou "1234567.5" -> 1234567.5 ; vide -> 0 ; illisible -> NaN
 function lireNombre(valeur) {
-  const texte = String(valeur ?? '').replace(/[\s  ]/g, '').replace(/(FCFA|USD|\$|F)$/i, '');
-  if (texte === '') return 0;
+  const brut = String(valeur ?? '').replace(/[\s  ]/g, '');
+  if (brut === '') return 0;
+  const texte = brut.replace(/(FCFA|USD|\$|F)$/i, ''); // « USD » seul (en-tête) -> NaN, pas 0
   const normalise = texte.includes(',') && !texte.includes('.') ? texte.replace(',', '.') : texte.replace(/,/g, '');
-  return Number(normalise);
+  // Décimal seulement (notation 1.5E+05 d'Excel admise) : « 0x10 », « 0b1 » ou « Infinity » -> NaN
+  return /^-?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(normalise) ? Number(normalise) : NaN;
 }
 
 // Tableau de lignes -> texte CSV pour Excel (séparateur « ; », BOM UTF-8 pour les accents)

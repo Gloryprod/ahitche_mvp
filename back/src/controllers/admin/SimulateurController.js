@@ -3,12 +3,13 @@ const Product = require('../../models/product');
 const { manquesParProduit } = require('../../services/stockService');
 const { TYPES_PACK, calculerCompositionPack } = require('../../services/compositionService');
 const Parametres = require('../../models/parametres');
+const { lireNombre } = require('../../utils/texte');
 
 // Simulateurs en lecture seule (conception, questions 9 à 14) : rien n'est enregistré, aucun prix n'est modifié.
 // Logique de composition : celle du calcul de pack existant (services/compositionService.js).
 
 const arrondir = (n) => Math.round(n);
-const nombrePositif = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : 0; };
+const nombrePositif = (v) => { const n = lireNombre(v); return Number.isFinite(n) && n >= 0 ? n : 0; };
 
 /**
  * Prix d'achat réel par produit : moyenne des lots en stock pondérée par la quantité restante,
