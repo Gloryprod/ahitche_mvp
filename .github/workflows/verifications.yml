@@ -1,0 +1,96 @@
+# Vérifications automatiques de chaque PR vers main (et de main après une fusion) : rien n'est déployé ni publié.
+# Front : types, lint, tests unitaires, build (avec le rendu de l'accueil) et test de bout en bout sur le build.
+# API : démarrage réel sur une base MongoDB jetable, puis appels de santé, de session et d'une route publique.
+# Aucun secret : ni la base de production, ni Resend, ni Cloudinary ne sont utilisés.
+name: Vérifications
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: # Lancement à la main depuis l'onglet Actions
+
+permissions:
+  contents: read
+
+# Un nouvel envoi sur la même branche annule la vérification en cours
+concurrency:
+  group: verifications-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  front:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+      - run: npm ci
+      - name: Lint (sans correction automatique)
+        run: npx oxlint . && npx eslint .
+      - name: Tests unitaires
+        run: npx vitest run
+      - name: Types et build (avec le rendu de l'accueil au build)
+        run: npm run build
+      - name: Navigateur du test de bout en bout
+        run: npx playwright install --with-deps chromium
+      - name: Test de bout en bout (sur le build, API de production bloquée)
+        run: npx playwright test --project=chromium
+        env:
+          CI: true
+      - name: Rapport du test de bout en bout (en cas d'échec)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-playwright
+          path: front/playwright-report/
+          retention-days: 7
+
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          - 27017:27017
+    defaults:
+      run:
+        working-directory: back
+    env:
+      MONGO_URI: mongodb://localhost:27017/verifications
+      JWT_SECRET: verifications-github
+      RESEND_API_KEY: re_verifications # factice : aucun e-mail n'est envoyé
+      FRONTEND_URL: http://localhost:4173
+      PORT: 5000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: back/package-lock.json
+      - run: npm ci
+      - name: Syntaxe de tous les fichiers
+        run: find index.js instrument.js src -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Démarrage de l'API et appels de contrôle
+        run: |
+          node index.js > api.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:5000/api/sante > /dev/null && break; sleep 1; done
+          verifier() { code=$(curl -s -o reponse.json -w '%{http_code}' "http://localhost:5000$1"); echo "$1 -> $code"; [ "$code" = "$2" ] || { cat reponse.json; exit 1; }; }
+          verifier /api/sante 200
+          verifier /api/auth/session 200
+          verifier /api/public/zones 200
+          verifier /api/public/site 200
+          verifier /api/admin/compteurs 401
+      - name: Journal de l'API (en cas d'échec)
+        if: failure()
+        run: cat api.log
