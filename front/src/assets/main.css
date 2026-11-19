@@ -1,7 +1,7 @@
 @import "tailwindcss";
 /* Kit d'interface (shadcn-vue, Inspira UI) : animations d'entrée/sortie et variantes data-* de leurs composants */
 @import "tw-animate-css";
-@import "shadcn-vue/tailwind.css";
+@import "./kit-shadcn.css"; /* copie locale, voir l'en-tête du fichier */
 
 /* Pas de thème sombre : les classes dark: des composants ne s'activent qu'avec une classe .dark, jamais posée */
 @custom-variant dark (&:is(.dark *));
