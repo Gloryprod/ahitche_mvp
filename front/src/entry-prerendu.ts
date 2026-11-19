@@ -12,7 +12,7 @@ import { VueQueryPlugin } from '@tanstack/vue-query'
 import NavBar from './components/layout/NavBar.vue'
 import HeroSection from './components/sections/HeroSection.vue'
 import { routes } from './router/routes'
-import { donneesCommerce, donneesFaq } from './services/referencement'
+import { donneesCommerce, donneesFaq, donneesSite } from './services/referencement'
 
 // Même structure que App.vue et HomeView.vue autour du titre : rien ne bouge quand l'application prend le relais
 const HautDeLAccueil = defineComponent({
@@ -38,6 +38,7 @@ export async function rendreAccueil(): Promise<string> {
 
 // Données structurées de l'accueil, mêmes blocs (et mêmes id) que ceux ajoutés par la page dans le navigateur
 export const donneesStructurees = () => [
+  { id: 'donnees-site', donnees: donneesSite() },
   { id: 'donnees-commerce', donnees: donneesCommerce() },
   { id: 'donnees-faq', donnees: donneesFaq() },
 ]

@@ -78,6 +78,7 @@ export function donneesCommerce() {
     '@type': 'GroceryStore',
     '@id': `${SITE}/#commerce`,
     name: 'Ahitché',
+    alternateName: 'Ahitche',
     url: `${SITE}/`,
     logo: `${SITE}/logo-ahitche-512.webp`,
     image: `${SITE}/og-image.jpeg`,
@@ -109,6 +110,20 @@ export function donneesCommerce() {
         url: `${SITE}/#formules`,
       })),
     },
+  }
+}
+
+// Nom du site affiché par Google dans ses résultats (« Ahitché » plutôt que l'adresse), orthographe sans accent comprise
+export function donneesSite() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${SITE}/#site`,
+    name: 'Ahitché',
+    alternateName: 'Ahitche',
+    url: `${SITE}/`,
+    inLanguage: 'fr',
+    publisher: { '@id': `${SITE}/#commerce` },
   }
 }
 
