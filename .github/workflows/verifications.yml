@@ -21,7 +21,8 @@ concurrency:
 
 jobs:
   front:
-    runs-on: ubuntu-latest
+    # shortcut: Playwright 1.60 n'installe pas Chrome sur Ubuntu 26.04 (ubuntu-latest), repasser à ubuntu-latest quand il le prendra en charge
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
