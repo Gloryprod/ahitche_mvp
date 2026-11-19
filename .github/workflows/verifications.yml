@@ -1,6 +1,6 @@
 # Vérifications automatiques de chaque PR vers main (et de main après une fusion) : rien n'est déployé ni publié.
 # Front : types, lint, tests unitaires, build (avec le rendu de l'accueil) et test de bout en bout sur le build.
-# API : démarrage réel sur une base MongoDB jetable, puis appels de santé, de session et d'une route publique.
+# API : tests (npm test, base MongoDB jetable en mémoire), puis démarrage réel et appels de santé, de session et publics.
 # Aucun secret : ni la base de production, ni Resend, ni Cloudinary ne sont utilisés.
 name: Vérifications
 
@@ -56,8 +56,9 @@ jobs:
           retention-days: 7
 
   api:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Ubuntu 24.04 : version pour laquelle MongoDB publie son programme (utilisé par les tests de l'API)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     services:
       mongo:
         image: mongo:8
@@ -81,7 +82,16 @@ jobs:
           cache-dependency-path: back/package-lock.json
       - run: npm ci
       - name: Syntaxe de tous les fichiers
-        run: find index.js instrument.js src -name '*.js' -print0 | xargs -0 -n1 node --check
+        run: find index.js instrument.js src test -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Programme MongoDB des tests (gardé d'une exécution à l'autre)
+        uses: actions/cache@v4
+        with:
+          path: .mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-8.2.6
+      - name: Tests de l'API (base MongoDB jetable en mémoire, API sur un port libre)
+        run: npm test
+        env:
+          MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
       - name: Démarrage de l'API et appels de contrôle
         run: |
           node index.js > api.log 2>&1 &

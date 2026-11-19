@@ -30,6 +30,7 @@ npm run test:e2e     # playwright
 # Back (dans back/)
 npm run dev          # node --watch index.js (relance à chaque modification)
 npm start
+npm test             # tests de l'API (test/*.test.js) : base MongoDB jetable en mémoire, API sur un port libre, .env jamais lu
 node src/scripts/createAdmin.js     # crée l'admin (ADMIN_PASSWORD dans .env)
 node src/scripts/createFormules.js  # upsert des formules (prix, « Bientôt » ; cycle de relance seulement à la création, ensuite réglé dans l'admin)
 node src/scripts/migrerDonnees.js   # migration idempotente (téléphone, fournisseurs, zones, statuts, taux, admin principal)
