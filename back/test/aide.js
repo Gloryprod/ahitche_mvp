@@ -30,7 +30,10 @@ async function demarrer() {
   });
   const uri = base.getUri('ahitche_tests');
   // Garde-fou : jamais une autre base que celle qui vient d'être créée sur ce poste
-  if (!/^mongodb:\/\/127\.0\.0\.1:\d+\//.test(uri)) throw new Error(`Base des tests non locale : ${uri}`);
+  if (!/^mongodb:\/\/127\.0\.0\.1:\d+\//.test(uri)) {
+    await base.stop();
+    throw new Error(`Base des tests non locale : ${uri}`);
+  }
   await mongoose.connect(uri);
   for (const fichier of fs.readdirSync(path.join(BACK, 'src/models'))) require(path.join(BACK, 'src/models', fichier));
   // Collections et index créés avant les transactions
@@ -60,7 +63,8 @@ async function demarrer() {
   for (let i = 0; ; i++) {
     if (processus.exitCode !== null) throw new Error(`L'API s'est arrêtée au démarrage :\n${journal}`);
     try { if ((await fetch(`${api}/api/sante`)).ok) break; } catch { /* pas encore prête */ }
-    if (i >= 60) throw new Error(`L'API ne répond pas après 30 s :\n${journal}`);
+    // 60 s : le premier démarrage peut être lent sur un poste chargé (un essai à 30 s a échoué)
+    if (i >= 120) throw new Error(`L'API ne répond pas après 60 s :\n${journal}`);
     await new Promise((r) => setTimeout(r, 500));
   }
 
