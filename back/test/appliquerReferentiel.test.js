@@ -139,8 +139,10 @@ test('incohérences : tout est refusé, rien n’est écrit', async () => {
   ]) assert.ok(r.sortie.includes(attendu), `attendu : ${attendu}\n--- sortie ---\n${r.sortie}`);
   assert.strictEqual(await etat(), avant);
 
-  const illisible = await ctx.script('appliquerReferentiel.js', [fichier('illisible.csv', `${ENTETE}\nP99;Produit;Variable;kg;abc;;;;;;;`)]);
+  const illisible = await ctx.script('appliquerReferentiel.js', [fichier('illisible.csv', `${ENTETE}\nP99;Produit;Variable;kg;abc;;;;;;;\nP98;Produit B;Fixe;sac;;1;;;;;;5`)]);
   assert.strictEqual(illisible.code, 1, illisible.sortie);
-  assert.ok(illisible.sortie.includes('Fichier à corriger') && illisible.sortie.includes('ne correspond pas au type') && illisible.sortie.includes('prix illisible'), illisible.sortie);
+  for (const attendu of ['Fichier à corriger', 'ne correspond pas au type', 'prix illisible', 'Ligne 3 : une conversion exige le prix de la nouvelle unité']) {
+    assert.ok(illisible.sortie.includes(attendu), `attendu : ${attendu}\n--- sortie ---\n${illisible.sortie}`);
+  }
   assert.strictEqual(await etat(), avant);
 });

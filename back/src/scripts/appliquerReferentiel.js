@@ -63,8 +63,11 @@ function lireFichier(chemin) {
     const quantites = Object.fromEntries(PACKS.map(p => [p, l[`quantite_${p}`] === '=' ? undefined : nombre(l[`quantite_${p}`], `quantité ${p}`, n)]));
     if (type === 'extra' && PACKS.some(p => quantites[p] !== null)) erreurs.push(`Ligne ${n} : un produit variable n'a pas de quantité par pack`);
     const conversion = nombre(l.conversion, 'conversion', n);
+    const prix = nombre(l.prix_unitaire_fcfa, 'prix', n);
     if (conversion === 0) erreurs.push(`Ligne ${n} : conversion à 0`);
-    return { n, reference: l.reference, nom: l.produit, type, unite: l.unite, prix: nombre(l.prix_unitaire_fcfa, 'prix', n), quantites, categorie: l.categorie, conversion };
+    // Sinon l'ancien prix (au kilo, par exemple) resterait sur la nouvelle unité
+    if (conversion && prix === null) erreurs.push(`Ligne ${n} : une conversion exige le prix de la nouvelle unité`);
+    return { n, reference: l.reference, nom: l.produit, type, unite: l.unite, prix, quantites, categorie: l.categorie, conversion };
   });
   for (const [cle, libelle] of [['reference', 'Référence'], ['nom', 'Produit']]) {
     const vus = new Map();
