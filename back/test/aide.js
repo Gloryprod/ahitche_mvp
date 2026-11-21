@@ -90,13 +90,24 @@ async function demarrer() {
     return cookie.split(';')[0];
   }
 
+  // Lance un script de src/scripts sur la base des tests, avec le même environnement imposé que l'API
+  function script(nom, args = []) {
+    return new Promise((ok) => {
+      const p = spawn(process.execPath, [path.join(BACK, 'src/scripts', nom), ...args], { cwd: __dirname, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      let sortie = '';
+      p.stdout.on('data', (d) => { sortie += d; });
+      p.stderr.on('data', (d) => { sortie += d; });
+      p.on('close', (code) => ok({ code, sortie }));
+    });
+  }
+
   async function arreter() {
     processus.kill();
     await mongoose.disconnect();
     await base.stop();
   }
 
-  return { api, comptes, appel, connexion, arreter, journal: () => journal };
+  return { api, comptes, appel, connexion, script, arreter, journal: () => journal };
 }
 
 module.exports = { demarrer, BACK };
