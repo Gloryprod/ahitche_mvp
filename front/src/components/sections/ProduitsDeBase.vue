@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { PRODUITS_INCLUS as produits, EXCLUS_ESSENTIEL as exclus, ANIMATION_PRODUITS as reglages } from '@/config/formules'
+import { PRODUITS_INCLUS as produits, ANIMATION_PRODUITS as reglages } from '@/config/formules'
 
 // Produits de base présentés par groupes successifs, en boucle (réglages dans config/formules.ts).
 // L'animation ne tourne que si la section est à l'écran, l'onglet actif et la souris ailleurs (sur téléphone, un
@@ -72,14 +72,12 @@ const puce = 'bg-creme text-foret text-sm font-medium px-4 py-2 rounded-full bor
   >
     <!-- Liste complète pour les lecteurs d'écran et les moteurs de recherche (la partie animée est décorative) -->
     <ul class="sr-only">
-      <li v-for="produit in produits" :key="produit">{{ produit }}{{ exclus.includes(produit) ? ' (non incluse dans la formule AHI Essentiel)' : '' }}</li>
+      <li v-for="produit in produits" :key="produit">{{ produit }}</li>
     </ul>
 
     <!-- Tous les produits d'un coup : choix du visiteur, ou animations réduites sur l'appareil -->
     <div v-if="!anime" class="flex flex-wrap justify-center gap-2" aria-hidden="true">
-      <span v-for="produit in produits" :key="produit" :class="puce">
-        {{ produit }}<span v-if="exclus.includes(produit)">*</span>
-      </span>
+      <span v-for="produit in produits" :key="produit" :class="puce">{{ produit }}</span>
     </div>
 
     <!-- Groupes empilés au même endroit : la hauteur est celle du plus grand, la page ne bouge pas -->
@@ -96,9 +94,7 @@ const puce = 'bg-creme text-foret text-sm font-medium px-4 py-2 rounded-full bor
         class="groupe flex flex-wrap justify-center content-center gap-2"
         :class="{ actif: g === actif, sortant: g === precedent }"
       >
-        <span v-for="(produit, i) in groupe" :key="produit" class="puce" :class="puce" :style="{ '--i': i }">
-          {{ produit }}<span v-if="exclus.includes(produit)">*</span>
-        </span>
+        <span v-for="(produit, i) in groupe" :key="produit" class="puce" :class="puce" :style="{ '--i': i }">{{ produit }}</span>
       </div>
     </div>
 

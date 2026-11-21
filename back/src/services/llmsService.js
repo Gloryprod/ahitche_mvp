@@ -26,11 +26,11 @@ const DEFAUTS = {
   },
 };
 
-// Restent dans le code, comme sur la vitrine : noms, ordre des cartes, produit exclu de l'Essentiel (EXCLUS_ESSENTIEL)
+// Restent dans le code, comme sur la vitrine : noms et ordre des cartes
 const FORMULES = [
-  { slug: 'ahi-essentiel', nom: 'AHI Essentiel', precision: ' (sans huile de palme)' },
-  { slug: 'ahi-equilibre', nom: 'AHI Équilibré', precision: '' },
-  { slug: 'ahi-confort', nom: 'AHI Confort', precision: '' },
+  { slug: 'ahi-essentiel', nom: 'AHI Essentiel' },
+  { slug: 'ahi-equilibre', nom: 'AHI Équilibré' },
+  { slug: 'ahi-confort', nom: 'AHI Confort' },
 ];
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
@@ -74,10 +74,10 @@ const sansPointFinal = (t) => t.replace(/[\s.]+$/, '');
  */
 function texteLlms({ infos = null, formules = null, prix = null } = {}) {
   const i = infos || DEFAUTS.infos;
-  const lignesFormules = FORMULES.map(({ slug, nom, precision }) => {
+  const lignesFormules = FORMULES.map(({ slug, nom }) => {
     const cible = cibleDansPhrase(formules?.[slug]?.cible ?? DEFAUTS.formules[slug].cible);
     const montantMois = prix?.[slug] ?? DEFAUTS.formules[slug].prix;
-    return `- ${nom} : ${cible ? `${cible}, ` : ''}${montant(montantMois)} FCFA par mois${precision}.`;
+    return `- ${nom} : ${cible ? `${cible}, ` : ''}${montant(montantMois)} FCFA par mois.`;
   });
   const horaires = `${jours(i.horaires.jours)}, ${heure(i.horaires.ouverture)} à ${heure(i.horaires.fermeture)}`;
   const livraison = i.joursLivraison ? `Livraison ${sansPointFinal(i.joursLivraison)}` : 'Livraison à jour fixe';

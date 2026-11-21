@@ -111,7 +111,6 @@ async function choisirFoyer(valeur: TailleFoyer) {
         <p class="text-foret font-bold mb-2 font-body">Composition adaptée à vos besoins : {{ produitsInclus.length }} produits de base</p>
         <p class="text-gris text-sm mb-6">Les quantités varient selon la formule et la taille de votre foyer.</p>
         <ProduitsDeBase />
-        <p class="text-gris text-xs mt-5">* Non incluse dans la formule AHI Essentiel.</p>
       </div>
     </div>
   </section>

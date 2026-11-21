@@ -72,16 +72,14 @@ export const PRIX_D_APPEL = computed(() => Math.min(...FORMULES.map(f => f.prix)
 // Le même, d'après le code : il réserve la place du prix dans le haut de l'accueil (rien ne bouge à l'arrivée du vrai)
 export const PRIX_D_APPEL_DU_CODE = Math.min(...FORMULES_DU_CODE.map(f => f.prix))
 
-// 17 produits de base ; les quantités varient selon la formule et ne sont pas affichées
+// 17 produits de base, les mêmes dans les trois formules (référentiel v4 : le sel remplace l'huile de palme) ;
+// les quantités varient selon la formule et ne sont pas affichées
 export const PRODUITS_INCLUS = [
   "Riz local", "Haricots", "Coquillettes", "Spaghetti",
   "Couscous", "Gari", "Tapioca", "Farine de maïs", "Huile végétale",
   "Tomates", "Oignons", "Sucre", "Lait concentré",
-  "Œufs", "Épices Ahitché", "Assaisonnement", "Huile de palme"
+  "Œufs", "Épices Ahitché", "Assaisonnement", "Sel"
 ]
-
-// Produits absents de la formule AHI Essentiel
-export const EXCLUS_ESSENTIEL = ['Huile de palme']
 
 // Animation de la liste des produits de base (section Formules) : les produits défilent par groupes, en boucle.
 // Ajouter un produit à PRODUITS_INCLUS suffit : les groupes se recalculent. Sans animation (réglage du téléphone
