@@ -38,6 +38,7 @@ STAFF_PASSWORD=… node src/scripts/createStaff.js <email> "<Nom>" <role> [--liv
 STAFF_PASSWORD=… node src/scripts/importerDonnees.js ../docs-internes/imports [--appliquer] [--attendu <json>]  # import 01 à 11 (simulation sans --appliquer)
 node src/scripts/decisionsMiseEnService.js ../docs-internes/imports [--appliquer] [--garder-compte-generique]  # décisions du porteur après l'import (prix admin, anciens lots et règles, commandes d'essai, compte admin générique supprimé sauf --garder-compte-generique, choix du 25/10 pour la production)
 node src/scripts/controlerDonnees.js [--attendu <json>]  # contrôles B.4, lecture seule
+node src/scripts/appliquerReferentiel.js ../docs-internes/referentiel/<changements>.csv [--appliquer]  # changements d'une version du référentiel (produits reconnus par leur nom, échange de références, unité changée avec conversion du stock) ; simulation sans --appliquer
 MONGO_URI=<lecture seule> node src/scripts/inventaireBase.js  # inventaire d'une base (nombres seulement, aucune donnée personnelle)
 MONGO_URI=<lecture seule> node src/scripts/sauvegarderBase.js [dossier]  # sauvegarde complète (défaut : ../docs-internes/sauvegardes)
 MONGO_URI=<base vide> node src/scripts/restaurerBase.js <dossier>       # restauration, refusée si la base n'est pas vide
