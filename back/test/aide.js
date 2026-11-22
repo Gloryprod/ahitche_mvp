@@ -39,6 +39,11 @@ async function demarrer() {
   // Collections et index créés avant les transactions
   await Promise.all(Object.values(mongoose.models).map((modele) => modele.init()));
 
+  // Les 5 formules du référentiel, comme en production (packs reconnus par packService) ; aucun prix
+  await mongoose.connection.collection('formules').insertMany(['essentiel', 'equilibre', 'confort', 'reserve', 'fraicheur'].map((type) => ({
+    slug: `ahi-${type}`, nom: `AHI ${type}`, cible: 'test', statut: 'actif', bientotDisponible: false, cycleJours: 30, lienWhatsApp: 'https://wa.me/', prixActuel: null,
+  })));
+
   const User = require(path.join(BACK, 'src/models/user'));
   const hash = await bcrypt.hash(MOT_DE_PASSE, 4);
   const comptes = {};
