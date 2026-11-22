@@ -7,6 +7,7 @@ import { messageErreur } from '@/services/erreurs'
 import { useAuthStore } from '@/stores/auth'
 import { peutLire, peutEcrire } from '@/config/roles'
 import { genererSimulationPDF, fcfaPDF } from '@/services/pdfSimulateurs'
+import { usePacks } from '@/composables/usePacks'
 
 // Simulateurs en lecture seule : coût et marge d'un pack, seuil de rentabilité (la prévision d'achats est dans le Stock).
 // Aucun prix n'est appliqué ici : le prix de vente se fixe dans « Formules et prix ».
@@ -25,7 +26,7 @@ interface SimulationPack {
 interface Parametres {
   chargesFixesMensuellesFcfa: number | null
   objectifCaMensuelFcfa: number | null
-  repartition: { essentiel: number | null; equilibre: number | null; confort: number | null }
+  repartition: Record<string, number | null> // Enregistrée par le serveur pour essentiel, equilibre et confort
   emballageParCommandeFcfa: number | null
   commissionMobileMoneyPct: number | null
   livraisonMoyenneFcfa: number | null
@@ -37,15 +38,8 @@ interface Parametres {
   coefficient: number | null
 }
 
-const PACKS = [
-  { type: 'essentiel', nom: 'AHI Essentiel' },
-  { type: 'equilibre', nom: 'AHI Équilibré' },
-  { type: 'confort', nom: 'AHI Confort' },
-  { type: 'reserve', nom: 'AHI Réserve' },
-  { type: 'fraicheur', nom: 'AHI Fraîcheur' },
-] as const
-// Réserve et Fraîcheur ouvrent après le lancement
-const PACKS_OUVERTS = PACKS.slice(0, 3) as { type: 'essentiel' | 'equilibre' | 'confort'; nom: string }[]
+// Packs de la base ; le seuil de rentabilité ne compte que les packs ouverts (actifs, pas « bientôt disponibles »)
+const { packs, packsOuverts } = usePacks()
 
 interface Seuil {
   incomplet: string // Raison pour laquelle le calcul n'est pas possible ; vide sinon
@@ -93,7 +87,7 @@ watch(parametres, (p) => {
 const paramsFrais = computed(() => ({ livraison: frais.livraison ?? 0, emballage: frais.emballage ?? 0, commission: frais.commission ?? 0 }))
 
 // --- (a) Coût et marge d'un pack ---
-const packChoisi = ref<typeof PACKS[number]['type']>('essentiel')
+const packChoisi = ref('essentiel')
 const { data: simulation, isLoading: chargementPack, error: erreurPack } = useQuery({
   queryKey: ['simulateur', 'pack', packChoisi, paramsFrais],
   queryFn: async (): Promise<SimulationPack> => (await api.get(`/api/admin/simulateurs/pack/${packChoisi.value}`, { params: paramsFrais.value })).data,
@@ -118,7 +112,7 @@ function exporterPack() {
 // --- (c) Seuil de rentabilité et objectif de chiffre d'affaires ---
 // Marge réelle unitaire de chaque formule ouverte, avec les mêmes frais
 const simulationsOuvertes = useQueries({
-  queries: computed(() => PACKS_OUVERTS.map(p => ({
+  queries: computed(() => packsOuverts.value.map(p => ({
     queryKey: ['simulateur', 'pack', p.type, paramsFrais.value],
     queryFn: async (): Promise<SimulationPack> => (await api.get(`/api/admin/simulateurs/pack/${p.type}`, { params: paramsFrais.value })).data,
     enabled: onglet.value === 'seuil',
@@ -127,11 +121,11 @@ const simulationsOuvertes = useQueries({
 
 const seuil = computed((): Seuil | null => {
   const sims = simulationsOuvertes.value.map(q => q.data)
-  if (sims.some(s => !s)) return null
+  if (!sims.length || sims.some(s => !s)) return null // Packs ou marges en cours de chargement
   if (sims.some(s => s!.formule.prixVente === null || s!.totaux.margeReelle === null)) return seuilIncomplet('Une formule ouverte n\'a pas de prix.')
-  const totalPart = PACKS_OUVERTS.reduce((s, p) => s + (repartition[p.type] ?? 0), 0)
+  const totalPart = packsOuverts.value.reduce((s, p) => s + (repartition[p.type] ?? 0), 0)
   if (!totalPart) return seuilIncomplet('Renseignez la répartition des commandes.')
-  const poids = PACKS_OUVERTS.map(p => (repartition[p.type] ?? 0) / totalPart)
+  const poids = packsOuverts.value.map(p => (repartition[p.type] ?? 0) / totalPart)
   const prixMoyen = sims.reduce((s, sim, i) => s + sim!.formule.prixVente! * poids[i]!, 0)
   const margeMoyenne = sims.reduce((s, sim, i) => s + sim!.totaux.margeReelle! * poids[i]!, 0)
   const commandesSeuil = chargesFixes.value === null ? null : margeMoyenne > 0 ? Math.ceil(chargesFixes.value / margeMoyenne) : -1
@@ -142,7 +136,7 @@ const seuil = computed((): Seuil | null => {
     caSeuil: commandesSeuil !== null && commandesSeuil >= 0 ? commandesSeuil * prixMoyen : null,
     commandesObjectif,
     resultatObjectif: commandesObjectif === null || chargesFixes.value === null ? null : commandesObjectif * margeMoyenne - chargesFixes.value,
-    detail: PACKS_OUVERTS.map((p, i) => ({ nom: p.nom, part: Math.round(poids[i]! * 100), prix: sims[i]!.formule.prixVente!, marge: sims[i]!.totaux.margeReelle! }))
+    detail: packsOuverts.value.map((p, i) => ({ nom: p.nom, part: Math.round(poids[i]! * 100), prix: sims[i]!.formule.prixVente!, marge: sims[i]!.totaux.margeReelle! }))
   }
 })
 
@@ -172,6 +166,8 @@ function exporterSeuil() {
 // --- (d) Paramètres : enregistrés côté serveur, journalisés ---
 const formParams = ref<Parametres | null>(null)
 watch(parametres, (p) => { if (p) formParams.value = JSON.parse(JSON.stringify({ ...p, debutObjectif: p.debutObjectif?.slice(0, 10) ?? '', finObjectif: p.finObjectif?.slice(0, 10) ?? '' })) }, { immediate: true })
+// Répartition enregistrée : seulement les packs que le serveur garde (essentiel, equilibre, confort)
+const packsRepartition = computed(() => packs.value.filter(p => p.type in (formParams.value?.repartition ?? {})))
 const messageParams = ref({ texte: '', type: '' })
 const coefficientSaisi = computed(() => {
   const p = formParams.value?.parts
@@ -227,7 +223,7 @@ const etiquette = 'text-[10px] font-bold uppercase text-gris'
       <div class="flex flex-wrap items-end gap-3">
         <label :class="etiquette">Formule
           <select v-model="packChoisi" class="mt-1 block px-3 py-2 rounded-xl border border-creme2 bg-creme text-sm text-noir font-normal normal-case">
-            <option v-for="p in PACKS" :key="p.type" :value="p.type">{{ p.nom }}</option>
+            <option v-for="p in packs" :key="p.type" :value="p.type">{{ p.nom }}</option>
           </select>
         </label>
         <button @click="exporterPack" :disabled="!simulation" class="cursor-pointer ml-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-foret text-white text-xs font-bold disabled:opacity-50"><FileText class="w-3.5 h-3.5" /> PDF</button>
@@ -297,7 +293,7 @@ const etiquette = 'text-[10px] font-bold uppercase text-gris'
       </div>
       <fieldset class="grid grid-cols-3 gap-3">
         <legend class="text-[10px] font-bold uppercase text-gris mb-1">Répartition des commandes (%)</legend>
-        <label v-for="p in PACKS_OUVERTS" :key="p.type" :class="etiquette">{{ p.nom }}
+        <label v-for="p in packsOuverts" :key="p.type" :class="etiquette">{{ p.nom }}
           <input v-model.number="repartition[p.type]" type="number" min="0" max="100" placeholder="—" :class="champ" />
         </label>
       </fieldset>
@@ -344,7 +340,7 @@ const etiquette = 'text-[10px] font-bold uppercase text-gris'
           <label :class="etiquette">Objectif de clients<input v-model.number="formParams.objectifClients" type="number" min="0" :class="champ" /></label>
           <label :class="etiquette">Début de l'objectif<input v-model="formParams.debutObjectif" type="date" :class="champ" /></label>
           <label :class="etiquette">Fin de l'objectif<input v-model="formParams.finObjectif" type="date" :class="champ" /></label>
-          <label v-for="p in PACKS_OUVERTS" :key="p.type" :class="etiquette">Part {{ p.nom }} (%)<input v-model.number="formParams.repartition[p.type]" type="number" min="0" max="100" :class="champ" /></label>
+          <label v-for="p in packsRepartition" :key="p.type" :class="etiquette">Part {{ p.nom }} (%)<input v-model.number="formParams.repartition[p.type]" type="number" min="0" max="100" :class="champ" /></label>
         </fieldset>
         <p v-if="messageParams.texte" role="status" :class="messageParams.type === 'success' ? 'text-green-800' : 'text-red-700'" class="text-xs font-semibold">{{ messageParams.texte }}</p>
         <button v-if="ecrireParametres" type="submit" class="cursor-pointer px-4 py-2.5 rounded-xl bg-foret text-white text-xs font-bold">Enregistrer les paramètres</button>

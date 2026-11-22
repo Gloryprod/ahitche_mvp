@@ -14,8 +14,10 @@ export interface ReponseReferentiel {
   lignes: LigneReferentiel[]
 }
 
+// Colonnes facultatives : une colonne quantite_<type> par pack (GET /api/admin/packs)
+export const colonnesFacultatives = (types: string[]) => ['type', 'unite', 'prix_unitaire_fcfa', ...types.map((t) => `quantite_${t}`), 'categorie', 'conversion']
 // Ligne d'en-têtes copiée par « Copier le modèle »
-export const MODELE_REFERENTIEL = 'reference;produit;type;unite;prix_unitaire_fcfa;quantite_essentiel;quantite_equilibre;quantite_confort;quantite_reserve;quantite_fraicheur;categorie;conversion'
+export const modeleReferentiel = (types: string[]) => ['reference', 'produit', ...colonnesFacultatives(types)].join(';')
 
 // « Appliquer » : aperçu sans erreur, obtenu avec le texte tel qu'il est maintenant, et qui change au moins un produit
 export function peutAppliquerReferentiel(apercu: ReponseReferentiel | null, texte: string, texteVerifie: string | null): boolean {

@@ -10,19 +10,15 @@ import type { Product, CompositionRule, Category, PackType, TypeProduit } from '
 import { FAMILLES_PRODUIT, estVendu, familleDe } from '@/config/produits'
 import { useAuthStore } from '@/stores/auth'
 import { peutLire, peutEcrire } from '@/config/roles'
+import { usePacks } from '@/composables/usePacks'
+import { libelleCourt } from '@/services/packs'
 
 // Catalogue du référentiel packs v4, quatre familles : produits fixes (P, base des packs), produits variables
 // (V, extras), matières premières (MP) et fournitures (EMB). MP et EMB ne se vendent pas : ni quantités par pack,
 // ni affichage sur le site (le serveur vide leurs quantités).
 // Les quantités par pack font foi (D-14) ; la règle sert seulement à proposer les quantités d'un nouveau produit.
-// Une valeur vide reste vide et s'affiche « à renseigner ».
-const PACKS: { cle: PackType; libelle: string }[] = [
-  { cle: 'essentiel', libelle: 'Essentiel' },
-  { cle: 'equilibre', libelle: 'Équilibré' },
-  { cle: 'confort', libelle: 'Confort' },
-  { cle: 'reserve', libelle: 'Réserve' },
-  { cle: 'fraicheur', libelle: 'Fraîcheur' },
-]
+// Une valeur vide reste vide et s'affiche « à renseigner ». Une colonne par pack de la base (GET /api/admin/packs).
+const { packs } = usePacks()
 
 const page = ref(1)
 const search = ref('')
@@ -38,7 +34,7 @@ const categoriesList = ref<Category[]>([])
 const rulesList = ref<CompositionRule[]>([])
 
 type Quantites = Record<PackType, number | null>
-const quantitesVides = (): Quantites => ({ essentiel: null, equilibre: null, confort: null, reserve: null, fraicheur: null })
+const quantitesVides = (): Quantites => Object.fromEntries(packs.value.map(p => [p.type, null]))
 const formVide = () => ({
   _id: '', reference: '', name: '', category: '', compositionRule: '', type: 'base fixe' as Product['type'],
   statut: 'disponible' as Product['statut'], unit: 'kg', priceUnit: null as number | null, seuilAlerte: null as number | null,
@@ -132,7 +128,7 @@ const regleChoisie = computed(() => rulesList.value.find(r => r._id === form.val
 function proposerQuantites() {
   const base = form.value.quantites.essentiel
   const regle = regleChoisie.value
-  if (!regle || base === null) return
+  if (!regle || base === null || base === undefined) return
   // Une règle sans multiplicateur ne propose rien pour ce pack
   if (regle.multiplierEquilibre !== null) form.value.quantites.equilibre = Math.round(base * regle.multiplierEquilibre * 100) / 100
   if (regle.multiplierConfort !== null) form.value.quantites.confort = Math.round(base * regle.multiplierConfort * 100) / 100
@@ -148,8 +144,9 @@ async function handleSubmit() {
     ...produit,
     priceUnit: versNombre(form.value.priceUnit),
     seuilAlerte: versNombre(form.value.seuilAlerte),
-    // Matière première ou fourniture : hors packs (le serveur vide aussi ces quantités)
-    quantites: Object.fromEntries(PACKS.map(p => [p.cle, formVendu.value ? versNombre(form.value.quantites[p.cle]) : null])),
+    // Matière première ou fourniture : hors packs (le serveur vide aussi ces quantités).
+    // Toutes les clés du formulaire (packs + celles du produit) : un pack absent de l'envoi serait vidé par le serveur
+    quantites: Object.fromEntries(Object.entries(form.value.quantites).map(([cle, q]) => [cle, formVendu.value ? versNombre(q) : null])),
     // Prix VIP : seulement si l'admin l'a modifié ; vide = retiré des achats libres (MP et EMB : toujours vide)
     ...(saisirPrixVip.value && prixVipModifie.value ? { prixVip: formVendu.value ? versNombre(prixVip) : null } : {}),
   }
@@ -241,7 +238,7 @@ function showNotification(text: string, type: string) {
                   <th class="py-2 pr-2">Produit</th>
                   <th class="py-2 pr-2 text-right">P.U.</th>
                   <th v-if="voirPrixVip" class="py-2 pr-2 text-right whitespace-nowrap">Prix VIP</th>
-                  <th v-for="p in PACKS" :key="p.cle" class="py-2 px-1 text-right">{{ p.libelle }}</th>
+                  <th v-for="p in packs" :key="p.type" class="py-2 px-1 text-right">{{ libelleCourt(p.nom) }}</th>
                   <th class="py-2 px-1 text-right">Seuil</th>
                   <th class="py-2 text-right">Actions</th>
                 </tr>
@@ -262,9 +259,9 @@ function showNotification(text: string, type: string) {
                   <td class="py-2.5 pr-2 text-right font-mono whitespace-nowrap" :class="prixManquant(prod) ? 'text-amber-800' : ''">{{ prixAffiche(prod) }}</td>
                   <td v-if="voirPrixVip" class="py-2.5 pr-2 text-right font-mono whitespace-nowrap" :title="prixVipAffiche(prod) === '—' ? 'Non proposé en achat libre' : undefined">{{ prixVipAffiche(prod) }}</td>
                   <template v-if="estVendu(prod.type)">
-                    <td v-for="p in PACKS" :key="p.cle" class="py-2.5 px-1 text-right tabular-nums">{{ quantite(prod.quantites?.[p.cle]) }}</td>
+                    <td v-for="p in packs" :key="p.type" class="py-2.5 px-1 text-right tabular-nums">{{ quantite(prod.quantites?.[p.type]) }}</td>
                   </template>
-                  <td v-else :colspan="PACKS.length" class="py-2.5 px-1 text-center text-[10px] text-gris">Non vendu · hors packs</td>
+                  <td v-else :colspan="packs.length" class="py-2.5 px-1 text-center text-[10px] text-gris">Non vendu · hors packs</td>
                   <td class="py-2.5 px-1 text-right tabular-nums" :class="prod.seuilAlerte === null ? 'text-amber-800' : ''">{{ prod.seuilAlerte === null ? aRenseigner : quantite(prod.seuilAlerte) }}</td>
                   <td class="py-2.5 text-right whitespace-nowrap">
                     <button @click="openEditMode(prod)" class="cursor-pointer p-1.5 text-gris hover:text-foret" :aria-label="`Modifier ${prod.name}`"><Edit2 class="w-3.5 h-3.5" /></button>
@@ -342,8 +339,8 @@ function showNotification(text: string, type: string) {
           <fieldset v-else class="p-3 rounded-xl border border-creme2 space-y-2">
             <legend class="px-1 text-[10px] font-bold uppercase text-gris">Quantités par pack ({{ form.unit || 'unité' }}) · vide = absent</legend>
             <div class="grid grid-cols-5 gap-1.5">
-              <label v-for="p in PACKS" :key="p.cle" class="block text-[9px] font-bold uppercase text-gris text-center">{{ p.libelle }}
-                <input :id="`produit-quantite-${p.cle}`" v-model="form.quantites[p.cle]" type="number" min="0" step="any" class="mt-1 w-full px-1.5 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal text-center" />
+              <label v-for="p in packs" :key="p.type" class="block text-[9px] font-bold uppercase text-gris text-center">{{ libelleCourt(p.nom) }}
+                <input :id="`produit-quantite-${p.type}`" v-model="form.quantites[p.type]" type="number" min="0" step="any" class="mt-1 w-full px-1.5 py-2 bg-creme border border-creme2 rounded-lg text-noir font-normal text-center" />
               </label>
             </div>
             <div class="flex flex-wrap items-end gap-2">

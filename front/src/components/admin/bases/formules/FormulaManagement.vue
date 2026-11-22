@@ -4,8 +4,11 @@ import { useQuery, useMutation, useQueryClient, type QueryFunctionContext } from
 import api from '@/stores/api'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
-import { Layers, ShoppingBag, CheckCircle, ShieldAlert, Save, Loader2 } from 'lucide-vue-next'
+import { Layers, ShoppingBag, CheckCircle, ShieldAlert, Save, Loader2, Plus } from 'lucide-vue-next'
 import type { Formule, ProductItem } from '@/type'
+import { usePacks } from '@/composables/usePacks'
+import { libelleCourt, type Pack } from '@/services/packs'
+import CreerPack from './CreerPack.vue'
 
 interface PackDetailsResponse {
   formule: Formule;
@@ -17,8 +20,19 @@ interface PackDetailsResponse {
 
 const queryClient = useQueryClient()
 
-// 1. Extension de l'état pour inclure 'reserve' et 'fraicheur'
-const activePack = ref<'essentiel' | 'equilibre' | 'confort' | 'reserve' | 'fraicheur'>('essentiel')
+// Onglets : un par pack de la base (GET /api/admin/packs), dans l'ordre de l'admin
+const { packs } = usePacks()
+const activePack = ref('essentiel')
+
+// Créer un pack : admin seulement (le serveur refuse aussi les autres rôles)
+const formCreation = ref(false)
+const messageCreation = ref('')
+function packCree(pack: Pack, message: string) {
+  formCreation.value = false
+  activePack.value = pack.type
+  messageCreation.value = message
+  setTimeout(() => (messageCreation.value = ''), 5000)
+}
 
 // Champ pour le prix général fixé par l'admin
 const customPrice = ref<number | null>(null)
@@ -54,6 +68,7 @@ watch(activePack, () => {
 // Jours entre la livraison et la relance du client (alerte à J-5 au tableau de bord)
 const authStore = useAuthStore()
 const peutModifierCycle = computed(() => peutEcrire(authStore.role.value, 'donneesBase'))
+const estAdmin = computed(() => authStore.role.value === 'admin')
 const CYCLES_COURANTS = [
   { jours: 7, libelle: 'Semaine (7 j)' },
   { jours: 14, libelle: '2 semaines (14 j)' },
@@ -122,14 +137,25 @@ const handleSavePrice = () => {
   }
 }
 
-// 2. Classes de couleurs dynamiques étendues pour les badges et synthèses
-const getPackColorClass = (pack: string) => {
-  if (pack === 'essentiel') return 'border-gray-500 bg-gray-50 text-gray-700'
-  if (pack === 'equilibre') return 'border-foret bg-emerald-50 text-foret'
-  if (pack === 'confort') return 'border-savane bg-amber-50 text-savane'
-  if (pack === 'reserve') return 'border-indigo-600 bg-indigo-50 text-indigo-700'
-  return 'border-rose-500 bg-rose-50 text-rose-700'
+// 2. Couleurs des packs du référentiel (synthèse et onglet choisi) ; repli neutre de la charte pour un pack créé ensuite
+const COULEURS_SYNTHESE: Record<string, string> = {
+  essentiel: 'border-gray-500 bg-gray-50 text-gray-700',
+  equilibre: 'border-foret bg-emerald-50 text-foret',
+  confort: 'border-savane bg-amber-50 text-savane',
+  reserve: 'border-indigo-600 bg-indigo-50 text-indigo-700',
+  fraicheur: 'border-rose-500 bg-rose-50 text-rose-700',
 }
+const getPackColorClass = (pack: string) => COULEURS_SYNTHESE[pack] ?? 'border-gris-lt bg-creme text-noir'
+const COULEURS_ONGLET: Record<string, string> = {
+  essentiel: 'bg-white text-noir',
+  equilibre: 'bg-foret text-white',
+  confort: 'bg-savane text-white',
+  reserve: 'bg-indigo-600 text-white',
+  fraicheur: 'bg-rose-500 text-white',
+}
+const classeOnglet = (pack: string) => activePack.value === pack
+  ? `${COULEURS_ONGLET[pack] ?? 'bg-gris text-white'} shadow-xs font-bold`
+  : 'text-gris hover:text-noir'
 
 // 3. Texte dynamique pour la période couverte
 // Logique de commande et cycle : lus dans la formule (référentiel packs v4)
@@ -149,40 +175,28 @@ const getPeriodText = computed(() => {
         <p class="text-gris text-[11px] mt-0.5">Vue d'ensemble et simulation des dots mensuelles et commandes libres</p>
       </div>
       
-      <!-- Sélecteur d'onglets -->
-      <div class="flex flex-wrap bg-[#f9f9fb] rounded-xl border border-gray-200 self-start xl:self-center">
-        <button 
-          @click="activePack = 'essentiel'"
-          :class="[activePack === 'essentiel' ? 'bg-white text-noir shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
+      <div class="flex flex-wrap items-center gap-2 self-start xl:self-center">
+        <!-- Sélecteur d'onglets : un par pack -->
+        <div v-onglets role="tablist" aria-label="Packs" class="flex flex-wrap bg-creme rounded-xl border border-creme2">
+          <button
+            v-for="p in packs" :key="p.type" type="button" role="tab" :aria-selected="activePack === p.type"
+            @click="activePack = p.type"
+            :class="[classeOnglet(p.type), 'px-3 py-2 rounded-lg transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-foret']"
+          >
+            {{ libelleCourt(p.nom) }}
+          </button>
+        </div>
+        <button
+          v-if="estAdmin" type="button" @click="formCreation = !formCreation" :aria-expanded="formCreation"
+          class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 bg-foret text-white text-xs font-bold rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foret"
         >
-          Essentiel
-        </button>
-        <button 
-          @click="activePack = 'equilibre'"
-          :class="[activePack === 'equilibre' ? 'bg-foret text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
-        >
-          Équilibré
-        </button>
-        <button 
-          @click="activePack = 'confort'"
-          :class="[activePack === 'confort' ? 'bg-savane text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
-        >
-          Confort
-        </button>
-        <button 
-          @click="activePack = 'reserve'"
-          :class="[activePack === 'reserve' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
-        >
-          Réserve
-        </button>
-        <button 
-          @click="activePack = 'fraicheur'"
-          :class="[activePack === 'fraicheur' ? 'bg-rose-500 text-white shadow-xs font-bold' : 'text-gris hover:text-gris', 'px-3 py-2 rounded-lg transition-all cursor-pointer']"
-        >
-          Fraîcheur
+          <Plus class="w-3.5 h-3.5" /> Créer un pack
         </button>
       </div>
     </div>
+
+    <CreerPack v-if="estAdmin && formCreation" @fermer="formCreation = false" @cree="packCree" />
+    <p v-if="messageCreation" role="status" class="p-3 rounded-xl border bg-foret/10 text-foret border-foret/20 text-xs font-semibold">{{ messageCreation }}</p>
 
     <div v-if="isLoading" class="text-sm font-medium text-gris p-12 text-center bg-white rounded-2xl border">
       Génération de la formule {{ activePack }} en cours...

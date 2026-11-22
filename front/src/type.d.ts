@@ -53,7 +53,8 @@ export interface CompositionRule {
   createdAt?: string
 }
 
-export type PackType = 'essentiel' | 'equilibre' | 'confort' | 'reserve' | 'fraicheur'
+// Type d'un pack : vient du slug « ahi-<type> » de sa formule en base (essentiel, equilibre… ou un pack créé dans l'admin)
+export type PackType = string
 
 // Familles du catalogue (voir config/produits.ts) : P « base fixe », V « extra », MP « matière première »,
 // EMB « fourniture » ; MP et EMB ne se vendent jamais
@@ -67,7 +68,7 @@ export interface Product {
   compositionRule: CompositionRule | null // Libellé seulement (les quantités par pack font foi)
   type: TypeProduit
   statut: 'disponible' | 'indisponible'
-  quantites: Record<PackType, number | null> // Vide = absent du pack
+  quantites: Record<PackType, number | null> // Une clé par pack ; vide ou absente = absent du pack
   unit: string
   priceUnit: number | null // Vide = à renseigner
   // Prix des achats libres VIP : envoyé seulement aux rôles de la section « vip » (admin, coordinateur) ;
