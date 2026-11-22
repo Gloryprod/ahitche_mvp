@@ -5,6 +5,7 @@ const { LotStockFifo, ManqueStock } = require('../../models/stock');
 const { echapperRegex, lireNombre } = require('../../utils/texte');
 const { journaliser } = require('../../services/journalService');
 const { ACCES } = require('../../config/roles');
+const { importerReferentiel, MAX_OCTETS: MAX_OCTETS_REFERENTIEL } = require('../../services/referentielService');
 
 // Champs suivis au journal : prix, prix VIP, quantités par pack, statut, seuil d'alerte, type
 function differences(avant, apres) {
@@ -187,4 +188,29 @@ async function deleteProduct(req, res) {
   }
 }
 
-module.exports = { getAllProducts, createProduct, updateProduct, deleteProduct, lireProduit };
+/**
+ * IMPORTER UN RÉFÉRENTIEL (POST /api/admin/products/referentiel/import) : tableau collé, simulation ou application,
+ * tout ou rien. Admin seulement : l'import change les prix du catalogue et peut convertir le stock.
+ */
+async function importerReferentielProduits(req, res) {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: "Seul l'admin peut importer un référentiel." });
+  const { texte, appliquer } = req.body ?? {};
+  if (typeof texte !== 'string' || !texte.trim()) return res.status(400).json({ message: "Collez le tableau du référentiel, en-têtes compris." });
+  if (typeof appliquer !== 'boolean') return res.status(400).json({ message: "« appliquer » doit valoir true ou false." });
+  if (Buffer.byteLength(texte, 'utf8') > MAX_OCTETS_REFERENTIEL) return res.status(400).json({ message: "Texte trop long : 100 Ko au plus par import." });
+  const session = await mongoose.startSession();
+  try {
+    const { statut, corps } = await importerReferentiel(req, texte, appliquer, session);
+    return res.status(statut).json(corps);
+  } catch (error) {
+    if (session.inTransaction()) await session.abortTransaction();
+    if (error.code === 11000) return res.status(400).json({ message: "Une référence vient d'être prise : relancez la vérification." });
+    // Sans le message de l'erreur, qui peut citer une valeur collée (prix)
+    console.error("Erreur importerReferentielProduits:", error.name, error.code ?? '', (error.stack || '').split('\n').slice(1, 4).join(' | '));
+    return res.status(500).json({ message: "Erreur lors de l'import du référentiel." });
+  } finally {
+    session.endSession();
+  }
+}
+
+module.exports = { getAllProducts, createProduct, updateProduct, deleteProduct, lireProduit, importerReferentielProduits };
