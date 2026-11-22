@@ -13,13 +13,14 @@ const TYPES_PRODUIT = ['base fixe', 'extra', 'matière première', 'fourniture']
 const TYPES_VENDUS = ['base fixe', 'extra'];
 const FAMILLES = { 'base fixe': 'P', 'extra': 'V', 'matière première': 'MP', 'fourniture': 'EMB' };
 const STATUTS_PRODUIT = ['disponible', 'indisponible'];
+// Packs du référentiel v4 (scripts d'import et contrôles de la mise en service). La liste vivante des packs vient de
+// la collection Formules (services/packService.js) : un pack créé dans l'admin a ses quantités ici aussi.
 const PACKS = ['essentiel', 'equilibre', 'confort', 'reserve', 'fraicheur'];
 
-// Quantité d'un produit dans chaque pack, dans l'unité du produit ; vide = absent du pack
-const quantitesSchema = new mongoose.Schema(
-  Object.fromEntries(PACKS.map(p => [p, { type: Number, min: 0, default: null }])),
-  { _id: false }
-);
+// Quantité d'un produit dans chaque pack (clé = type du pack : « essentiel », « etudiant »…), dans l'unité du
+// produit ; vide (null) ou absente = absent du pack
+const quantitesValides = (q) => q !== null && typeof q === 'object' && !Array.isArray(q) && Object.entries(q).every(([k, v]) =>
+  /^[a-z][a-z0-9]{1,19}$/.test(k) && (v === null || (typeof v === 'number' && Number.isFinite(v) && v >= 0)));
 
 const ProductSchema = new mongoose.Schema({
   reference: { type: String, trim: true, default: null }, // Ex : "P01", "V13", "MP01", "EMB01"
@@ -28,7 +29,10 @@ const ProductSchema = new mongoose.Schema({
   compositionRule: { type: mongoose.Schema.Types.ObjectId, ref: 'CompositionRule', default: null }, // Libellé seulement
   type: { type: String, enum: TYPES_PRODUIT, default: 'base fixe' },
   statut: { type: String, enum: STATUTS_PRODUIT, default: 'disponible' },
-  quantites: { type: quantitesSchema, default: () => ({}) },
+  quantites: {
+    type: mongoose.Schema.Types.Mixed, default: () => ({}),
+    validate: { validator: quantitesValides, message: 'Quantités par pack invalides (nombre positif ou vide, par pack).' }
+  },
   baseQuantity: { type: Number, default: null }, // Ancien champ (quantité Essentiel) : remplacé par quantites.essentiel
   unit: { type: String, required: true, trim: true }, // ex: "kg", "boîte", "unités"
   priceUnit: { type: Number, min: 0, default: null }, // P.U. FCFA du référentiel ; vide = à renseigner

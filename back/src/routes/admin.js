@@ -160,6 +160,9 @@ router.put('/site/:cle', siteC.publierContenu); // { valeurs }
 router.post('/site/:cle/versions/:id/restaurer', siteC.restaurerVersion);
 
 // --- Formules / Packs ---
+// Liste des packs (Formules en base) : toute l'équipe ; création : admin seulement (écriture des données de base)
+router.get('/packs', formulaC.listerPacksEquipe);
+router.post('/formulas', formulaC.creerPack);
 router.get('/formulas/:packType', formulaC.getPackDetails);
 router.patch('/formulas/:packType/price', formulaC.updateFormulaPrice);
 router.patch('/formulas/:packType/cycle', formulaC.updateFormulaCycle); // cycle de relance, réglé par l'admin

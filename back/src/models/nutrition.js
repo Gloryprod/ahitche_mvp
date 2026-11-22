@@ -44,7 +44,7 @@ const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dim
 const STATUTS_IDEE = ['Brouillon', 'À valider', 'Publié'];
 const MENTION_SANTE = "Ces conseils ne remplacent pas l'avis d'un professionnel de santé."; // Q 11.5
 const menuSchema = new mongoose.Schema({
-  formuleSlug: { type: String, required: true, enum: ['ahi-essentiel', 'ahi-equilibre', 'ahi-confort', 'ahi-reserve', 'ahi-fraicheur'] },
+  formuleSlug: { type: String, required: true, match: /^ahi-[a-z][a-z0-9]{1,19}$/ }, // Pack existant : contrôlé par le contrôleur (packService)
   titre: { type: String, required: true, trim: true, maxlength: 120 },
   jours: [{
     _id: false,
