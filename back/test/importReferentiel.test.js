@@ -63,6 +63,12 @@ const MELANGE = [
   'V05;Poisson test;Variable;sachet;330;;;;;;;',  // 5 : unité changée sans conversion
 ].join('\n');
 
+test('garde-fous de lecture : référence invalide (un seul motif), conversion aberrante', async () => {
+  const r = await imp(admin, [ENTETE, 'X2;Produit x;Fixe;kg;1;;;;;;;', 'P01;Riz test;Fixe;sachet;1;;;;;;;5000'].join('\n'));
+  assert.strictEqual(r.statut, 200, JSON.stringify(r));
+  assert.deepStrictEqual(r.json.lignes.map((l) => l.messages), [['Référence « X2 » invalide (P01, V19…)'], ['Conversion de plus de 1 000 : vérifie la valeur']]);
+});
+
 test('simulation : aperçu ligne par ligne, rien n’est écrit', async () => {
   const avant = await etat();
   const r = await imp(admin, MELANGE);

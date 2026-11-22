@@ -66,7 +66,7 @@ function lireLignes(texte) {
     if (!/^[PV]\d{2}$/.test(l.reference)) erreur(`Référence « ${l.reference} » invalide (P01, V19…)`);
     if (!l.produit) erreur('Nom du produit manquant');
     l.type = l.reference.startsWith('P') ? 'base fixe' : 'extra';
-    if (v.type) {
+    if (v.type && !l.messages.length) { // Référence invalide : un seul motif, le type n'est pas comparé
       const type = TYPES[normaliser(v.type)];
       if (!type) erreur(`Type « ${v.type.slice(0, 20)} » inconnu (Fixe ou Variable)`);
       else if (type !== l.type) erreur(`La référence ${l.reference} ne correspond pas au type « ${v.type} »`);
@@ -85,6 +85,8 @@ function lireLignes(texte) {
     l.categorie = (v.categorie ?? '').slice(0, 60);
     l.conversion = presente('conversion') ? nombre(v.conversion, 'Conversion') : null;
     if (l.conversion === 0) erreur('Conversion à 0');
+    // Garde-fou : un facteur aberrant multiplierait tout le stock du produit
+    if (l.conversion > 1000) erreur('Conversion de plus de 1 000 : vérifie la valeur');
     // Sinon l'ancien prix (au kilo, par exemple) resterait sur la nouvelle unité
     if (l.conversion && l.prix === null) erreur('Une conversion exige le prix de la nouvelle unité');
     return l;
