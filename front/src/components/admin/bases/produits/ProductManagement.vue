@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, nextTick } from 'vue'
-import { Search, Plus, Edit2, Trash2, X, Wand2 } from 'lucide-vue-next'
+import { Search, Plus, Edit2, Trash2, X, Wand2, Upload } from 'lucide-vue-next'
+import ImportReferentiel from './ImportReferentiel.vue'
 import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/vue-query'
@@ -50,6 +51,14 @@ const form = ref(formVide())
 const authStore = useAuthStore()
 const voirPrixVip = computed(() => peutLire(authStore.role.value, 'vip'))
 const saisirPrixVip = computed(() => peutEcrire(authStore.role.value, 'vip'))
+// Import du référentiel : admin seulement (prix du catalogue, conversion du stock), contrôlé aussi par le serveur
+const estAdmin = computed(() => authStore.role.value === 'admin')
+const importReferentiel = ref(false)
+function referentielImporte(message: string) {
+  importReferentiel.value = false
+  showNotification(message, 'success')
+  queryClient.invalidateQueries({ queryKey: ['products'] })
+}
 const prixVipModifie = ref(false)
 const prixVipAffiche = (p: Product) => (!estVendu(p.type) || p.prixVip === null || p.prixVip === undefined ? '—' : prix(p.prixVip))
 
@@ -202,11 +211,16 @@ function showNotification(text: string, type: string) {
           <option value="">Toutes les familles</option>
           <option v-for="f in FAMILLES_PRODUIT" :key="f.type" :value="f.type">{{ f.code }} · {{ f.libelle }}</option>
         </select>
+        <button v-if="estAdmin" @click="importReferentiel = !importReferentiel" :aria-expanded="importReferentiel" class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-creme2 text-noir text-xs font-bold rounded-xl hover:bg-creme">
+          <Upload class="w-3.5 h-3.5" /> Importer un référentiel
+        </button>
         <button @click="openCreateMode" class="cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 bg-foret text-white text-xs font-bold rounded-xl">
           <Plus class="w-3.5 h-3.5" /> Ajouter
         </button>
       </div>
     </div>
+
+    <ImportReferentiel v-if="estAdmin && importReferentiel" @fermer="importReferentiel = false" @importe="referentielImporte" />
 
     <div v-if="notification.text" role="status" :class="[notification.type === 'success' ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200', 'p-4 rounded-xl border text-xs font-semibold fixed top-4 right-4 z-50 max-w-sm']">
       {{ notification.text }}
