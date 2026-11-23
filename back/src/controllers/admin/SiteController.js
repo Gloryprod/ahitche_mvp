@@ -2,8 +2,9 @@ const mongoose = require('mongoose');
 const ContenuSite = require('../../models/contenuSite');
 const { NB_VERSIONS } = require('../../models/contenuSite');
 const User = require('../../models/user');
-const { CLES, contenu, egal, SLUGS_VITRINE, refusPhoto } = require('../../services/contenuSiteService');
+const { CLES, contenu, egal, refusPhoto } = require('../../services/contenuSiteService');
 const { prixVitrine } = require('../../services/formuleService');
+const { listerPacks } = require('../../services/packService');
 const { journaliser } = require('../../services/journalService');
 
 // Écran « Site public » (docs-internes/admin/CONTRAT-site-public-A.md à -D.md), section « site » : lecture admin et
@@ -31,9 +32,10 @@ function definition(req, res) {
 
 /**
  * Publie des valeurs déjà validées : remplace les valeurs, ajoute la version en tête (10 au plus), journalise.
+ * `contexte` : données lues par def.charger() pour la validation, reprises par la phrase du journal.
  * @returns {Promise<{ inchange: true, doc } | { doc }>}
  */
-async function publier(req, cle, def, valeurs, versionRestauree = null) {
+async function publier(req, cle, def, valeurs, contexte, versionRestauree = null) {
   const avant = await ContenuSite.findOne({ cle }).select('valeurs').lean();
   if (avant && egal(avant.valeurs, valeurs)) {
     return { inchange: true, doc: await ContenuSite.findOne({ cle }).select(SANS_VALEURS_DES_VERSIONS).lean() };
@@ -57,7 +59,7 @@ async function publier(req, cle, def, valeurs, versionRestauree = null) {
     doc = await ecrire(); // Deux premières publications simultanées : la seconde met à jour le document créé par la première
   }
 
-  const resume = def.resumer(avant?.valeurs ?? null, valeurs)
+  const resume = def.resumer(avant?.valeurs ?? null, valeurs, contexte)
     + (versionRestauree ? ` (retour à la version du ${dateVersion(versionRestauree.publieLe)})` : '');
   await journaliser(req, {
     action: avant ? 'Modification' : 'Création', entite: 'Site public', entiteId: cle, resume,
@@ -73,7 +75,8 @@ async function listerContenus(req, res) {
   try {
     const [docs, prix] = await Promise.all([
       ContenuSite.find({ cle: { $in: CLES } }).select(SANS_VALEURS_DES_VERSIONS).lean(),
-      prixVitrine(SLUGS_VITRINE),
+      // Prix de chaque pack : l'aperçu d'une carte de pack créé l'affiche aussi
+      listerPacks().then(packs => prixVitrine(packs.map(p => p.slug))),
     ]);
     const contenus = Object.fromEntries(CLES.map(cle => [cle, versEcran(docs.find(d => d.cle === cle))]));
     return res.status(200).json({ contenus, prix });
@@ -103,10 +106,11 @@ async function publierContenu(req, res) {
   try {
     const def = definition(req, res);
     if (!def) return;
-    const { valeurs, erreur } = def.valider(req.body?.valeurs);
+    const contexte = def.charger ? await def.charger() : undefined; // Ex. packs de la base, pour les formules
+    const { valeurs, erreur } = def.valider(req.body?.valeurs, contexte);
     if (erreur) return res.status(400).json({ message: erreur });
 
-    const { inchange, doc } = await publier(req, req.params.cle, def, valeurs);
+    const { inchange, doc } = await publier(req, req.params.cle, def, valeurs, contexte);
     return res.status(200).json({
       message: inchange ? "Aucun changement : rien n'a été publié." : 'Publication enregistrée : le site est à jour.',
       contenu: versEcran(doc)
@@ -127,10 +131,11 @@ async function restaurerVersion(req, res) {
       ? (await ContenuSite.findOne({ cle: req.params.cle }, { versions: { $elemMatch: { _id: req.params.id } } }).lean())?.versions?.[0]
       : null;
     if (!version) return res.status(404).json({ message: 'Version introuvable.' });
-    const { valeurs, erreur } = def.valider(version.valeurs);
+    const contexte = def.charger ? await def.charger() : undefined;
+    const { valeurs, erreur } = def.valider(version.valeurs, contexte);
     if (erreur) return res.status(400).json({ message: `Cette version ne respecte plus les règles actuelles : ${erreur}` });
 
-    const { inchange, doc } = await publier(req, req.params.cle, def, valeurs, version);
+    const { inchange, doc } = await publier(req, req.params.cle, def, valeurs, contexte, version);
     return res.status(200).json({
       message: inchange ? "Cette version est déjà celle du site : rien n'a été publié." : 'Version rétablie : le site est à jour.',
       contenu: versEcran(doc)

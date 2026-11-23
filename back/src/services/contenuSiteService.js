@@ -4,15 +4,19 @@
 // (lot C : « faq » et « actualites », des listes, avec des variables dans les réponses et les résumés) et
 // CONTRAT-site-public-D.md (lot D : « photos » de la frise, envoyées dans Cloudinary, et « temoignages »).
 // Un nouveau contenu s'ajoute à la table CONTENUS, sans toucher au contrôleur :
-//   cle → { libelle, valider(valeurs) → { valeurs } | { erreur }, resumer(avant, apres) → texte, publier?(valeurs, maintenant) }
+//   cle → { libelle, valider(valeurs, contexte?) → { valeurs } | { erreur }, resumer(avant, apres, contexte?) → texte,
+//           publier?(valeurs, maintenant), charger?() → contexte }
 //  - valider : contrôle complet, renvoie seulement les champs du contrat, nettoyés (jamais un champ inconnu) ;
 //  - resumer : phrase du journal, ce qui change en clair (« Infos pratiques publiées : numéro WhatsApp, horaires ») ;
-//  - publier : facultatif, ce que voit le site à cet instant (ex. bandeau hors de ses dates → null, questions masquées retirées).
+//  - publier : facultatif, ce que voit le site à cet instant (ex. bandeau hors de ses dates → null, questions masquées retirées) ;
+//  - charger : facultatif, données de la base lues avant une publication et passées à valider et resumer (ex. les packs
+//    des formules) ; à la relecture par le site, valider est appelé sans contexte.
 // Aucune valeur par défaut ici : sans publication, le site garde celles du code (front/src/config/contact.ts,
 // formules.ts, faq.ts, actualites.ts, photos.ts, temoignages.ts) ; seul llms.txt en garde une copie côté serveur
 // (services/llmsService.js).
 
 const { echapperRegex } = require('../utils/texte');
+const { TYPE_PACK, typeDepuisSlug, listerPacks } = require('./packService');
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -75,12 +79,12 @@ function jour(valeur, nom) {
 const jourCotonou = (maintenant = new Date()) => new Date(maintenant.getTime() + DECALAGE_COTONOU_MS).toISOString().slice(0, 10);
 
 // Exécute une validation qui lève ErreurSaisie ; toute autre erreur remonte (erreur serveur).
-// `liste` : les valeurs sont une liste (faq, actualites), sinon un objet.
+// `liste` : les valeurs sont une liste (faq, actualites), sinon un objet. `contexte` : ce que renvoie charger(), s'il existe.
 function valider(fn, liste = false) {
-  return (valeurs) => {
+  return (valeurs, contexte) => {
     try {
       if (liste ? !Array.isArray(valeurs) : !objet(valeurs)) return { erreur: 'Valeurs manquantes ou invalides.' };
-      return { valeurs: fn(valeurs) };
+      return { valeurs: fn(valeurs, contexte) };
     } catch (e) {
       if (e instanceof ErreurSaisie) return { erreur: e.message };
       throw e;
@@ -200,64 +204,111 @@ function bandeauVisible(valeurs, maintenant = new Date()) {
 }
 
 // ------------------------------------------------------------------
-// Formules de la vitrine (lot B, docs-internes/admin/CONTRAT-site-public-B.md)
+// Cartes des formules de l'accueil (lot B, docs-internes/admin/CONTRAT-site-public-B.md)
 // ------------------------------------------------------------------
 
-// Slugs des cartes de l'accueil, dans l'ordre de la liste FORMULES de front/src/config/formules.ts (à garder identiques).
-// Seuls les textes des cartes se publient ici ; nom, emoji, teinte, niveau, ordre et produits restent dans le code,
-// et le prix vient de la base (« Formules et prix »), jamais de cet écran.
+// Une carte se règle ici pour tout pack de la base (collection Formules, services/packService.js) : affichage, ordre,
+// emoji, couleur, niveau et textes. Le nom du pack et son prix viennent de la base (« Formules et prix »), jamais de cet écran.
+// Cartes par défaut, dans l'ordre de la liste FORMULES de front/src/config/formules.ts (à garder identiques) : affichées
+// tant qu'aucune publication ne dit le contraire (rien de publié, publication sans le champ « afficher », d'avant les
+// cartes réglables). Leur nom court sert aux messages et au journal.
 const FORMULES_VITRINE = {
   'ahi-essentiel': 'Essentiel',
   'ahi-equilibre': 'Équilibré',
   'ahi-confort': 'Confort',
 };
 const SLUGS_VITRINE = Object.keys(FORMULES_VITRINE);
-const FOYERS = ['1', '2-3', '4-6'];
-const CHAMPS_FORMULE = [['cible', ['cible']], ['accroche', ['accroche']], ['repas', ['repas']], ['heures', ['heures']], ['taille de foyer', ['foyer']]];
+const FOYERS = ['1', '2-3', '4-6', '']; // '' : carte proposée par aucun choix du comparateur « taille du foyer »
+const COULEURS = ['savane', 'foret', 'marine']; // Thèmes prêts à l'emploi des cartes (front), sinon une couleur libre
+const HEXA = /^#[0-9A-Fa-f]{6}$/;
+const CHAMPS_FORMULE = [
+  ['ordre', ['ordre']], ['emoji', ['emoji']], ['couleur', ['couleur']], ['niveau de confort', ['niveau']],
+  ['cible', ['cible']], ['accroche', ['accroche']], ['repas', ['repas']], ['heures', ['heures']], ['taille de foyer', ['foyer']],
+];
 
 // Fourchettes « 20–30 » (repas) et « 2–4h » (heures) : au moins un chiffre ; tiret ou tiret demi-cadratin (U+2013)
 const REPAS = /^(?=.*\d)[\d \-–]+$/;
 const HEURES = /^(?=.*\d)[\d \-–h]+$/;
 
-function validerFormule(v, nom) {
+// Nom d'une carte dans les messages et le journal : nom court d'une carte par défaut, sinon nom du pack en base
+const nomCarte = (slug, packs) => (Object.hasOwn(FORMULES_VITRINE, slug) ? FORMULES_VITRINE[slug] : packs?.find((p) => p.slug === slug)?.nom ?? slug);
+
+// Carte voulue sur l'accueil : « afficher » publié ; sans ce champ, seulement les 3 cartes par défaut
+const afficherCarte = (publication, slug) => publication?.[slug]?.afficher ?? Object.hasOwn(FORMULES_VITRINE, slug);
+
+/**
+ * Cartes affichées sur l'accueil, règle unique de GET /api/public/site et de llms.txt : pack actif et carte voulue
+ * (afficherCarte), dans l'ordre publié, puis celui des cartes par défaut, puis celui des packs.
+ * @param {object | null} publication valeurs publiées de « formules », déjà validées (null : rien de publié)
+ * @param {{ slug, nom, statut, bientotDisponible }[]} packs packService.listerPacks()
+ * @returns {object[]} les packs affichés, dans l'ordre d'affichage
+ */
+function cartesAffichees(publication, packs) {
+  const rang = (slug) => (SLUGS_VITRINE.includes(slug) ? SLUGS_VITRINE.indexOf(slug) : SLUGS_VITRINE.length);
+  const ordre = (slug) => publication?.[slug]?.ordre ?? rang(slug);
+  return packs.filter((p) => p.statut === 'actif' && afficherCarte(publication, p.slug))
+    .sort((a, b) => ordre(a.slug) - ordre(b.slug) || rang(a.slug) - rang(b.slug));
+}
+
+// `publication` : tous les champs sont obligatoires. À la relecture par le site, les réglages de la carte (afficher,
+// ordre, emoji, couleur, niveau) peuvent manquer, dans une publication plus ancienne (textes seulement) : ils sont omis.
+function validerFormule(v, nom, publication) {
   if (!objet(v)) refuser(`${nom} : valeurs manquantes.`);
+  const carte = {};
+  const reglage = (champ, controle) => { if (publication || v[champ] !== undefined) carte[champ] = controle(v[champ]); };
+  reglage('afficher', (x) => (typeof x === 'boolean' ? x : refuser(`${nom} : afficher sur l'accueil, oui ou non.`)));
+  reglage('ordre', (x) => (Number.isInteger(x) && x >= 0 && x <= 99 ? x : refuser(`${nom} : ordre, un nombre entier de 0 à 99.`)));
+  reglage('emoji', (x) => {
+    const emoji = texte(x, `${nom} : emoji`, 1, 8);
+    return /\p{Cc}/u.test(emoji) ? refuser(`${nom} : emoji, caractère invalide.`) : emoji;
+  });
+  reglage('couleur', (x) => (COULEURS.includes(x) || (typeof x === 'string' && HEXA.test(x))
+    ? x : refuser(`${nom} : couleur, savane, foret, marine ou un code #RRGGBB (ex. #1C2E4A).`)));
+  reglage('niveau', (x) => ([1, 2, 3].includes(x) ? x : refuser(`${nom} : niveau de confort, 1, 2 ou 3.`)));
   const cible = texte(v.cible, `${nom} : cible`, 1, 60);
   const accroche = texte(v.accroche, `${nom} : accroche`, 1, 120);
   const repas = texte(v.repas, `${nom} : repas`, 1, 15);
   if (!REPAS.test(repas)) refuser(`${nom} : repas, chiffres et tiret seulement (ex. 20–30).`);
   const heures = texte(v.heures, `${nom} : heures`, 1, 15);
   if (!HEURES.test(heures)) refuser(`${nom} : heures, chiffres, tiret et « h » seulement (ex. 2–4h).`);
-  if (!FOYERS.includes(v.foyer)) refuser(`${nom} : taille de foyer, 1, 2-3 ou 4-6.`);
+  if (!FOYERS.includes(v.foyer)) refuser(`${nom} : taille de foyer, 1, 2-3, 4-6 ou aucune.`);
   if (typeof v.recommandee !== 'boolean') refuser(`${nom} : recommandée, oui ou non.`);
-  return { cible, accroche, repas, heures, foyer: v.foyer, recommandee: v.recommandee };
+  return { ...carte, cible, accroche, repas, heures, foyer: v.foyer, recommandee: v.recommandee };
 }
 
-function validerFormules(v) {
-  const inconnue = Object.keys(v).find((slug) => !Object.hasOwn(FORMULES_VITRINE, slug));
+// `packs` (chargés avant une publication) : seuls les packs de la base sont acceptés. Sans packs (relecture par le
+// site) : slug au format d'un pack, même s'il n'existe plus (cartesAffichees l'écarte alors).
+function validerFormules(v, packs) {
+  const publication = Array.isArray(packs);
+  const connu = (slug) => (publication ? packs.some((p) => p.slug === slug) : TYPE_PACK.test(typeDepuisSlug(slug)));
+  const inconnue = Object.keys(v).find((slug) => !connu(slug));
   if (inconnue !== undefined) refuser(`Formule inconnue : ${inconnue.slice(0, 40)}.`);
   const formules = {};
-  for (const [slug, nom] of Object.entries(FORMULES_VITRINE)) {
-    if (!Object.hasOwn(v, slug)) refuser(`${nom} : formule manquante.`);
-    formules[slug] = validerFormule(v[slug], nom);
-  }
-  if (SLUGS_VITRINE.filter((slug) => formules[slug].recommandee).length > 1) refuser('Formule recommandée : une seule au plus.');
-  // Le comparateur de l'accueil conseille une formule par taille de foyer : deux formules ne visent pas le même foyer
-  const foyers = SLUGS_VITRINE.map((slug) => formules[slug].foyer);
-  if (new Set(foyers).size !== foyers.length) refuser('Taille de foyer : une formule différente pour chaque taille (1, 2-3, 4-6).');
+  for (const slug of Object.keys(v)) formules[slug] = validerFormule(v[slug], nomCarte(slug, packs), publication);
+  if (publication && !cartesAffichees(formules, packs).length) refuser("Cartes de l'accueil : au moins une carte doit être affichée (pack actif).");
+  // Comparateur de l'accueil : sur les cartes voulues, pack actif ou non (sa réactivation ne crée pas de conflit)
+  const affichees = Object.keys(formules).filter((slug) => afficherCarte(formules, slug));
+  if (affichees.filter((slug) => formules[slug].recommandee).length > 1) refuser('Formule recommandée : une seule au plus parmi les cartes affichées.');
+  // Une carte conseillée par taille de foyer : deux cartes affichées ne visent pas le même foyer
+  const foyers = affichees.map((slug) => formules[slug].foyer).filter(Boolean);
+  if (new Set(foyers).size !== foyers.length) refuser('Taille de foyer : une carte affichée différente pour chaque taille (1, 2-3, 4-6).');
   return formules;
 }
 
-// Phrase du journal, formule par formule : « Formules publiées : Essentiel (accroche, repas), Confort (cible),
+// Phrase du journal, carte par carte : « Formules publiées : Essentiel (masquée), AHI Étudiant (affichée, emoji, cible),
 // formule recommandée : Confort »
-function resumerFormules(avant, apres) {
-  const liste = SLUGS_VITRINE.map((slug) => {
+function resumerFormules(avant, apres, packs) {
+  const slugs = [...new Set([...Object.keys(apres), ...Object.keys(objet(avant) ? avant : {})])];
+  const liste = slugs.map((slug) => {
     const champs = changements(avant?.[slug], apres[slug], CHAMPS_FORMULE);
-    return champs.length ? `${FORMULES_VITRINE[slug]} (${champs.join(', ')})` : null;
+    if (afficherCarte(avant, slug) !== afficherCarte(apres, slug)) champs.unshift(afficherCarte(apres, slug) ? 'affichée' : 'masquée');
+    return champs.length ? `${nomCarte(slug, packs)} (${champs.join(', ')})` : null;
   }).filter(Boolean);
-  const recommandee = (valeurs) => SLUGS_VITRINE.find((slug) => valeurs?.[slug]?.recommandee) ?? null;
+  const recommandee = (valeurs) => Object.keys(objet(valeurs) ? valeurs : {})
+    .find((slug) => afficherCarte(valeurs, slug) && valeurs[slug]?.recommandee) ?? null;
   const nouvelle = recommandee(apres);
   if (avant && recommandee(avant) !== nouvelle) {
-    liste.push(nouvelle ? `formule recommandée : ${FORMULES_VITRINE[nouvelle]}` : 'plus de formule recommandée');
+    liste.push(nouvelle ? `formule recommandée : ${nomCarte(nouvelle, packs)}` : 'plus de formule recommandée');
   }
   return phrase('Formules publiées', avant, liste);
 }
@@ -563,7 +614,7 @@ const CONTENUS = {
     libelle: "Bandeau d'annonce", valider: valider(validerBandeau), resumer: resumerBandeau,
     publier: (valeurs, maintenant) => (bandeauVisible(valeurs, maintenant) ? valeurs : null),
   },
-  formules: { libelle: 'Formules', valider: valider(validerFormules), resumer: resumerFormules },
+  formules: { libelle: 'Formules', valider: valider(validerFormules), resumer: resumerFormules, charger: () => listerPacks() },
   faq: { libelle: 'Questions fréquentes', valider: valider(validerFaq, true), resumer: resumerFaq, publier: faqPubliee },
   actualites: { libelle: 'Actualités', valider: valider(validerActualites, true), resumer: resumerActualites },
   photos: { libelle: 'Photos de la frise', valider: valider(validerPhotos), resumer: resumerPhotos },
@@ -576,4 +627,4 @@ const CLES = Object.keys(CONTENUS);
 // Définition d'une clé, ou null (jamais une propriété héritée comme « constructor » ou « __proto__ »)
 const contenu = (cle) => (typeof cle === 'string' && Object.hasOwn(CONTENUS, cle) ? CONTENUS[cle] : null);
 
-module.exports = { CONTENUS, CLES, contenu, bandeauVisible, jourCotonou, egal, SLUGS_VITRINE, VARIABLES, refusPhoto };
+module.exports = { CONTENUS, CLES, contenu, bandeauVisible, jourCotonou, egal, SLUGS_VITRINE, cartesAffichees, VARIABLES, refusPhoto };
