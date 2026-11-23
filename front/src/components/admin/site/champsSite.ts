@@ -8,9 +8,11 @@ import { cartesDuCode } from '@/config/actualites'
 import { PHOTOS, TITRES_FRISE } from '@/config/photos'
 import { TEMOIGNAGES_PAR_DEFAUT } from '@/config/temoignages'
 import { adresseCloudinary } from '@/services/images'
+import { nomPack, type Pack } from '@/services/packs'
 import {
   BANDEAU_VIDE, annonceLivraison, copierInfos, formaterHoraires, formaterNumero, fusionnerInfos, normaliserNumero,
   JOURS_SEMAINE, REGLES_FORMULE, fusionnerTextesFormules, lirePrix,
+  CARTE_NOUVELLE, emojiValide, estTheme, trierParOrdre, type CouleurFormule, type TexteFormule, type ThemeFormule,
   ICONES_ACTUALITE, ID_CONTENU, VARIABLES_TEXTE, REGLES_ACTUALITE, REGLES_FAQ, accoladeInconnue, fusionnerActualites, fusionnerFaq, lienActualiteValide,
   lienFaqValide,
   EMPLACEMENTS_FRISE, PUBLIC_ID_SITE, REGLES_PHOTO, REGLES_TEMOIGNAGE, fusionnerPhotos, fusionnerTemoignages, jourCotonou, noteValide,
@@ -32,7 +34,8 @@ export interface ContenusSite {
   photos: ContenuEcran<PhotosSite> | null
   temoignages: ContenuEcran<TemoignageSite[]> | null
 }
-// Réponse de GET /api/admin/site : contenus publiés et prix de vente de la base (lecture seule ici, lot B)
+// Réponse de GET /api/admin/site : contenus publiés et prix de vente de la base (lecture seule ici, lot B ; les trois
+// cartes du code, et chaque autre pack dont le serveur donne le prix)
 export interface ReponseSite { contenus: ContenusSite; prix: PrixSite }
 
 export const lireReponseSite = (d: { contenus?: Partial<ContenusSite>; prix?: unknown } | undefined): ReponseSite => ({
@@ -41,7 +44,7 @@ export const lireReponseSite = (d: { contenus?: Partial<ContenusSite>; prix?: un
     faq: d?.contenus?.faq ?? null, actualites: d?.contenus?.actualites ?? null,
     photos: d?.contenus?.photos ?? null, temoignages: d?.contenus?.temoignages ?? null,
   },
-  prix: lirePrix(SLUGS_VITRINE, d?.prix),
+  prix: lirePrix([...new Set([...SLUGS_VITRINE, ...Object.keys(typeof d?.prix === 'object' && d.prix ? d.prix : {})])], d?.prix),
 })
 
 export const TITRES_CONTENUS: Record<CleContenu, string> = {
@@ -87,22 +90,81 @@ export const nomCourt = (nom: string) => {
   const mot = nom.replace(/^AHI\s+/i, '').toLocaleLowerCase('fr-FR')
   return mot.charAt(0).toLocaleUpperCase('fr-FR') + mot.slice(1)
 }
-export const libelleFoyer = (foyer: string) => TAILLES_FOYER.find(t => t.valeur === foyer)?.libelle ?? foyer
-const nomRecommandee = (v: TextesFormules) => FORMULES_DU_CODE.find(f => v[f.slug]?.recommandee)?.nom ?? 'aucune'
+export const libelleFoyer = (foyer: string) => (foyer ? TAILLES_FOYER.find(t => t.valeur === foyer)?.libelle ?? foyer : 'aucune')
 
-export const CHAMPS_FORMULES: Champ<TextesFormules>[] = [
-  ...FORMULES_DU_CODE.flatMap(f => {
-    const court = nomCourt(f.nom)
-    return [
-      { id: `${f.slug}.cible`, libelle: `${court} : cible`, lire: (v: TextesFormules) => v[f.slug]!.cible },
-      { id: `${f.slug}.accroche`, libelle: `${court} : accroche`, lire: (v: TextesFormules) => v[f.slug]!.accroche },
-      { id: `${f.slug}.repas`, libelle: `${court} : repas`, lire: (v: TextesFormules) => `${v[f.slug]!.repas} repas possibles` },
-      { id: `${f.slug}.heures`, libelle: `${court} : heures`, lire: (v: TextesFormules) => `${v[f.slug]!.heures} économisées` },
-      { id: `${f.slug}.foyer`, libelle: `${court} : taille de foyer`, lire: (v: TextesFormules) => libelleFoyer(v[f.slug]!.foyer) },
-    ]
-  }),
-  { id: 'recommandee', libelle: 'Formule recommandée', lire: nomRecommandee },
+// Une carte par pack de la base (usePacks) ; avant l'arrivée de la liste, et dans les tests, les trois cartes du code
+export const PACKS_DU_CODE: Pack[] = FORMULES_DU_CODE.map(f => ({
+  type: f.slug.replace(/^ahi-/, ''), slug: f.slug, nom: nomPack(f.nom), statut: 'actif', bientotDisponible: false, ordre: null,
+}))
+export const estCarteDuCode = (slug: string) => SLUGS_VITRINE.includes(slug)
+// Nom affiché sur la carte : celui du code pour les trois cartes par défaut, sinon celui du pack en capitales (comme le site)
+export const nomSurLaCarte = (pack: Pick<Pack, 'slug' | 'nom'>) =>
+  FORMULES_DU_CODE.find(f => f.slug === pack.slug)?.nom ?? pack.nom.toLocaleUpperCase('fr-FR')
+const nomDuPack = (packs: readonly Pack[], slug: string) => packs.find(p => p.slug === slug)?.nom ?? slug
+
+export const NOMS_THEMES: Record<ThemeFormule, string> = { savane: 'Savane clair', foret: 'Forêt', marine: 'Marine' }
+const lireCouleur = (c: CouleurFormule) => (estTheme(c) ? NOMS_THEMES[c] : `couleur libre ${c.toUpperCase()}`)
+const lireTexte = (t: string, suite = '') => (t ? `${t}${suite}` : '(vide)')
+
+// Réglages d'une carte ; absente des valeurs : celle d'un pack sans publication
+const reglagesDe = (v: TextesFormules, slug: string) => v[slug] ?? CARTE_NOUVELLE
+// Place parmi les cartes affichées (« 2e place »), ou « masquée »
+function place(v: TextesFormules, slug: string): string {
+  if (!reglagesDe(v, slug).afficher) return 'masquée'
+  const rang = trierParOrdre(v).filter(s => v[s]!.afficher).indexOf(slug) + 1
+  return rang === 1 ? '1re place' : `${rang}e place`
+}
+function nomRecommandee(v: TextesFormules, packs: readonly Pack[]): string {
+  const slug = trierParOrdre(v).find(s => v[s]!.afficher && v[s]!.recommandee)
+  return slug ? nomSurLaCarte({ slug, nom: nomDuPack(packs, slug) }) : 'aucune'
+}
+
+// Champs des cartes, pour la confirmation et l'historique ; les libellés reprennent les messages du serveur
+// (« Étudiant : niveau de confort, 1, 2 ou 3. »)
+export function champsFormules(packs: readonly Pack[] = PACKS_DU_CODE): Champ<TextesFormules>[] {
+  return [
+    ...packs.flatMap((p): Champ<TextesFormules>[] => {
+      const court = nomCourt(p.nom)
+      const r = (v: TextesFormules) => reglagesDe(v, p.slug)
+      return [
+        { id: `${p.slug}.afficher`, libelle: `${court} : afficher`, lire: v => (r(v).afficher ? 'oui' : 'non') },
+        { id: `${p.slug}.ordre`, libelle: `${court} : ordre`, lire: v => place(v, p.slug) },
+        { id: `${p.slug}.emoji`, libelle: `${court} : emoji`, lire: v => r(v).emoji },
+        { id: `${p.slug}.couleur`, libelle: `${court} : couleur`, lire: v => lireCouleur(r(v).couleur) },
+        { id: `${p.slug}.niveau`, libelle: `${court} : niveau de confort`, lire: v => `${r(v).niveau} sur 3` },
+        { id: `${p.slug}.cible`, libelle: `${court} : cible`, lire: v => lireTexte(r(v).cible) },
+        { id: `${p.slug}.accroche`, libelle: `${court} : accroche`, lire: v => lireTexte(r(v).accroche) },
+        { id: `${p.slug}.repas`, libelle: `${court} : repas`, lire: v => lireTexte(r(v).repas, ' repas possibles') },
+        { id: `${p.slug}.heures`, libelle: `${court} : heures`, lire: v => lireTexte(r(v).heures, ' économisées') },
+        { id: `${p.slug}.foyer`, libelle: `${court} : taille de foyer`, lire: v => libelleFoyer(r(v).foyer) },
+      ]
+    }),
+    { id: 'recommandee', libelle: 'Formule recommandée', lire: v => nomRecommandee(v, packs) },
+  ]
+}
+
+// Mots des messages du serveur après le nom de la carte (« Étudiant : niveau de confort, 1, 2 ou 3. ») -> champ
+const CHAMPS_ERREUR_FORMULE: [string, string][] = [
+  ['afficher', 'afficher'], ['ordre', 'ordre'], ['emoji', 'emoji'], ['couleur', 'couleur'], ['niveau', 'niveau'],
+  ['cible', 'cible'], ['accroche', 'accroche'], ['repas', 'repas'], ['heures', 'heures'], ['taille de foyer', 'foyer'],
 ]
+// Le serveur nomme une carte du code par son nom court (« Essentiel ») et les autres par le nom du pack
+// (« AHI Étudiant ») : les deux sont reconnus, sans tenir compte des majuscules
+function champErreurFormule(message: string, packs: readonly Pack[]): string {
+  const m = message.toLocaleLowerCase('fr-FR')
+  if (m.startsWith('formule recommandée')) return 'recommandee'
+  for (const p of packs) {
+    for (const nom of [p.nom, nomCourt(p.nom)]) {
+      const debut = `${nom.toLocaleLowerCase('fr-FR')} : `
+      if (!m.startsWith(debut)) continue
+      const reste = m.slice(debut.length)
+      if (reste.startsWith('recommandée')) return 'recommandee'
+      const champ = CHAMPS_ERREUR_FORMULE.find(([mot]) => reste.startsWith(mot))?.[1]
+      return champ ? `${p.slug}.${champ}` : ''
+    }
+  }
+  return ''
+}
 
 // Libellés d'erreur du serveur qui ne sont pas des champs de la liste ci-dessus
 const AUTRES_ERREURS: Record<string, string> = {
@@ -113,11 +175,13 @@ const AUTRES_ERREURS: Record<string, string> = {
 
 // Champ nommé au début du message d'erreur (« Facebook : adresse invalide… »), sinon '' (erreur en haut du formulaire).
 // FAQ et actualités : « Question 3 : réponse : … » ou « Carte 2 : titre : … », d'après les identifiants du formulaire.
-export function champDeLErreur(cle: CleContenu, message: string, ids: readonly string[] = []): string {
+// Formules : d'après les packs de l'écran (`packs`).
+export function champDeLErreur(cle: CleContenu, message: string, ids: readonly string[] = [], packs: readonly Pack[] = PACKS_DU_CODE): string {
   if (cle === 'faq' || cle === 'actualites') return champErreurListe(cle, message, ids)
   if (cle === 'temoignages') return champErreurTemoignage(message, ids)
   if (cle === 'photos') return champErreurPhoto(message)
-  const champs: { id: string; libelle: string }[] = cle === 'infos' ? CHAMPS_INFOS : cle === 'bandeau' ? CHAMPS_BANDEAU : CHAMPS_FORMULES
+  if (cle === 'formules') return champErreurFormule(message, packs)
+  const champs: { id: string; libelle: string }[] = cle === 'infos' ? CHAMPS_INFOS : CHAMPS_BANDEAU
   const libelles = [...champs, ...(cle === 'infos' ? Object.entries(AUTRES_ERREURS).map(([libelle, id]) => ({ id, libelle })) : [])]
   // « Essentiel : accroche : … », ou « Essentiel : repas, chiffres… » pour les formats des formules
   const trouve = libelles.find(c => message.startsWith(`${c.libelle} :`) || message.startsWith(`${c.libelle},`))
@@ -151,8 +215,13 @@ export function bandeauPublie(contenu: ContenusSite['bandeau'] | undefined): Ban
   }
 }
 
-export const formulesPubliees = (contenu: ContenusSite['formules'] | undefined): TextesFormules =>
-  fusionnerTextesFormules(TEXTES_FORMULES_DU_CODE, contenu?.valeurs)
+// Réglages du site pour chaque pack (`packs` : ceux de la base ; sans packs, les cartes du code puis les autres publiées)
+export const formulesPubliees = (contenu: ContenusSite['formules'] | undefined, packs?: readonly Pack[]): TextesFormules =>
+  fusionnerTextesFormules(TEXTES_FORMULES_DU_CODE, contenu?.valeurs, packs?.map(p => p.slug))
+
+// Formulaire : cartes rangées et numérotées 0, 1, 2… (les flèches échangent deux places)
+export const formulesEnFormulaire = (t: TextesFormules): TextesFormules =>
+  Object.fromEntries(trierParOrdre(t).map((slug, i) => [slug, { ...t[slug]!, ordre: i }]))
 
 // Retours à la ligne remplacés par une espace (le serveur les refuse) et espaces en trop retirées
 const nettoyer = (texte: string) => texte.replace(/\s*[\r\n]+\s*/g, ' ').replace(/\s{2,}/g, ' ').trim()
@@ -179,14 +248,20 @@ export function bandeauAEnvoyer(f: BandeauSite): BandeauSite {
   return { ...f, message: nettoyer(f.message), lien: nettoyer(f.lien), texteLien: nettoyer(f.texteLien) }
 }
 
-// Les trois slugs de la vitrine, dans l'ordre des cartes, textes nettoyés
+const sansTexte = (t: TexteFormule) => ![t.cible, t.accroche, t.repas, t.heures].some(x => nettoyer(x))
+
+// Réglages complets de chaque carte, dans l'ordre (numérotée 0, 1, 2…), textes nettoyés et couleur libre en capitales.
+// Le serveur exige les quatre textes de chaque carte envoyée : la carte masquée d'un pack créé, encore sans aucun
+// texte, n'est pas envoyée (elle reste sans publication). Une carte masquée n'est jamais la recommandée.
 export function formulesAEnvoyer(f: TextesFormules): TextesFormules {
-  return Object.fromEntries(SLUGS_VITRINE.map(slug => {
-    const t = f[slug] ?? TEXTES_FORMULES_DU_CODE[slug]!
+  const envoyees = trierParOrdre(f).filter(slug => estCarteDuCode(slug) || f[slug]!.afficher || !sansTexte(f[slug]!))
+  return Object.fromEntries(envoyees.map((slug, ordre) => {
+    const t = f[slug]!
     return [slug, {
-      cible: nettoyer(t.cible), accroche: nettoyer(t.accroche), repas: nettoyer(t.repas), heures: nettoyer(t.heures),
-      foyer: t.foyer, recommandee: t.recommandee === true,
-    }]
+      afficher: t.afficher, ordre, emoji: t.emoji.trim(), couleur: (estTheme(t.couleur) ? t.couleur : t.couleur.toUpperCase()) as CouleurFormule,
+      niveau: t.niveau, cible: nettoyer(t.cible), accroche: nettoyer(t.accroche), repas: nettoyer(t.repas), heures: nettoyer(t.heures),
+      foyer: t.foyer, recommandee: t.recommandee && t.afficher,
+    } satisfies TexteFormule]
   }))
 }
 
@@ -196,41 +271,49 @@ const FORMATS: Record<'repas' | 'heures', string> = {
   heures: 'heures, chiffres, tiret et « h » seulement (ex. 2–4h).',
 }
 
-// Taille de foyer déjà choisie par une formule précédente (le serveur veut une formule différente par taille) :
-// slug -> nom de la formule qui l'a déjà
-export function doublonsFoyer(f: TextesFormules): Record<string, string> {
+// Taille de foyer déjà choisie par une carte affichée placée avant (le serveur veut une carte affichée différente par
+// taille ; « Aucune » ne compte pas) : slug -> nom de la carte qui l'a déjà
+export function doublonsFoyer(f: TextesFormules, packs: readonly Pack[] = PACKS_DU_CODE): Record<string, string> {
   const vus = new Map<string, string>()
   const doublons: Record<string, string> = {}
-  for (const formule of FORMULES_DU_CODE) {
-    const foyer = f[formule.slug]?.foyer
-    if (!foyer) continue
+  for (const slug of trierParOrdre(f)) {
+    const { afficher, foyer } = f[slug]!
+    if (!afficher || !foyer) continue
     const deja = vus.get(foyer)
-    if (deja) doublons[formule.slug] = deja
-    else vus.set(foyer, formule.nom)
+    if (deja) doublons[slug] = deja
+    else vus.set(foyer, nomSurLaCarte({ slug, nom: nomDuPack(packs, slug) }))
   }
   return doublons
 }
 export const messageDoublonFoyer = (deja: string) => `Taille de foyer : déjà choisie pour ${deja}. Une formule différente pour chaque taille (1, 2-3, 4-6).`
 
-export function controlerFormules(f: TextesFormules): { champ: string; message: string } | null {
-  for (const formule of FORMULES_DU_CODE) {
-    const t = f[formule.slug]
-    if (!t) continue
+// Mêmes règles que le serveur, sur les valeurs à envoyer (formulesAEnvoyer), carte par carte dans l'ordre
+export function controlerFormules(f: TextesFormules, packs: readonly Pack[] = PACKS_DU_CODE): { champ: string; message: string } | null {
+  for (const slug of trierParOrdre(f)) {
+    const t = f[slug]!
+    const court = nomCourt(nomDuPack(packs, slug))
+    if (!emojiValide(t.emoji)) return { champ: `${slug}.emoji`, message: `${court} : emoji : 1 à 8 caractères (ex. 🎓), sans < ni >.` }
     for (const nom of ['cible', 'accroche', 'repas', 'heures'] as const) {
       const valeur = t[nom]
-      const champ = `${formule.slug}.${nom}`
-      const erreur = (texte: string) => ({ champ, message: `${nomCourt(formule.nom)} : ${nom} : ${texte}` })
+      const champ = `${slug}.${nom}`
+      const erreur = (texte: string) => ({ champ, message: `${court} : ${nom} : ${texte}` })
       if (/[<>]/.test(valeur)) return erreur('les caractères < et > ne sont pas acceptés.')
-      if (!valeur) return erreur('obligatoire.')
+      if (!valeur) return erreur(t.afficher || estCarteDuCode(slug) ? 'obligatoire.' : 'obligatoire. Carte masquée : remplissez ses quatre textes, ou videz-les tous.')
       if (Array.from(valeur).length > REGLES_FORMULE[nom].max) return erreur(`${REGLES_FORMULE[nom].max} caractères au plus.`)
       if ((nom === 'repas' || nom === 'heures') && !REGLES_FORMULE[nom].motif.test(valeur)) {
-        return { champ, message: `${nomCourt(formule.nom)} : ${FORMATS[nom]}` }
+        return { champ, message: `${court} : ${FORMATS[nom]}` }
       }
     }
   }
-  const doublon = Object.entries(doublonsFoyer(f))[0]
+  const actif = (slug: string) => packs.find(p => p.slug === slug)?.statut !== 'inactif'
+  if (!Object.keys(f).some(s => f[s]!.afficher && actif(s))) {
+    return { champ: '', message: 'Cartes de l\'accueil : affichez au moins une carte d\'un pack actif.' }
+  }
+  const doublon = Object.entries(doublonsFoyer(f, packs))[0]
   if (doublon) return { champ: `${doublon[0]}.foyer`, message: messageDoublonFoyer(doublon[1]) }
-  if (SLUGS_VITRINE.filter(s => f[s]?.recommandee).length > 1) return { champ: 'recommandee', message: 'Formule recommandée : une seule au plus.' }
+  if (Object.values(f).filter(t => t.afficher && t.recommandee).length > 1) {
+    return { champ: 'recommandee', message: 'Formule recommandée : une seule au plus parmi les cartes affichées.' }
+  }
   return null
 }
 
