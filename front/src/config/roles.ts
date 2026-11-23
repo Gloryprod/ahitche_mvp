@@ -22,6 +22,8 @@ export const ACCES: Record<Section, { lecture: Role[]; ecriture: Role[] }> = {
   nutrition:     { lecture: ['admin', 'nutritionniste'],                            ecriture: ['admin', 'nutritionniste'] },
   repas:         { lecture: ['admin', 'gestionnaire', 'nutritionniste', 'coordinateur'], ecriture: ['admin', 'gestionnaire', 'nutritionniste'] },
   avis:          { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
+  // Écrans de gestion du catalogue seulement : le serveur ouvre la lecture des données de base à toute l'équipe
+  // (back/src/config/roles.js), dont les écrans du stock et des commandes ont besoin. Différence voulue (D-17).
   donneesBase:   { lecture: ['admin', 'comptable', 'nutritionniste', 'coordinateur'], ecriture: ['admin'] },
   contenus:      { lecture: ['admin'],                                               ecriture: ['admin'] },
   complements:   { lecture: ['admin', 'gestionnaire', 'coordinateur'],              ecriture: ['admin', 'gestionnaire'] },
