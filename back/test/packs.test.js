@@ -73,3 +73,16 @@ test('un pack créé est reconnu partout : quantités, import du référentiel, 
   assert.strictEqual((await ctx.appel(admin, 'GET', '/api/admin/formulas/inconnu')).statut, 404);
   assert.strictEqual((await ctx.appel(admin, 'GET', '/api/admin/formulas/Inconnu!')).statut, 400);
 });
+
+test('ouvrir un pack à la commande : admin seulement, journalisé', async () => {
+  const route = '/api/admin/formulas/etudiant/disponibilite';
+  assert.strictEqual((await ctx.appel(gest, 'PATCH', route, { bientotDisponible: false })).statut, 403);
+  assert.strictEqual((await ctx.appel(admin, 'PATCH', route, { bientotDisponible: 'non' })).statut, 400);
+  assert.strictEqual((await ctx.appel(admin, 'PATCH', '/api/admin/formulas/inconnu/disponibilite', { bientotDisponible: false })).statut, 404);
+  const r = await ctx.appel(admin, 'PATCH', route, { bientotDisponible: false });
+  assert.strictEqual(r.statut, 200, JSON.stringify(r));
+  assert.strictEqual((await col('formules').findOne({ slug: 'ahi-etudiant' })).bientotDisponible, false);
+  assert.ok(await col('auditlogs').findOne({ entite: 'Formule', resume: 'AHI Étudiant test : ouvert à la commande' }));
+  const packs = await ctx.appel(gest, 'GET', '/api/admin/packs');
+  assert.strictEqual(packs.json.find((p) => p.type === 'etudiant').bientotDisponible, false);
+});

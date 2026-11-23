@@ -194,7 +194,7 @@ const fleche = 'cursor-pointer inline-flex items-center justify-center w-11 h-11
               Pas de prix de vente en base (formule inactive, bientôt disponible ou sans prix) : le site affiche le prix du code,
               <strong class="tabular-nums whitespace-nowrap">{{ formaterPrix(prixDuCode(slug)!) }} FCFA</strong>.
             </p>
-            <p v-else class="text-noir">Le prix vient de l'écran « Formules et prix » : la carte ne s'affiche qu'avec un prix de vente en base.</p>
+            <p v-else class="text-noir">Le prix vient de l'écran « Formules et prix » : la carte ne s'affiche qu'avec un prix de vente en base et un pack ouvert à la commande (pas « bientôt disponible »).</p>
             <p v-if="typeof prix[slug] === 'number' && prixDuCode(slug) !== null && prix[slug] !== prixDuCode(slug)">Prix de secours du code, affiché si le serveur ne répond pas : <span class="tabular-nums whitespace-nowrap">{{ formaterPrix(prixDuCode(slug)!) }} FCFA</span>.</p>
             <RouterLink :to="{ name: 'formulas-page' }" class="inline-flex items-center gap-1.5 min-h-11 text-savane font-bold hover:text-foret">
               <Tags class="w-4 h-4 shrink-0" aria-hidden="true" /> Modifier le prix dans Formules et prix

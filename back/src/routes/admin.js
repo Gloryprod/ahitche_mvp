@@ -166,6 +166,7 @@ router.post('/formulas', formulaC.creerPack);
 router.get('/formulas/:packType', formulaC.getPackDetails);
 router.patch('/formulas/:packType/price', formulaC.updateFormulaPrice);
 router.patch('/formulas/:packType/cycle', formulaC.updateFormulaCycle); // cycle de relance, réglé par l'admin
+router.patch('/formulas/:packType/disponibilite', formulaC.updateFormulaDisponibilite); // ouvrir à la commande (admin)
 
 // --- Posts / Contenus ---
 router.get('/posts', postC.getPosts);
