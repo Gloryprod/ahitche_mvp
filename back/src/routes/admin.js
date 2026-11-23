@@ -24,6 +24,7 @@ const vipC = require('../controllers/VipController');
 const equipeC = require('../controllers/admin/EquipeController');
 const compteurC = require('../controllers/admin/CompteurController');
 const siteC = require('../controllers/admin/SiteController');
+const enqueteC = require('../controllers/admin/EnqueteController');
 const { verifyToken, checkRole, acces } = require('../middlewares/auth');
 const { EQUIPE, ACCES } = require('../config/roles');
 const { limiteTentatives } = require('../middlewares/limiteTentatives');
@@ -54,6 +55,7 @@ router.use('/fiches', acces(ACCES.fiches));
 router.use('/vip', acces(ACCES.vip));
 router.use('/equipe', acces(ACCES.equipe));
 router.use('/site', acces(ACCES.site));
+router.use('/enquete', acces(ACCES.enquete));
 
 // Compteurs du menu admin (pastilles) : lecture pour toute l'équipe, aucune écriture. Ce n'est pas une section :
 // chaque clé de la réponse n'est donnée qu'aux rôles qui lisent sa section (commandes, avis), voir le contrôleur.
@@ -270,6 +272,11 @@ router.post('/repas/:id/decision', nutritionC.deciderMenu); // Admin seulement (
 router.get('/avis', avisC.listerAvis);
 router.post('/avis/:id/decision', avisC.deciderAvis);
 router.delete('/avis/:id', avisC.supprimerAvis);
+
+// Enquête de satisfaction : synthèse et réponses (admin, coordinateur), suppression (admin, journalisée)
+router.get('/enquete/synthese', enqueteC.synthese);
+router.get('/enquete/reponses', enqueteC.listerReponses);
+router.delete('/enquete/:id', enqueteC.supprimerReponse);
 
 module.exports = router;
         

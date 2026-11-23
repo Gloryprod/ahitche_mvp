@@ -52,6 +52,19 @@ import { lienWhatsApp, WHATSAPP_AFFICHAGE, RESEAUX_SOCIAUX } from '@/config/cont
       </section>
 
       <section class="mb-8">
+        <h2 class="text-lg font-bold text-noir mb-2">Enquête de satisfaction</h2>
+        <p>
+          Notre enquête de satisfaction se remplit sans compte. Seule la note globale est obligatoire ; le reste est facultatif :
+          vos autres notes, votre pack, votre avis sur ses produits, vos suggestions et, seulement si vous les indiquez, votre
+          prénom et votre téléphone, avec votre accord pour être recontacté au sujet de vos réponses. Sans numéro, vos réponses
+          sont anonymes. Elles servent uniquement à améliorer nos packs et notre service, ne sont lues que par notre équipe et sont
+          effacées automatiquement au bout d'un an. N'y indiquez aucune information de santé. Vous pouvez demander la suppression
+          de vos réponses à tout moment en nous écrivant sur
+          <a :href="lienWhatsApp()" target="_blank" rel="noopener noreferrer" class="font-semibold text-foret underline underline-offset-4">WhatsApp</a>.
+        </p>
+      </section>
+
+      <section class="mb-8">
         <h2 class="text-lg font-bold text-noir mb-2">Cookies</h2>
         <p>
           Le site n'utilise qu'un cookie technique, déposé lorsque vous vous connectez à votre espace : il maintient votre

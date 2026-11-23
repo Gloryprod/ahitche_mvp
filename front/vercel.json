@@ -23,7 +23,7 @@
       "destination": "https://api.ahitchebj.com/api/public/llms.txt"
     },
     {
-      "source": "/(blog|login|register|reset-password|mentions-legales)",
+      "source": "/(blog|login|register|reset-password|mentions-legales|enquete)",
       "destination": "/app.html"
     },
     {

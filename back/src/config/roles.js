@@ -13,6 +13,7 @@
 //  Avis clients : rédigés par les clients dans leur espace, publiés (ou refusés) par l'admin
 //  Codes VIP, prix VIP et chiffrage des achats libres : admin seulement, coordinateur en lecture
 //  Site public (infos pratiques, bandeau d'annonce…) : publié par l'admin seulement, coordinateur en lecture
+//  Enquête de satisfaction : réponses lues par l'admin et le coordinateur, supprimées par l'admin seulement
 
 const ROLES = ['user', 'admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
 const EQUIPE = ['admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur', 'auditeur'];
@@ -44,6 +45,8 @@ const ACCES = {
   nutrition:     { lecture: ['admin', 'nutritionniste'],                            ecriture: ['admin', 'nutritionniste'] },
   repas:         { lecture: ['admin', 'gestionnaire', 'nutritionniste', 'coordinateur'], ecriture: ['admin', 'gestionnaire', 'nutritionniste'] },
   avis:          { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
+  // Enquête de satisfaction (page publique /enquete) : synthèse et réponses ; suppression journalisée
+  enquete:       { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
   // Réglages des simulateurs (charges, objectifs, coefficient, marge) : journalisés (Q 10.4)
   parametres:    { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable', 'coordinateur'] },
 };

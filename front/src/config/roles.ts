@@ -8,7 +8,7 @@ export const EQUIPE: Role[] = ['admin', 'gestionnaire', 'comptable', 'nutritionn
 export type Section =
   | 'tableauDeBord' | 'commandes' | 'clients' | 'stock' | 'prestataires' | 'logistique'
   | 'finances' | 'simulateurs' | 'nutrition' | 'repas' | 'avis' | 'donneesBase' | 'contenus' | 'complements' | 'mesures' | 'parametres'
-  | 'fiches' | 'vip' | 'equipe' | 'site'
+  | 'fiches' | 'vip' | 'equipe' | 'site' | 'enquete'
 
 export const ACCES: Record<Section, { lecture: Role[]; ecriture: Role[] }> = {
   tableauDeBord: { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: [] },
@@ -33,6 +33,8 @@ export const ACCES: Record<Section, { lecture: Role[]; ecriture: Role[] }> = {
   equipe:        { lecture: ['admin'],                                               ecriture: ['admin'] },
   // Site public : infos pratiques, bandeau d'annonce… publiés par l'admin, lus par le coordinateur
   site:          { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
+  // Enquête de satisfaction : réponses lues par l'admin et le coordinateur, supprimées par l'admin
+  enquete:       { lecture: ['admin', 'coordinateur'],                              ecriture: ['admin'] },
   mesures:       { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: [] },
   parametres:    { lecture: ['admin', 'comptable', 'coordinateur'],                 ecriture: ['admin', 'comptable', 'coordinateur'] },
 }
