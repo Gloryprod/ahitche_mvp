@@ -9,6 +9,7 @@ const { enregistrerEntree, importerEntrees, MAX_OCTETS } = require('../../servic
 const { journaliser } = require('../../services/journalService');
 const { ACCES } = require('../../config/roles');
 const BudgetLine = require('../../models/budgetLine');
+const { annulerTransaction } = require('../../services/transactionService');
 
 // Motifs d'une correction saisie à la main (Q 6.5) ; « Comptage » est réservé à la confirmation d'un lot à compter
 const RAISONS_SAISIE = ['Perte', 'Péremption', 'Erreur de saisie'];
@@ -139,7 +140,7 @@ async function enregistrerEntreeStock(req, res) {
       : (combles ? `Entrée enregistrée${combles}.` : "Entrée enregistrée avec succès !");
     return res.status(201).json({ message, lot, depenseRattachee: !!depense, depenseCreee: creee, comblements });
   } catch (error) {
-    if (session.inTransaction()) await session.abortTransaction();
+    await annulerTransaction(session);
     if (error.code === 11000) return res.status(400).json({ message: "Ce numéro de lot existe déjà." });
     console.error("Erreur enregistrerEntreeStock:", error);
     return res.status(500).json({ message: "Erreur serveur." });
@@ -166,7 +167,7 @@ async function importerEntreesStock(req, res) {
     const { statut, corps } = await importerEntrees(req, tableau, appliquer, session);
     return res.status(statut).json(corps);
   } catch (error) {
-    if (session.inTransaction()) await session.abortTransaction();
+    await annulerTransaction(session);
     if (error.code === 11000) return res.status(400).json({ message: "Un numéro de lot vient d'être utilisé : relancez la vérification." });
     // Sans le message de l'erreur, qui peut citer une valeur collée (fournisseur, montant)
     console.error("Erreur importerEntreesStock:", error.name, error.code ?? '', (error.stack || '').split('\n').slice(1, 4).join(' | '));
@@ -293,8 +294,8 @@ async function compterLot(req, res) {
     const responsable = await nomResponsable(req);
     session.startTransaction();
     const lot = await LotStockFifo.findOne({ _id: req.params.id, deletedAt: null }).populate('product', 'name unit').session(session);
-    if (!lot) { await session.abortTransaction(); return res.status(404).json({ message: "Lot introuvable." }); }
-    if (lot.quantiteInitiale !== null) { await session.abortTransaction(); return res.status(400).json({ message: "Ce lot est déjà compté : utilisez « Corriger »." }); }
+    if (!lot) { await annulerTransaction(session); return res.status(404).json({ message: "Lot introuvable." }); }
+    if (lot.quantiteInitiale !== null) { await annulerTransaction(session); return res.status(400).json({ message: "Ce lot est déjà compté : utilisez « Corriger »." }); }
 
     const avant = { aConfirmer: lot.aConfirmer };
     lot.quantiteInitiale = quantite;
@@ -318,7 +319,7 @@ async function compterLot(req, res) {
     await session.commitTransaction();
     return res.status(200).json({ message: `Comptage enregistré${combles}.`, lot, comblements });
   } catch (error) {
-    if (session.inTransaction()) await session.abortTransaction();
+    await annulerTransaction(session);
     console.error("Erreur compterLot:", error);
     return res.status(500).json({ message: "Erreur lors du comptage." });
   } finally {
@@ -347,11 +348,11 @@ async function corrigerLot(req, res) {
     const responsable = await nomResponsable(req);
     session.startTransaction();
     const lot = await LotStockFifo.findOne({ _id: req.params.id, deletedAt: null }).populate('product', 'name unit').session(session);
-    const refus = async (statut, message) => { await session.abortTransaction(); return res.status(statut).json({ message }); };
-    if (!lot) return refus(404, "Lot introuvable.");
-    if (lot.quantiteRestante === null) return refus(400, "Lot à compter : enregistrez d'abord le comptage.");
+    const refus = async (statut, message) => { await annulerTransaction(session); return res.status(statut).json({ message }); };
+    if (!lot) return await refus(404, "Lot introuvable.");
+    if (lot.quantiteRestante === null) return await refus(400, "Lot à compter : enregistrez d'abord le comptage.");
     if (sens === 'negative' && quantite > lot.quantiteRestante) {
-      return refus(400, `Il ne reste que ${lot.quantiteRestante} ${lot.product.unit} dans ce lot.`);
+      return await refus(400, `Il ne reste que ${lot.quantiteRestante} ${lot.product.unit} dans ce lot.`);
     }
 
     const avant = lot.quantiteRestante;
@@ -374,7 +375,7 @@ async function corrigerLot(req, res) {
     await session.commitTransaction();
     return res.status(200).json({ message: `Correction enregistrée${combles}.`, lot, comblements });
   } catch (error) {
-    if (session.inTransaction()) await session.abortTransaction();
+    await annulerTransaction(session);
     console.error("Erreur corrigerLot:", error);
     return res.status(500).json({ message: "Erreur lors de la correction." });
   } finally {
@@ -403,7 +404,7 @@ async function enregistrerEssai(req, res) {
     await session.commitTransaction();
     return res.status(201).json({ message: "Essai enregistré." });
   } catch (error) {
-    if (session.inTransaction()) await session.abortTransaction();
+    await annulerTransaction(session);
     if (/Stock insuffisant/.test(error.message)) return res.status(400).json({ message: error.message });
     console.error("Erreur enregistrerEssai:", error);
     return res.status(500).json({ message: "Erreur lors de l'enregistrement de l'essai." });
@@ -475,7 +476,7 @@ async function enregistrerTransformation(req, res) {
     await session.commitTransaction();
     return res.status(201).json({ message: `Transformation enregistrée${combles}.`, lot, rendement, comblements });
   } catch (error) {
-    if (session.inTransaction()) await session.abortTransaction();
+    await annulerTransaction(session);
     if (/Stock insuffisant/.test(error.message)) return res.status(400).json({ message: error.message });
     if (error.code === 11000) return res.status(400).json({ message: "Ce numéro de lot existe déjà." });
     console.error("Erreur enregistrerTransformation:", error);

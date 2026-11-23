@@ -8,6 +8,7 @@ const { comblerManques, texteComblements, genererNumeroLot, nomResponsable } = r
 const { journaliser } = require('./journalService');
 const { lireCsv } = require('../utils/csv');
 const { normaliser, lireNombre } = require('../utils/texte');
+const { annulerTransaction } = require('./transactionService');
 
 /**
  * Enregistre une entrée en stock dans la transaction `session` : dépense de la pièce (rattachée, créée ou aucune),
@@ -225,7 +226,7 @@ async function importerEntrees(req, texte, appliquer, session) {
   const resume = { lignes: lignes.length, totalFcfa: Math.round(valides.reduce((s, r) => s + r.valeur, 0)), lotsCrees: valides.length };
   const sortie = () => lignes.map(({ _v, _produit, _fiche, _date, _creer, ...r }) => r);
   if (valides.length < lignes.length) {
-    await session.abortTransaction();
+    await annulerTransaction(session);
     const message = appliquer ? "L'import contient des erreurs : rien n'a été enregistré." : "Des lignes sont à corriger : rien ne peut encore être importé.";
     return { statut: appliquer ? 400 : 200, corps: { message, lignes: sortie(), resume: appliquer ? { ...resume, lotsCrees: 0 } : resume } };
   }
@@ -268,7 +269,7 @@ async function importerEntrees(req, texte, appliquer, session) {
   await journaliser(req, { action: 'Import', entite: 'Lot de stock', resume: `Import de ${pluriel(lignes.length, 'lot')} (${pluriel(pieces.length, 'pièce')})` }, session);
 
   if (appliquer) await session.commitTransaction();
-  else await session.abortTransaction();
+  else await annulerTransaction(session);
   return {
     statut: appliquer ? 201 : 200,
     corps: {

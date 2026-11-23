@@ -7,6 +7,7 @@ const { journaliser } = require('../../services/journalService');
 const { ACCES } = require('../../config/roles');
 const { typesPacks } = require('../../services/packService');
 const { importerReferentiel, MAX_OCTETS: MAX_OCTETS_REFERENTIEL } = require('../../services/referentielService');
+const { annulerTransaction } = require('../../services/transactionService');
 
 // Champs suivis au journal : prix, prix VIP, quantités par pack, statut, seuil d'alerte, type
 function differences(avant, apres, packs = PACKS) {
@@ -206,7 +207,7 @@ async function importerReferentielProduits(req, res) {
     const { statut, corps } = await importerReferentiel(req, texte, appliquer, session);
     return res.status(statut).json(corps);
   } catch (error) {
-    if (session.inTransaction()) await session.abortTransaction();
+    await annulerTransaction(session);
     if (error.code === 11000) return res.status(400).json({ message: "Une référence vient d'être prise : relancez la vérification." });
     // Sans le message de l'erreur, qui peut citer une valeur collée (prix)
     console.error("Erreur importerReferentielProduits:", error.name, error.code ?? '', (error.stack || '').split('\n').slice(1, 4).join(' | '));
