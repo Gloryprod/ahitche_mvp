@@ -7,10 +7,13 @@ const complementC = require('../controllers/public/ComplementController');
 const mesureC = require('../controllers/public/MesureController');
 const avisC = require('../controllers/public/AvisController');
 const siteC = require('../controllers/public/SiteController');
+const enqueteC = require('../controllers/public/EnqueteController');
 const { limiteTentatives } = require('../middlewares/limiteTentatives');
 
 // Mesure d'audience : 300 comptages par heure et par adresse IP (l'adresse n'est jamais enregistrée)
 const limiteMesure = limiteTentatives({ nom: 'mesure', minutes: 60, maxParCompte: 0, maxParIp: 300, message: 'Trop de mesures.' });
+// Enquête de satisfaction : 30 envois par heure et par adresse IP (réseaux mobiles partagés)
+const limiteEnquete = limiteTentatives({ nom: 'enquete', minutes: 60, maxParCompte: 0, maxParIp: 30, message: "Trop d'envois de l'enquête." });
 
 router.get('/posts', postC.getPosts);
 router.get('/posts/:slug', postC.getPostParSlug); // Page d'un contenu (/blog/:slug)
@@ -21,6 +24,8 @@ router.get('/complements', complementC.complementsDeLaSemaine); // « Disponible
 router.get('/site', siteC.contenusPublies); // Infos pratiques, bandeau, formules, FAQ et actualités publiés depuis l'admin (null : valeurs du code), prix de la vitrine
 router.get('/llms.txt', siteC.llmsTxt); // Résumé pour les assistants IA, servi sur ahitchebj.com/llms.txt (vercel.json)
 router.get('/avis', avisC.avisPublies); // Avis clients publiés par l'admin (« Ce que disent nos clients »)
+router.get('/enquete', enqueteC.produitsEnquete); // Produits de base proposés dans l'enquête de satisfaction (nom seulement)
+router.post('/enquete', limiteEnquete, enqueteC.enregistrerReponse); // Réponse à l'enquête (page /enquete, sans compte)
 router.post('/mesure', limiteMesure, express.text({ type: 'text/plain', limit: '1kb' }), mesureC.enregistrerMesure); // Mesure d'audience (sendBeacon : texte JSON)
 
 module.exports = router;

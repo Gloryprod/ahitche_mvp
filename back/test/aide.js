@@ -54,6 +54,8 @@ async function demarrer() {
     PATH: process.env.PATH, SYSTEMROOT: process.env.SYSTEMROOT,
     MONGO_URI: uri, PORT: String(port), NODE_ENV: 'test',
     JWT_SECRET: 'secret-des-tests', RESEND_API_KEY: 're_tests', FRONTEND_URL: 'http://localhost:4173',
+    // Adresse IP lue dans X-Forwarded-For venant du poste : un test peut simuler plusieurs visiteurs (limites par IP)
+    TRUST_PROXY: 'loopback',
     SENTRY_DSN: '', ADMIN_PASSWORD: '', CLOUDINARY_CLOUD_NAME: '', CLOUDINARY_API_KEY: '', CLOUDINARY_API_SECRET: '',
   };
   const processus = spawn(process.execPath, [path.join(BACK, 'index.js')], { cwd: __dirname, env, stdio: ['ignore', 'pipe', 'pipe'] });
