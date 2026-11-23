@@ -107,7 +107,7 @@ const champ = 'mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg te
       <p v-if="erreur" role="alert" class="sm:col-span-2 p-3 rounded-xl border bg-red-50 text-red-700 border-red-200 text-xs font-semibold">{{ erreur }}</p>
 
       <button
-        type="submit" :disabled="enCours"
+        type="submit" :disabled="enCours || !valide"
         class="sm:col-span-2 cursor-pointer inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-foret text-white text-xs font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foret"
       >
         <Loader2 v-if="enCours" class="w-3.5 h-3.5 animate-spin" />
