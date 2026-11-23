@@ -49,6 +49,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { hideNavigation: true }
   },
   {
+    path: '/enquete',
+    name: 'enquete',
+    component: () => import('@/views/EnqueteView.vue'),
+    meta: { hideNavigation: true }
+  },
+  {
     path: '/reset-password',
     name: 'ResetPassword',
     component: () => import('../views/ResetPassword.vue'),
@@ -119,6 +125,12 @@ export const routes: RouteRecordRaw[] = [
         name: 'avis-page',
         meta: { roles: ACCES.avis.lecture },
         component: () => import('@/components/admin/avis/AvisClients.vue')
+      },
+      {
+        path: 'enquete',
+        name: 'enquete-page',
+        meta: { roles: ACCES.enquete.lecture },
+        component: () => import('@/components/admin/enquete/EnqueteSatisfaction.vue')
       },
       // Données de base
       {

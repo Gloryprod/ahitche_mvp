@@ -18,6 +18,7 @@ import {
   Boxes,
   ArrowLeftRight,
   ClipboardList,
+  ClipboardCheck,
   CalendarClock,
   Handshake,
   Wallet,
@@ -66,6 +67,7 @@ export const GROUPES_MENU: GroupeMenu[] = [
     entrees: [
       { id: 'clients', nom: 'Clients', icone: Users, chemin: '/dashboard/admin/clients', section: 'clients', motsCles: ['client', 'contact', 'téléphone', 'adresse', 'quartier'] },
       { id: 'avis', nom: 'Avis clients', icone: MessageSquareQuote, chemin: '/dashboard/admin/avis', section: 'avis', motsCles: ['avis', 'témoignage', 'note', 'publier', 'à valider'], compteur: 'avisAValider' },
+      { id: 'enquete', nom: 'Enquête de satisfaction', icone: ClipboardCheck, chemin: '/dashboard/admin/enquete', section: 'enquete', motsCles: ['enquête', 'satisfaction', 'questionnaire', 'sondage', 'note', 'suggestion', 'pack'] },
       { id: 'vip', nom: 'Codes VIP', icone: Crown, chemin: '/dashboard/admin/vip', section: 'vip', motsCles: ['vip', 'code', 'achat libre', 'remise'] },
     ],
   },
