@@ -22,7 +22,10 @@ const EQUIPE = ['admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordin
 const ACCES = {
   clients:       { lecture: ['admin', 'gestionnaire', 'comptable', 'nutritionniste', 'coordinateur'], ecriture: ['admin'] },
   commandes:     { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: ['admin', 'gestionnaire'] },
-  donneesBase:   { lecture: EQUIPE,                                                  ecriture: ['admin'] },
+  // Lecture ouverte à toute l'équipe, volontairement plus large que l'écran (front/src/config/roles.ts) : l'entrée en
+  // stock, les bons de commande et la création d'une commande lisent produits et composition des packs. L'écran cache
+  // seulement les écrans de gestion du catalogue (Produits, Formules, Catégories, Règles) au gestionnaire et à l'auditeur.
+  donneesBase:   { lecture: EQUIPE,                                                 ecriture: ['admin'] },
   contenus:      { lecture: ['admin'],                                               ecriture: ['admin'] },
   // Fréquentation du site (mesure d'audience sans cookie), affichée au tableau de bord
   mesures:       { lecture: ['admin', 'gestionnaire', 'comptable', 'coordinateur'], ecriture: [] },

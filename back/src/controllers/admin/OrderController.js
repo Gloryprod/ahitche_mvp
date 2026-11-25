@@ -12,6 +12,7 @@ const { MODES_PAIEMENT_ACCEPTES, calculerPrixCommande } = require('../../service
 const { journaliser } = require('../../services/journalService');
 const { ACCES } = require('../../config/roles');
 const { livreurDuCompte, clientsDuLivreur, filtreCommandesLivreur } = require('../../services/perimetreService');
+const { annulerTransaction } = require('../../services/transactionService');
 const {
   MAX_DEMANDES, nettoyer, demandesAChiffrer, demandesChiffrees, totalAchatLibre, lirePrixDemande, prixVide,
   lireAchatLibre, preparerLignes, enregistrerAchatLibre, catalogueVip
@@ -330,7 +331,7 @@ async function updateOrderStatus(req, res) {
 
   } catch (error) {
     // En cas d'erreur ou de stock insuffisant, on annule tous les changements (Rollback)
-    await session.abortTransaction();
+    await annulerTransaction(session);
 
     if (error instanceof ErreurStatut) {
       return res.status(error.code || 400).json({ message: error.message, ...(error.manques ? { manques: error.manques } : {}) });

@@ -11,6 +11,7 @@ const { genererNumeroLot, nomResponsable, comblerManques, texteComblements, manq
 const { journaliser } = require('../../services/journalService');
 const { echapperRegex, lireNombre } = require('../../utils/texte');
 const { lireDate } = require('../../utils/dates');
+const { annulerTransaction } = require('../../services/transactionService');
 
 const texte = (v, max = 300) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const arrondi2 = (n) => Math.round(n * 100) / 100;
@@ -428,9 +429,7 @@ async function modifierBonRecu(req, res, existant, enTete) {
     const lots = modifiedCount ? ` ${modifiedCount} lot(s) du bon mis à jour.` : '';
     return res.status(200).json({ message: `Bon mis à jour avec succès.${lots}`, bon: await peuplerBon(PurchaseOrder.findById(existant._id)) });
   } catch (error) {
-    if (session.inTransaction()) {
-      try { await session.abortTransaction(); } catch { /* transaction déjà annulée par le serveur */ }
-    }
+    await annulerTransaction(session);
     if (conflitTransaction(error)) return res.status(409).json({ message: "Une réception est en cours sur ce bon : réessayez." });
     if (error.code === 11000) return res.status(409).json({ message: "Ce numéro de bon ou cette facture est déjà enregistré." });
     console.error("Erreur modifierBonRecu:", error);
@@ -645,9 +644,7 @@ async function receptionnerBon(req, res) {
     const message = `${lots.length} lot(s) entré(s) en stock, bon « ${bon.statut} ».${combles}${sansDepense ? ` Aucune dépense ne porte la pièce ${bon.numeroFacture} : les lots restent sans dépense rattachée.` : ''}`;
     return res.status(201).json({ message, bon: await peuplerBon(PurchaseOrder.findById(bon._id)), lots, comblements });
   } catch (error) {
-    if (session.inTransaction()) {
-      try { await session.abortTransaction(); } catch { /* transaction déjà annulée par le serveur */ }
-    }
+    await annulerTransaction(session);
     if (error instanceof ErreurMetier) return res.status(error.statut).json({ message: error.message });
     if (conflitTransaction(error)) {
       return res.status(409).json({ message: "Une autre réception est en cours sur ce bon ou sur ce produit : réessayez." });

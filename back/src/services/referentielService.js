@@ -22,6 +22,7 @@ const { lireTableau } = require('./entreeStockService');
 const { normaliser, lireNombre } = require('../utils/texte');
 const { journaliser } = require('./journalService');
 const { typesPacks } = require('./packService');
+const { annulerTransaction } = require('./transactionService');
 
 const MAX_LIGNES = 200;
 const MAX_OCTETS = 100 * 1024;
@@ -258,18 +259,18 @@ async function importerReferentiel(req, texte, appliquer, session) {
     lignes: lignes.map(({ ligne, reference, produit, statut, changements, messages }) => ({ ligne, reference, produit, statut, changements, messages }))
   });
   if (resume.erreurs) {
-    await session.abortTransaction();
+    await annulerTransaction(session);
     const message = `${pluriel(resume.erreurs, 'ligne')} à corriger : rien ${appliquer ? "n'a été" : 'ne sera'} enregistré.`;
     return { statut: appliquer ? 400 : 200, corps: corps(message) };
   }
   if (!resume.creations && !resume.modifications) {
-    await session.abortTransaction();
+    await annulerTransaction(session);
     return { statut: 200, corps: corps('Aucun changement : le catalogue suit déjà le tableau.') };
   }
   await ecrire(lignes, packs, req, session);
   const bilan = [resume.modifications && pluriel(resume.modifications, 'modification'), resume.creations && pluriel(resume.creations, 'création')].filter(Boolean).join(', ');
   if (!appliquer) {
-    await session.abortTransaction();
+    await annulerTransaction(session);
     return { statut: 200, corps: corps(`Prêt : ${bilan}.`) };
   }
   await journaliser(req, { action: 'Import', entite: 'Produit', resume: `Import du référentiel : ${bilan}` }, session);
