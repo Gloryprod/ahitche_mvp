@@ -9,10 +9,9 @@ const Formule = require('../models/formules');
 // (Product.quantites) et fait foi ; une quantité vide signifie que le produit est absent du pack.
 // Seuls les produits « base fixe » entrent automatiquement dans un pack ; les extras s'ajoutent à la demande.
 
-const TYPES_PACK = ['essentiel', 'equilibre', 'confort', 'reserve', 'fraicheur'];
-
+// Types des packs : collection Formules (services/packService.js) ; un pack inconnu ou inactif n'a pas de composition
 // 'ahi-equilibre' -> 'equilibre'
-const typeDepuisSlug = (slug) => String(slug || '').replace(/^ahi-/, '');
+const { typeDepuisSlug } = require('./packService');
 
 /**
  * @param {string} type - 'essentiel', 'equilibre', 'confort', 'reserve' ou 'fraicheur'
@@ -58,4 +57,4 @@ async function calculerCompositionPack(type) {
   };
 }
 
-module.exports = { TYPES_PACK, typeDepuisSlug, calculerCompositionPack };
+module.exports = { typeDepuisSlug, calculerCompositionPack };

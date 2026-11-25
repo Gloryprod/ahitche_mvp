@@ -7,6 +7,7 @@ import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
 import { useAuthStore } from '@/stores/auth'
 import { peutEcrire } from '@/config/roles'
+import { usePacks } from '@/composables/usePacks'
 
 // Idées de repas par formule (D-18) : rédigées par l'équipe (gestionnaire, nutritionniste), sans conseil de santé,
 // publiées seulement après validation du porteur (admin). Toute modification retire la publication.
@@ -26,10 +27,7 @@ interface Idee {
 }
 
 const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
-const FORMULES = [
-  { slug: 'ahi-essentiel', nom: 'AHI Essentiel' }, { slug: 'ahi-equilibre', nom: 'AHI Équilibré' }, { slug: 'ahi-confort', nom: 'AHI Confort' },
-  { slug: 'ahi-reserve', nom: 'AHI Réserve' }, { slug: 'ahi-fraicheur', nom: 'AHI Fraîcheur' },
-]
+const { packs } = usePacks() // Formules au choix : packs de la base (GET /api/admin/packs)
 const MENTION = "Ces conseils ne remplacent pas l'avis d'un professionnel de santé."
 const CLASSES_STATUT: Record<Statut, string> = {
   'Brouillon': 'bg-creme2 text-gris',
@@ -106,7 +104,7 @@ async function supprimer(i: Idee & { _id: string }) {
   }
 }
 
-const nomFormule = (slug: string) => FORMULES.find(f => f.slug === slug)?.nom ?? slug
+const nomFormule = (slug: string) => packs.value.find(f => f.slug === slug)?.nom ?? slug
 const dateFr = (d?: string | null) => (d ? new Date(d).toLocaleDateString('fr-FR') : '')
 const champ = 'mt-1 w-full px-3 py-2 rounded-lg border border-creme2 bg-creme text-sm font-normal normal-case text-noir'
 </script>
@@ -136,7 +134,7 @@ const champ = 'mt-1 w-full px-3 py-2 rounded-lg border border-creme2 bg-creme te
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label class="font-bold uppercase text-[10px] text-gris">Formule
           <select v-model="edition.formuleSlug" :class="champ">
-            <option v-for="f in FORMULES" :key="f.slug" :value="f.slug">{{ f.nom }}</option>
+            <option v-for="f in packs" :key="f.slug" :value="f.slug">{{ f.nom }}</option>
           </select>
         </label>
         <label class="font-bold uppercase text-[10px] text-gris">Titre

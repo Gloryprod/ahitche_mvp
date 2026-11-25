@@ -2,7 +2,7 @@
 // aperçu, appliquer ; admin seulement) et script appliquerReferentiel.js. Une ligne par produit à créer ou à modifier ;
 // les produits absents du tableau ne sont pas touchés. Aucune valeur du référentiel dans le code.
 // Colonnes (ordre libre, sans casse ni accents) : reference et produit obligatoires ; type, unite, prix_unitaire_fcfa,
-// quantite_<pack> (essentiel, equilibre, confort, reserve, fraicheur), categorie, conversion facultatives (colonne
+// quantite_<pack> (un par pack de la base : essentiel, equilibre… et tout pack créé dans l'admin), categorie, conversion facultatives (colonne
 // absente : valeur actuelle gardée).
 //  - Le produit est reconnu par son nom, sinon par sa référence (nom identique exigé) ; il est créé s'il n'existe pas
 //    (unité exigée, catégorie du même nom). Reconnaître par le nom permet d'échanger deux références (ex. P09 et V19) :
@@ -21,24 +21,30 @@ const { LotStockFifo, MouvementStock, ManqueStock } = require('../models/stock')
 const { lireTableau } = require('./entreeStockService');
 const { normaliser, lireNombre } = require('../utils/texte');
 const { journaliser } = require('./journalService');
+const { typesPacks } = require('./packService');
 
-const { PACKS } = Product;
 const MAX_LIGNES = 200;
 const MAX_OCTETS = 100 * 1024;
-const COLONNES = ['reference', 'produit', 'type', 'unite', 'prix_unitaire_fcfa', ...PACKS.map(p => `quantite_${p}`), 'categorie', 'conversion'];
 const cle = (nom) => normaliser(nom).replace(/[\s()]/g, ''); // Sans casse, accents, espaces, « _ » ni parenthèses
-// Libellés d'Excel acceptés aussi : « Nom du produit », « Prix unitaire (FCFA) », « Essentiel »…
-const ALIAS = { nomduproduit: 'produit', prix: 'prix_unitaire_fcfa', ...Object.fromEntries(PACKS.map(p => [p, `quantite_${p}`])) };
-const COLONNE_PAR_CLE = new Map([...COLONNES.map(c => [cle(c), c]), ...Object.entries(ALIAS)]);
 const TYPES = { 'fixe': 'base fixe', 'base fixe': 'base fixe', 'variable': 'extra', 'extra': 'extra' };
 const ABREGES = { essentiel: 'Ess', equilibre: 'Équ', confort: 'Conf', reserve: 'Rés', fraicheur: 'Fra' };
+const abrege = (p) => ABREGES[p] ?? p.charAt(0).toUpperCase() + p.slice(1, 4);
 const vide = (v) => v === '' || v === '—' || v === '-';
 const arrondi = (x, d) => Math.round(x * 10 ** d) / 10 ** d;
-const quantitesTexte = (q) => PACKS.map(p => `${ABREGES[p]} ${q[p] ?? '—'}`).join(' · ');
+const quantitesTexte = (q, packs) => packs.map(p => `${abrege(p)} ${q[p] ?? '—'}`).join(' · ');
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
 
+// Colonnes reconnues pour les packs existants (packService) : quantite_<type> pour chacun ; libellés d'Excel acceptés
+// aussi (« Nom du produit », « Prix unitaire (FCFA) », « Essentiel », « Etudiant »…)
+function colonnesReconnues(packs) {
+  const colonnes = ['reference', 'produit', 'type', 'unite', 'prix_unitaire_fcfa', ...packs.map(p => `quantite_${p}`), 'categorie', 'conversion'];
+  const alias = { nomduproduit: 'produit', prix: 'prix_unitaire_fcfa', ...Object.fromEntries(packs.map(p => [p, `quantite_${p}`])) };
+  return new Map([...colonnes.map(c => [cle(c), c]), ...Object.entries(alias)]);
+}
+
 // En-tête et cellules ; erreur de fichier (sans aperçu) ou lignes lues, chacune avec ses motifs d'erreur
-function lireLignes(texte) {
+function lireLignes(texte, packs) {
+  const COLONNE_PAR_CLE = colonnesReconnues(packs);
   const [entete = [], ...donnees] = lireTableau(texte);
   const colonnes = [];
   for (const nom of entete) {
@@ -74,7 +80,7 @@ function lireLignes(texte) {
     l.unite = presente('unite') && v.unite ? v.unite.slice(0, 40) : undefined; // undefined : unité actuelle gardée
     l.prix = presente('prix_unitaire_fcfa') ? nombre(v.prix_unitaire_fcfa, 'Prix') : null; // null : prix actuel gardé
     // undefined : « = » ou colonne absente, quantité actuelle gardée ; un produit variable n'est dans aucun pack
-    l.quantites = Object.fromEntries(PACKS.map(p => {
+    l.quantites = Object.fromEntries(packs.map(p => {
       const c = `quantite_${p}`;
       if (l.type === 'extra') {
         if (presente(c) && !vide(v[c])) erreur("Un produit variable n'a pas de quantité par pack");
@@ -104,7 +110,7 @@ function lireLignes(texte) {
 }
 
 // Produit visé (ou création) et changements de chaque ligne sans erreur de lecture ; motifs ajoutés aux lignes
-async function preparer(lignes, s) {
+async function preparer(lignes, packs, s) {
   const produits = await Product.find({ deletedAt: null }).session(s);
   const categories = await Category.find({ deletedAt: null }).session(s);
   const parNom = new Map(), parRef = new Map();
@@ -151,9 +157,9 @@ async function preparer(lignes, s) {
       noter(`unité ${p.unit} → ${l.unite} (×${l.conversion})`, 'unit', l.unite);
     } else if (l.unite !== undefined && p.unit !== l.unite) noter(`libellé de l'unité « ${p.unit} » → « ${l.unite} »`, 'unit', l.unite);
     if (l.prix !== null && p.priceUnit !== l.prix) noter(`prix ${p.priceUnit ?? 'vide'} → ${l.prix}`, 'priceUnit', l.prix);
-    const avant = Object.fromEntries(PACKS.map(k => [k, p.quantites?.[k] ?? null]));
-    const quantites = Object.fromEntries(PACKS.map(k => [k, l.quantites[k] === undefined ? avant[k] : l.quantites[k]]));
-    if (PACKS.some(k => avant[k] !== quantites[k])) noter(`quantités ${quantitesTexte(avant)} → ${quantitesTexte(quantites)}`, 'quantites', quantites);
+    const avant = Object.fromEntries(packs.map(k => [k, p.quantites?.[k] ?? null]));
+    const quantites = Object.fromEntries(packs.map(k => [k, l.quantites[k] === undefined ? avant[k] : l.quantites[k]]));
+    if (packs.some(k => avant[k] !== quantites[k])) noter(`quantités ${quantitesTexte(avant, packs)} → ${quantitesTexte(quantites, packs)}`, 'quantites', quantites);
     if (l.type === 'base fixe' && p.cetteSemaine) noter('retiré de « Disponible cette semaine »', 'cetteSemaine', false);
     if (l.facteur) {
       const f = l.facteur;
@@ -203,12 +209,12 @@ async function convertir(id, f, s) {
   return `${lots.modifiedCount} lot(s), ${mouvements.modifiedCount} mouvement(s), ${manques.modifiedCount} manque(s), ${bons.modifiedCount} bon(s) convertis`;
 }
 
-const champsJournal = (p) => ({
+const champsJournal = (p, packs) => ({
   reference: p.reference, type: p.type, unit: p.unit, priceUnit: p.priceUnit ?? null, prixVip: p.prixVip ?? null,
-  quantites: Object.fromEntries(PACKS.map(k => [k, p.quantites?.[k] ?? null])), seuilAlerte: p.seuilAlerte ?? null, cetteSemaine: !!p.cetteSemaine
+  quantites: Object.fromEntries(packs.map(k => [k, p.quantites?.[k] ?? null])), seuilAlerte: p.seuilAlerte ?? null, cetteSemaine: !!p.cetteSemaine
 });
 
-async function ecrire(lignes, req, s) {
+async function ecrire(lignes, packs, req, s) {
   const aEcrire = lignes.filter(l => l.statut === 'creation' || l.statut === 'modification');
   // Références provisoires d'abord : deux produits peuvent échanger leurs références sans heurter l'index unique
   for (const l of aEcrire) {
@@ -221,13 +227,13 @@ async function ecrire(lignes, req, s) {
       await journaliser(req, {
         action: 'Modification', entite: 'Produit', entiteId: l.p._id,
         resume: `Produit ${l.reference} · ${l.p.name} (référentiel) : ${l.changements.join(' ; ')}`,
-        avant: champsJournal(l.p), apres: champsJournal({ ...l.p.toObject(), ...l.maj })
+        avant: champsJournal(l.p, packs), apres: champsJournal({ ...l.p.toObject(), ...l.maj }, packs)
       }, s);
       continue;
     }
     const [cree] = await Product.create([{
       reference: l.reference, name: l.produit, type: l.type, unit: l.unite, priceUnit: l.prix,
-      quantites: Object.fromEntries(PACKS.map(k => [k, l.quantites[k] ?? null])), category: l.categorieTrouvee?._id ?? null
+      quantites: Object.fromEntries(packs.map(k => [k, l.quantites[k] ?? null])), category: l.categorieTrouvee?._id ?? null
     }], { session: s });
     await journaliser(req, { action: 'Création', entite: 'Produit', entiteId: cree._id, resume: `Produit ${l.reference} · ${l.produit} ${l.changements.join(' ; ')} (référentiel)` }, s);
   }
@@ -239,11 +245,12 @@ async function ecrire(lignes, req, s) {
  * @returns {{ statut: number, corps: object }} 400 { message } pour une erreur de fichier ; sinon message, resume, lignes
  */
 async function importerReferentiel(req, texte, appliquer, session) {
-  const lu = lireLignes(texte);
+  const packs = await typesPacks(); // Packs de la base : une colonne quantite_<type> par pack
+  const lu = lireLignes(texte, packs);
   if (lu.erreur) return { statut: 400, corps: { message: lu.erreur } };
   const { lignes } = lu;
   session.startTransaction();
-  await preparer(lignes, session);
+  await preparer(lignes, packs, session);
   const compte = (statut) => lignes.filter(l => l.statut === statut).length;
   const resume = { lignes: lignes.length, creations: compte('creation'), modifications: compte('modification'), inchanges: compte('inchange'), erreurs: compte('erreur') };
   const corps = (message) => ({
@@ -259,7 +266,7 @@ async function importerReferentiel(req, texte, appliquer, session) {
     await session.abortTransaction();
     return { statut: 200, corps: corps('Aucun changement : le catalogue suit déjà le tableau.') };
   }
-  await ecrire(lignes, req, session);
+  await ecrire(lignes, packs, req, session);
   const bilan = [resume.modifications && pluriel(resume.modifications, 'modification'), resume.creations && pluriel(resume.creations, 'création')].filter(Boolean).join(', ');
   if (!appliquer) {
     await session.abortTransaction();

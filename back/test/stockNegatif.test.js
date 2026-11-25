@@ -25,7 +25,6 @@ before(async () => {
     ['riz', 'Riz local', 'kg', 'RIZ', { essentiel: 2 }], ['huile', 'Huile', 'L', 'HUI', {}], ['sucre', 'Sucre', 'kg', 'SUC', {}],
     ['mais', 'Maïs', 'kg', 'MAI', {}], ['farine', 'Farine de maïs', 'kg', 'FAR', {}],
   ]) P[cle] = await Product.create({ name, unit, reference, quantites, priceUnit: 500 });
-  await mongoose.connection.db.collection('formules').insertOne({ slug: 'ahi-essentiel', statut: 'actif', nom: 'AHI Essentiel' });
   cAdmin = await ctx.connexion('admin');
   cGest = await ctx.connexion('gestionnaire');
 });

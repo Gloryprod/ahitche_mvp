@@ -13,6 +13,8 @@ import { useToast } from 'vue-toastification'
 import type { Commande, ProductItem } from '@/type'
 import { ACTIONS_RAPIDES, entreeMenu } from '@/config/menuAdmin'
 import { formatStock } from '@/services/bonsCommande'
+import { usePacks } from '@/composables/usePacks'
+import { libelleCourt } from '@/services/packs'
 import {
   AlertTriangle,
   Bell,
@@ -133,7 +135,7 @@ const changerTaux = async () => {
 // Formules) ; alerte à J-5. Sans valeur chargée : 30 jours (packs mensuels), 7 pour Fraîcheur.
 const CYCLES_PAR_DEFAUT: Record<string, number> = { 'ahi-fraicheur': 7 }
 const cycleJours = (formuleSlug: string): number => {
-  const index = PACKS_CONFIG.findIndex(pack => `ahi-${pack.key}` === formuleSlug)
+  const index = PACKS_CONFIG.value.findIndex(pack => `ahi-${pack.key}` === formuleSlug)
   return formulaQueries.value[index]?.data?.formule?.cycleJours ?? CYCLES_PAR_DEFAUT[formuleSlug] ?? 30
 }
 
@@ -283,20 +285,15 @@ const recentOrders = computed(() => {
   return ordersList.value.slice(0, 5)
 })
 
-// Configuration des 5 formules
-const PACKS_CONFIG = [
-  { key: 'essentiel', label: 'ESSENTIEL' },
-  { key: 'equilibre', label: 'ÉQUILIBRÉ' },
-  { key: 'confort', label: 'CONFORT' },
-  { key: 'reserve', label: 'RÉSERVE' },
-  { key: 'fraicheur', label: 'FRAÎCHEUR' }
-]
+// Formules : une par pack de la base (GET /api/admin/packs), dans l'ordre de l'admin
+const { packs, chargementPacks } = usePacks()
+const PACKS_CONFIG = computed(() => packs.value.map(p => ({ key: p.type, label: libelleCourt(p.nom).toUpperCase() })))
 
 // Exécution parallèle des requêtes pour chaque formule
 const estAbsente = (erreur: unknown) => axios.isAxiosError(erreur) && erreur.response?.status === 404
 
 const formulaQueries = useQueries({
-  queries: PACKS_CONFIG.map(pack => ({
+  queries: computed(() => PACKS_CONFIG.value.map(pack => ({
     queryKey: ['packDetails', pack.key],
     queryFn: async () => {
       const response = await api.get(`/api/admin/formulas/${pack.key}`)
@@ -306,16 +303,16 @@ const formulaQueries = useQueries({
     // Formule absente ou inactive en base (404) : inutile de réessayer, la ligne est retirée du tableau
     retry: (echecs: number, erreur: unknown) => !estAbsente(erreur) && echecs < 3,
     // Après les commandes : ces détails servent aux marges et aux cycles de relance (calculés une fois arrivés)
-    enabled: computed(() => voirMarges.value && commandesChargees.value)
-  }))
+    enabled: voirMarges.value && commandesChargees.value
+  })))
 })
 
 // Indique si au moins une formule n'a pas encore de données (requête en attente ou en cours)
-const isLoadingFormulas = computed(() => formulaQueries.value.some(q => q.isPending))
+const isLoadingFormulas = computed(() => chargementPacks.value || formulaQueries.value.some(q => q.isPending))
 
 // Calcul dynamique des marges pour chaque pack
 const grossMargins = computed(() => {
-  return PACKS_CONFIG.map((pack, index) => {
+  return PACKS_CONFIG.value.map((pack, index) => {
     const query = formulaQueries.value[index]
     const data = query?.data
 

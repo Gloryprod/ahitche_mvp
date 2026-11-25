@@ -33,6 +33,8 @@ const formuleSchema = new mongoose.Schema({
   cycleJours: { type: Number, default: 7, min: 1 },
   // Formule annoncée mais pas encore ouverte : visible côté client, non commandable
   bientotDisponible: { type: Boolean, default: false },
+  // Ordre des packs dans l'admin ; vide : ordre du référentiel v4 (Essentiel… Fraîcheur), puis date de création
+  ordre: { type: Number, default: null },
   // Lien WhatsApp pré-rempli
   lienWhatsApp: { type: String, required: true }
 }, {

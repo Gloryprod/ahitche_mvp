@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, watchEffect } from 'vue'
 import { ShoppingCart, FileText, Info } from 'lucide-vue-next'
 import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
 import { genererSimulationPDF, fcfaPDF } from '@/services/pdfSimulateurs'
 import { formatStock } from '@/services/bonsCommande'
+import { usePacks } from '@/composables/usePacks'
 
 // Prévision d'achats pour N commandes (section Stock, gestionnaires compris) : besoins par produit,
 // stock disponible, quantité et coût d'achat estimé. Aucune marge ni prix de vente n'y figure.
@@ -16,18 +17,14 @@ interface PrevisionAchats {
   prixManquants: number
 }
 
-const PACKS = [
-  { type: 'essentiel', nom: 'AHI Essentiel' },
-  { type: 'equilibre', nom: 'AHI Équilibré' },
-  { type: 'confort', nom: 'AHI Confort' },
-  { type: 'reserve', nom: 'AHI Réserve' },
-  { type: 'fraicheur', nom: 'AHI Fraîcheur' },
-] as const
+// Une saisie par pack de la base (GET /api/admin/packs)
+const { packs } = usePacks()
 
 const formatFCFA = (n: number | null) => n === null ? 'à renseigner' : `${Math.round(n).toLocaleString('fr-FR')} FCFA`
 const formatNombre = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
 
-const commandesPrevues = reactive<Record<string, number>>({ essentiel: 0, equilibre: 0, confort: 0, reserve: 0, fraicheur: 0 })
+const commandesPrevues = reactive<Record<string, number>>({})
+watchEffect(() => { for (const p of packs.value) commandesPrevues[p.type] ??= 0 })
 const prevision = ref<PrevisionAchats | null>(null)
 const erreur = ref('')
 const calcul = ref(false)
@@ -49,7 +46,7 @@ function exporter() {
   const a = prevision.value
   if (!a) return
   genererSimulationPDF("Prévision d'achats", [
-    `Commandes prévues : ${PACKS.filter(p => commandesPrevues[p.type]).map(p => `${commandesPrevues[p.type]} ${p.nom}`).join(', ')}`,
+    `Commandes prévues : ${packs.value.filter(p => commandesPrevues[p.type]).map(p => `${commandesPrevues[p.type]} ${p.nom}`).join(', ')}`,
     'Prix estimé : prix d\'achat réel moyen du stock, sinon dernier achat, sinon prix catalogue',
   ], [{
     titre: 'Besoins et achats',
@@ -71,10 +68,10 @@ const champ = 'mt-1 w-full px-3 py-2 rounded-xl border border-creme2 bg-creme te
 
     <section class="bg-white rounded-2xl border border-creme2 p-4 space-y-4">
       <form @submit.prevent="calculer" class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <label v-for="p in PACKS" :key="p.type" class="text-[10px] font-bold uppercase text-gris">{{ p.nom }}
+        <label v-for="p in packs" :key="p.type" class="text-[10px] font-bold uppercase text-gris">{{ p.nom }}
           <input v-model.number="commandesPrevues[p.type]" type="number" min="0" step="1" :class="champ" />
         </label>
-        <button type="submit" :disabled="calcul" class="cursor-pointer col-span-2 sm:col-span-5 px-3 py-2.5 rounded-xl bg-foret text-white text-xs font-bold disabled:opacity-50">Calculer les achats</button>
+        <button type="submit" :disabled="calcul" class="cursor-pointer col-span-full px-3 py-2.5 rounded-xl bg-foret text-white text-xs font-bold disabled:opacity-50">Calculer les achats</button>
       </form>
       <p v-if="erreur" role="alert" class="text-red-700 text-xs">{{ erreur }}</p>
       <template v-if="prevision">

@@ -8,9 +8,12 @@ import { X, ClipboardCopy } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
 import api from '@/stores/api'
 import { messageErreur } from '@/services/erreurs'
-import { MODELE_REFERENTIEL, peutAppliquerReferentiel, lignesAffichees, type ReponseReferentiel } from '@/services/importReferentiel'
+import { modeleReferentiel, colonnesFacultatives, peutAppliquerReferentiel, lignesAffichees, type ReponseReferentiel } from '@/services/importReferentiel'
+import { usePacks } from '@/composables/usePacks'
 
 const emit = defineEmits<{ fermer: []; importe: [message: string] }>()
+const { packs } = usePacks()
+const typesPacks = computed(() => packs.value.map(p => p.type)) // Une colonne quantite_<type> par pack
 
 const texte = ref('')
 const texteVerifie = ref<string | null>(null) // Texte de la dernière vérification
@@ -71,7 +74,7 @@ async function appliquerImport() {
 
 async function copierModele() {
   try {
-    await navigator.clipboard.writeText(MODELE_REFERENTIEL)
+    await navigator.clipboard.writeText(modeleReferentiel(typesPacks.value))
     modeleCopie.value = true
     setTimeout(() => (modeleCopie.value = false), 2500)
   } catch {
@@ -99,7 +102,7 @@ const champ = 'w-full px-3 py-2 rounded-xl border border-creme2 bg-creme text-no
     <details class="rounded-xl bg-creme p-3 text-[11px] space-y-1.5">
       <summary class="cursor-pointer font-bold text-noir">Colonnes et règles</summary>
       <p class="mt-2">Première ligne : les en-têtes. Séparateur : tabulation (copié d'Excel), point-virgule ou tableau Markdown.</p>
-      <p>Obligatoires : <span class="font-mono text-noir">reference</span> et <span class="font-mono text-noir">produit</span>. Facultatives : <span class="font-mono">type, unite, prix_unitaire_fcfa, quantite_essentiel, quantite_equilibre, quantite_confort, quantite_reserve, quantite_fraicheur, categorie, conversion</span>. Une colonne absente garde la valeur actuelle.</p>
+      <p>Obligatoires : <span class="font-mono text-noir">reference</span> et <span class="font-mono text-noir">produit</span>. Facultatives : <span class="font-mono">{{ colonnesFacultatives(typesPacks).join(', ') }}</span> (une colonne de quantité par pack). Une colonne absente garde la valeur actuelle.</p>
       <ul class="list-disc pl-4 space-y-0.5">
         <li>Le produit est reconnu par son nom : deux produits peuvent échanger leurs références (P09, V19…) en gardant leur historique.</li>
         <li>Quantité vide ou « — » : absent du pack ; « = » : quantité actuelle gardée. Prix vide : prix actuel gardé.</li>

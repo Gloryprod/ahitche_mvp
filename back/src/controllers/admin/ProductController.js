@@ -5,15 +5,16 @@ const { LotStockFifo, ManqueStock } = require('../../models/stock');
 const { echapperRegex, lireNombre } = require('../../utils/texte');
 const { journaliser } = require('../../services/journalService');
 const { ACCES } = require('../../config/roles');
+const { typesPacks } = require('../../services/packService');
 const { importerReferentiel, MAX_OCTETS: MAX_OCTETS_REFERENTIEL } = require('../../services/referentielService');
 
 // Champs suivis au journal : prix, prix VIP, quantités par pack, statut, seuil d'alerte, type
-function differences(avant, apres) {
+function differences(avant, apres, packs = PACKS) {
   const lignes = [];
   const comparer = (libelle, a, b) => { if ((a ?? null) !== (b ?? null)) lignes.push(`${libelle} : ${a ?? 'vide'} → ${b ?? 'vide'}`); };
   comparer('prix', avant.priceUnit, apres.priceUnit);
   comparer('prix VIP', avant.prixVip, apres.prixVip);
-  for (const pack of PACKS) comparer(`quantité ${pack}`, avant.quantites?.[pack], apres.quantites?.[pack]);
+  for (const pack of packs) comparer(`quantité ${pack}`, avant.quantites?.[pack], apres.quantites?.[pack]);
   comparer('statut', avant.statut, apres.statut);
   comparer('seuil', avant.seuilAlerte, apres.seuilAlerte);
   comparer('type', avant.type, apres.type);
@@ -34,7 +35,8 @@ const PRIX_VIP_MAX = 10000000; // Garde-fou de saisie (FCFA)
 // Valide et normalise un produit saisi dans l'admin.
 // Type : un type fourni mais inconnu est refusé ; un type absent garde celui du produit modifié (typeExistant) et vaut
 // « base fixe » à la création (comportement de l'écran actuel).
-function lireProduit(body, typeExistant = null) {
+// packs : types des packs existants (services/packService.js)
+function lireProduit(body, typeExistant = null, packs = PACKS) {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const unit = typeof body.unit === 'string' ? body.unit.trim() : '';
   if (!name || !unit) return { erreur: "Le nom et l'unité du produit sont obligatoires." };
@@ -59,7 +61,7 @@ function lireProduit(body, typeExistant = null) {
   // Matière première et fourniture (type résolu ci-dessus) : jamais vendues, donc hors packs et jamais sur le site
   const vendu = TYPES_VENDUS.includes(type);
   const quantites = {};
-  for (const pack of PACKS) {
+  for (const pack of packs) {
     const q = nombreOuVide(body.quantites?.[pack]);
     if (q.erreur) return { erreur: `Quantité ${pack} invalide.` };
     quantites[pack] = vendu ? q.valeur : null;
@@ -119,7 +121,7 @@ async function getAllProducts(req, res) {
 // 2. Créer un nouveau produit
 async function createProduct(req, res) {
   try {
-    const { produit, erreur } = lireProduit(req.body || {});
+    const { produit, erreur } = lireProduit(req.body || {}, null, await typesPacks());
     if (erreur) return res.status(400).json({ message: erreur });
     if (produit.reference && await Product.exists({ reference: produit.reference, deletedAt: null })) {
       return res.status(400).json({ message: `La référence ${produit.reference} existe déjà.` });
@@ -140,14 +142,15 @@ async function updateProduct(req, res) {
     // Le produit d'abord : un type absent du formulaire garde le type existant
     const avant = await Product.findOne({ _id: req.params.id, deletedAt: null }).lean();
     if (!avant) return res.status(404).json({ message: "Produit introuvable." });
-    const { produit, erreur } = lireProduit(req.body || {}, avant.type);
+    const packs = await typesPacks();
+    const { produit, erreur } = lireProduit(req.body || {}, avant.type, packs);
     if (erreur) return res.status(400).json({ message: erreur });
     if (produit.reference && await Product.exists({ reference: produit.reference, deletedAt: null, _id: { $ne: req.params.id } })) {
       return res.status(400).json({ message: `La référence ${produit.reference} existe déjà.` });
     }
     const updatedProduct = await Product.findOneAndUpdate({ _id: req.params.id, deletedAt: null }, produit, { returnDocument: 'after', runValidators: true });
     if (!updatedProduct) return res.status(404).json({ message: "Produit introuvable." });
-    const changements = differences(avant, updatedProduct.toObject());
+    const changements = differences(avant, updatedProduct.toObject(), packs);
     if (changements.length) {
       await journaliser(req, {
         action: 'Modification', entite: 'Produit', entiteId: updatedProduct._id,

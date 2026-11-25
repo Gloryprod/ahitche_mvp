@@ -1,7 +1,8 @@
 const { LotStockFifo } = require('../../models/stock');
 const Product = require('../../models/product');
 const { manquesParProduit } = require('../../services/stockService');
-const { TYPES_PACK, calculerCompositionPack } = require('../../services/compositionService');
+const { calculerCompositionPack } = require('../../services/compositionService');
+const { TYPE_PACK, typesPacks } = require('../../services/packService');
 const Parametres = require('../../models/parametres');
 const { lireNombre } = require('../../utils/texte');
 
@@ -45,7 +46,7 @@ async function stockDisponible() {
 async function simulerPack(req, res) {
   try {
     const type = String(req.params.type).toLowerCase();
-    if (!TYPES_PACK.includes(type)) return res.status(400).json({ message: "Type de pack invalide." });
+    if (!TYPE_PACK.test(type)) return res.status(400).json({ message: "Type de pack invalide." });
 
     const composition = await calculerCompositionPack(type);
     if (!composition) return res.status(404).json({ message: "Formule introuvable ou inactive." });
@@ -119,7 +120,7 @@ async function simulerPack(req, res) {
 async function simulerAchats(req, res) {
   try {
     const quantites = req.query || {};
-    const packs = TYPES_PACK.map(t => ({ type: t, nombre: Math.min(Math.floor(nombrePositif(quantites[t])), 10000) })).filter(p => p.nombre > 0);
+    const packs = (await typesPacks()).map(t => ({ type: t, nombre: Math.min(Math.floor(nombrePositif(quantites[t])), 10000) })).filter(p => p.nombre > 0);
     if (!packs.length) return res.status(400).json({ message: "Indiquez au moins une commande à simuler." });
 
     const [prixReels, stock, manques] = await Promise.all([prixAchatReels(), stockDisponible(), manquesParProduit()]);

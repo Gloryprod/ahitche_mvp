@@ -3,6 +3,7 @@ const User = require('../models/user');
 const Formule = require('../models/formules');
 const { ProfilNutrition, SuiviNutrition, MenuType, TRANCHES_AGE, OBJECTIFS, JOURS, VERSION_CONSENTEMENT, MENTION_SANTE } = require('../models/nutrition');
 const { journaliser } = require('../services/journalService');
+const { listerPacks } = require('../services/packService');
 const { echapperRegex } = require('../utils/texte');
 
 // ------------------------------------------------------------------
@@ -167,10 +168,11 @@ async function ajouterSuivi(req, res) {
 // Idées de repas par formule (D-18) : section « repas » (admin, gestionnaire, nutritionniste)
 // ------------------------------------------------------------------
 
-function lireMenu(body) {
+// slugs : packs existants (services/packService.js)
+function lireMenu(body, slugs) {
   const formuleSlug = String(body.formuleSlug || '');
   const titre = typeof body.titre === 'string' ? body.titre.trim() : '';
-  if (!['ahi-essentiel', 'ahi-equilibre', 'ahi-confort', 'ahi-reserve', 'ahi-fraicheur'].includes(formuleSlug)) return { erreur: "Formule invalide." };
+  if (!slugs.includes(formuleSlug)) return { erreur: "Formule invalide." };
   if (!titre) return { erreur: "Le titre du menu est obligatoire." };
   const jours = JOURS.map(jour => {
     const saisi = Array.isArray(body.jours) ? body.jours.find(j => j?.jour === jour) : null;
@@ -196,7 +198,7 @@ async function listerMenus(req, res) {
 // POST /api/admin/repas
 async function creerMenu(req, res) {
   try {
-    const { menu, erreur } = lireMenu(req.body);
+    const { menu, erreur } = lireMenu(req.body, (await listerPacks()).map(p => p.slug));
     if (erreur) return res.status(400).json({ message: erreur });
     const cree = await MenuType.create({ ...menu, auteur: req.user.id });
     await journaliser(req, { action: 'Création', entite: 'Idée de repas', entiteId: cree._id, resume: `Idée de repas « ${cree.titre} » : ${cree.statut.toLowerCase()}` });
@@ -210,7 +212,7 @@ async function creerMenu(req, res) {
 // PUT /api/admin/repas/:id : toute modification retire la publication (nouvelle validation nécessaire)
 async function modifierMenu(req, res) {
   try {
-    const { menu, erreur } = lireMenu(req.body);
+    const { menu, erreur } = lireMenu(req.body, (await listerPacks()).map(p => p.slug));
     if (erreur) return res.status(400).json({ message: erreur });
     const maj = mongoose.isValidObjectId(req.params.id)
       ? await MenuType.findByIdAndUpdate(req.params.id, { $set: { ...menu, auteur: req.user.id, validePar: null, valideLe: null, remarque: '' } }, { returnDocument: 'after', runValidators: true })

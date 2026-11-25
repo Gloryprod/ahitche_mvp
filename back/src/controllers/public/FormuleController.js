@@ -1,4 +1,5 @@
-const { TYPES_PACK, calculerCompositionPack } = require('../../services/compositionService');
+const { calculerCompositionPack } = require('../../services/compositionService');
+const { listerPacks } = require('../../services/packService');
 const Parametres = require('../../models/parametres');
 
 // Valeur estimée de chaque pack, affichée en prix barré sur l'accueil (D-03) :
@@ -10,7 +11,8 @@ async function valeursEstimees(req, res) {
   try {
     const coefficient = (await Parametres.obtenir()).coefficient();
     const valeurs = {};
-    for (const type of TYPES_PACK) {
+    // Packs actifs seulement (un pack créé puis désactivé n'est pas exposé)
+    for (const { type } of (await listerPacks()).filter(p => p.statut === 'actif')) {
       const composition = await calculerCompositionPack(type);
       if (!composition) continue;
       const complete = composition.itemCount > 0 && composition.prixManquants === 0;

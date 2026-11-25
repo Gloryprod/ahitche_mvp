@@ -1,5 +1,6 @@
 const Formule = require('../../models/formules');
-const { TYPES_PACK, calculerCompositionPack } = require('../../services/compositionService');
+const { calculerCompositionPack } = require('../../services/compositionService');
+const { TYPE_PACK, listerPacks } = require('../../services/packService');
 const { journaliser } = require('../../services/journalService');
 const { lienWhatsAppFormule } = require('../../services/formuleService');
 
@@ -8,8 +9,8 @@ async function getPackDetails(req, res) {
   try {
     const type = String(req.params.packType).toLowerCase(); // 'essentiel', 'equilibre', 'confort', 'reserve' ou 'fraicheur'
 
-    if (!TYPES_PACK.includes(type)) {
-      return res.status(400).json({ message: "Type de pack invalide. Choisissez entre : essentiel, equilibre, confort, reserve ou fraicheur." });
+    if (!TYPE_PACK.test(type)) {
+      return res.status(400).json({ message: "Type de pack invalide." });
     }
 
     const composition = await calculerCompositionPack(type);
@@ -80,7 +81,7 @@ const CYCLE_MAX = 365;
 async function updateFormulaCycle(req, res) {
   try {
     const type = String(req.params.packType).toLowerCase();
-    if (!TYPES_PACK.includes(type)) {
+    if (!TYPE_PACK.test(type)) {
       return res.status(400).json({ success: false, message: 'Type de pack invalide.' });
     }
 
@@ -118,8 +119,62 @@ async function updateFormulaCycle(req, res) {
   }
 }
 
+// Liste des packs (GET /api/admin/packs) : toute l'équipe (colonnes de quantités, simulateurs, prévision d'achats,
+// idées de repas). Ordre de l'admin ; sans prix (le prix reste dans l'écran Formules, section données de base).
+async function listerPacksEquipe(req, res) {
+  try {
+    return res.status(200).json(await listerPacks());
+  } catch (error) {
+    console.error('Erreur listerPacksEquipe:', error);
+    return res.status(500).json({ message: 'Erreur lors du chargement des packs.' });
+  }
+}
+
+// Créer un pack (POST /api/admin/formulas) : admin seulement, journalisé. Le pack est aussitôt reconnu partout
+// (quantités du catalogue, import du référentiel, composition, prévision d'achats) ; « bientôt disponible » par
+// défaut : visible côté client mais pas commandable tant que l'admin ne l'ouvre pas.
+async function creerPack(req, res) {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Seul l'admin peut créer un pack." });
+    const { type, nom, cible, prix = null, cycleJours = 30, bientotDisponible = true } = req.body ?? {};
+    if (typeof type !== 'string' || !TYPE_PACK.test(type)) {
+      return res.status(400).json({ message: 'Identifiant du pack : minuscules et chiffres, sans accent ni espace, 2 à 20 caractères (ex. etudiant).' });
+    }
+    const nomPack = typeof nom === 'string' ? nom.trim() : '';
+    if (nomPack.length < 2 || nomPack.length > 40) return res.status(400).json({ message: 'Nom du pack : 2 à 40 caractères (ex. AHI Étudiant).' });
+    const ciblePack = typeof cible === 'string' ? cible.trim() : '';
+    if (!ciblePack || ciblePack.length > 80) return res.status(400).json({ message: 'Cible du pack : 1 à 80 caractères (ex. 1 étudiant · par mois).' });
+    if (prix !== null && (typeof prix !== 'number' || !Number.isFinite(prix) || prix < 0 || prix > 10000000)) {
+      return res.status(400).json({ message: 'Prix invalide : nombre de FCFA, ou vide (à définir).' });
+    }
+    if (!Number.isInteger(cycleJours) || cycleJours < CYCLE_MIN || cycleJours > CYCLE_MAX) {
+      return res.status(400).json({ message: `Le cycle doit être un nombre entier de jours, entre ${CYCLE_MIN} et ${CYCLE_MAX}.` });
+    }
+    if (typeof bientotDisponible !== 'boolean') return res.status(400).json({ message: '« bientotDisponible » doit valoir true ou false.' });
+    const slug = `ahi-${type}`;
+    if (await Formule.exists({ slug })) return res.status(409).json({ message: `Le pack ${slug} existe déjà.` });
+
+    const packs = await listerPacks();
+    const ordre = Math.max(packs.length, ...packs.map(p => (p.ordre ?? -1) + 1)); // Après les packs existants
+    const formule = new Formule({ slug, nom: nomPack, cible: ciblePack, prixActuel: prix, cycleJours, bientotDisponible, statut: 'actif', ordre, lienWhatsApp: '-' });
+    formule.lienWhatsApp = lienWhatsAppFormule(formule);
+    await formule.save();
+    await journaliser(req, {
+      action: 'Création', entite: 'Formule', entiteId: formule._id,
+      resume: `Pack ${nomPack} (${slug}) créé : prix ${prix ?? 'à définir'}, cycle ${cycleJours} jours${bientotDisponible ? ', bientôt disponible' : ', ouvert'}`
+    });
+    return res.status(201).json({ message: `Pack ${nomPack} créé.`, pack: (await listerPacks()).find(p => p.slug === slug) });
+  } catch (error) {
+    if (error.code === 11000) return res.status(409).json({ message: 'Ce pack existe déjà.' });
+    console.error('Erreur creerPack:', error.name, error.code ?? '');
+    return res.status(500).json({ message: 'Erreur lors de la création du pack.' });
+  }
+}
+
 module.exports = {
   getPackDetails,
   updateFormulaPrice,
-  updateFormulaCycle
+  updateFormulaCycle,
+  listerPacksEquipe,
+  creerPack
 };
