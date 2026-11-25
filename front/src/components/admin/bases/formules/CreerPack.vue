@@ -62,7 +62,7 @@ const champ = 'mt-1 w-full px-3 py-2 bg-creme border border-creme2 rounded-lg te
     <div class="flex items-start justify-between gap-3">
       <div>
         <h2 id="creer-pack-titre" class="font-display font-bold text-lg text-noir">Créer un pack</h2>
-        <p class="text-[11px] text-gris">Le pack est aussitôt reconnu dans le catalogue, l'import du référentiel et les simulateurs ; sa carte sur l'accueil se règle à part.</p>
+        <p class="text-[11px] text-gris">Le pack est aussitôt reconnu dans le catalogue, l'import du référentiel et les simulateurs ; sa carte sur l'accueil, masquée au départ, se règle dans « Site public ».</p>
       </div>
       <button type="button" @click="emit('fermer')" aria-label="Fermer la création du pack" class="cursor-pointer p-1.5 rounded-lg hover:bg-creme text-gris">
         <X class="w-4 h-4" />

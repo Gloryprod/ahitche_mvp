@@ -1,6 +1,7 @@
 // llms.txt : résumé public du site pour les assistants IA, servi par GET /api/public/llms.txt et sur
 // https://ahitchebj.com/llms.txt (réécriture de front/vercel.json). Contrat : docs-internes/admin/CONTRAT-site-public-B.md.
 // Même structure que l'ancien front/public/llms.txt, à partir des mêmes données que la vitrine :
+//  - formules : cartes affichées sur l'accueil (contenuSiteService.cartesAffichees), dans leur ordre, avec le nom en base ;
 //  - prix par mois : prix de vente de la base (formuleService.prixVitrine) ;
 //  - cible : textes des cartes publiés depuis l'admin (clé « formules ») ;
 //  - WhatsApp, horaires, paiement et jours de livraison : infos pratiques publiées (clé « infos »).
@@ -26,12 +27,15 @@ const DEFAUTS = {
   },
 };
 
-// Restent dans le code, comme sur la vitrine : noms et ordre des cartes
+// Cartes par défaut (noms et ordre de la vitrine), quand la base ne répond pas
 const FORMULES = [
   { slug: 'ahi-essentiel', nom: 'AHI Essentiel' },
   { slug: 'ahi-equilibre', nom: 'AHI Équilibré' },
   { slug: 'ahi-confort', nom: 'AHI Confort' },
 ];
+
+// Packs annoncés sous les cartes, sauf s'ils ont leur propre carte
+const BIENTOT = [['ahi-reserve', 'AHI Réserve'], ['ahi-fraicheur', 'AHI Fraîcheur']];
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 
@@ -68,17 +72,25 @@ const sansPointFinal = (t) => t.replace(/[\s.]+$/, '');
 
 /**
  * Texte de llms.txt.
- * @param {{ infos?: object | null, formules?: object | null, prix?: Record<string, number | null> | null }} [publie]
- *   valeurs publiées (déjà validées) ; null ou absent : valeurs du code
+ * @param {{ infos?: object | null, formules?: object | null, prix?: Record<string, number | null> | null,
+ *   cartes?: { slug, nom, bientotDisponible }[] | null }} [publie] valeurs publiées (déjà validées) et cartes affichées,
+ *   dans l'ordre ; null ou absent : valeurs du code
  * @returns {string}
  */
-function texteLlms({ infos = null, formules = null, prix = null } = {}) {
+function texteLlms({ infos = null, formules = null, prix = null, cartes = null } = {}) {
   const i = infos || DEFAUTS.infos;
-  const lignesFormules = FORMULES.map(({ slug, nom }) => {
-    const cible = cibleDansPhrase(formules?.[slug]?.cible ?? DEFAUTS.formules[slug].cible);
-    const montantMois = prix?.[slug] ?? DEFAUTS.formules[slug].prix;
-    return `- ${nom} : ${cible ? `${cible}, ` : ''}${montant(montantMois)} FCFA par mois.`;
+  const liste = cartes || FORMULES;
+  const lignesFormules = liste.map(({ slug, nom, bientotDisponible }) => {
+    const defaut = Object.hasOwn(DEFAUTS.formules, slug) ? DEFAUTS.formules[slug] : {};
+    const cible = cibleDansPhrase(formules?.[slug]?.cible ?? defaut.cible ?? '');
+    const montantMois = prix?.[slug] ?? defaut.prix;
+    const tarif = montantMois ? `${montant(montantMois)} FCFA par mois` : (bientotDisponible ? 'bientôt disponible' : '');
+    const detail = [cible, tarif].filter(Boolean).join(', ');
+    // Cartes par défaut : noms de la vitrine (« AHI Essentiel »), pas ceux de la base, en capitales ; pack créé : nom saisi
+    const nomAffiche = FORMULES.find((f) => f.slug === slug)?.nom ?? nom;
+    return `- ${nomAffiche}${detail ? ` : ${detail}` : ''}.`;
   });
+  const bientot = BIENTOT.filter(([slug]) => !liste.some((c) => c.slug === slug)).map(([, nom]) => nom);
   const horaires = `${jours(i.horaires.jours)}, ${heure(i.horaires.ouverture)} à ${heure(i.horaires.fermeture)}`;
   const livraison = i.joursLivraison ? `Livraison ${sansPointFinal(i.joursLivraison)}` : 'Livraison à jour fixe';
 
@@ -92,7 +104,7 @@ function texteLlms({ infos = null, formules = null, prix = null } = {}) {
     '## Formules (prix par mois)',
     '',
     ...lignesFormules,
-    '- AHI Réserve et AHI Fraîcheur : bientôt disponibles.',
+    ...(bientot.length ? [`- ${enumerer(bientot)} : bientôt disponible${bientot.length > 1 ? 's' : ''}.`] : []),
     '',
     'Chaque pack contient 17 produits de base (riz local, haricots, pâtes, gari, huile, tomates, oignons…), en quantités adaptées à la formule.',
     '',

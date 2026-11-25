@@ -20,9 +20,10 @@ onMounted(async () => {
 })
 
 // Comparateur « taille du foyer » : conseille une formule et la met en avant. Cartes, foyers et prix suivent les
-// valeurs publiées depuis l'admin (config/formules.ts : tableau réactif, valeurs du code par défaut)
+// valeurs publiées depuis l'admin (config/formules.ts : tableau réactif, valeurs du code par défaut). Une carte sans
+// foyer ('') n'est conseillée pour aucune taille ; une taille sans carte ne met aucune formule en avant.
 const foyer = ref<TailleFoyer | null>(null)
-const conseillee = computed(() => formules.find(f => f.foyer === foyer.value) ?? null)
+const conseillee = computed(() => (foyer.value ? formules.find(f => f.foyer === foyer.value) ?? null : null))
 const libelleFoyer = computed(() => TAILLES_FOYER.find(t => t.valeur === foyer.value)?.libelle ?? '')
 
 // Sur mobile, les cartes défilent horizontalement : la formule conseillée est amenée à l'écran
@@ -33,7 +34,7 @@ async function choisirFoyer(valeur: TailleFoyer) {
   const index = formules.findIndex(f => f.foyer === valeur)
   const carte = cartes[index]
   const rangee = carte?.parentElement
-  if (!carte || !rangee || rangee.scrollWidth <= rangee.clientWidth) return // Ordinateur : les trois cartes sont visibles
+  if (!carte || !rangee || rangee.scrollWidth <= rangee.clientWidth) return // Ordinateur : toutes les cartes sont visibles
   const reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const decalage = carte.getBoundingClientRect().left - rangee.getBoundingClientRect().left
   rangee.scrollTo({ left: rangee.scrollLeft + decalage - (rangee.clientWidth - carte.clientWidth) / 2, behavior: reduit ? 'auto' : 'smooth' })
@@ -77,31 +78,32 @@ async function choisirFoyer(valeur: TailleFoyer) {
               Pour {{ libelleFoyer }}, nous conseillons <strong class="text-foret">{{ conseillee.nom }}</strong> :
               <strong class="text-foret whitespace-nowrap">{{ formaterPrix(conseillee.prix) }} FCFA par mois</strong>.
             </span>
+            <span v-else-if="foyer" key="comparer">Pour {{ libelleFoyer }}, comparez les formules ci-dessous.</span>
             <span v-else key="invite">Choisissez la taille de votre foyer : nous vous indiquons la formule adaptée.</span>
           </Transition>
         </p>
       </fieldset>
 
-      <!-- Mobile : cartes côte à côte, à faire glisser ; ordinateur : grille de trois colonnes.
+      <!-- Mobile : cartes côte à côte, à faire glisser ; ordinateur : trois cartes par rangée, la dernière centrée.
            La rangée apparaît d'un bloc (une carte à moitié visible sur mobile reste lisible), puis les jauges se remplissent. -->
       <div
         v-apparition
-        class="flex md:grid md:grid-cols-3 gap-4 md:gap-8 items-stretch overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-4 px-4 pt-6 pb-4 md:pb-0 mb-12 [scrollbar-width:none]"
+        class="flex md:flex-wrap md:justify-center gap-4 md:gap-8 items-stretch overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-4 px-4 pt-6 pb-4 md:pb-0 mb-12 [scrollbar-width:none]"
         role="list"
         aria-label="Formules Ahitché"
       >
         <div
           v-for="(formule, i) in formules"
-          :key="formule.nom"
+          :key="formule.slug"
           :ref="el => { if (el) cartes[i] = el as HTMLElement }"
           role="listitem"
-          class="snap-center shrink-0 w-[85%] sm:w-[60%] md:w-auto flex"
+          class="snap-center shrink-0 w-[85%] sm:w-[60%] md:w-[calc((100%_-_4rem)/3)] flex"
         >
           <FormuleCard
             :formule="formule"
             :valeur-estimee="valeursEstimees[formule.slug] ?? null"
-            :conseillee="conseillee?.nom === formule.nom"
-            :autre-conseillee="!!conseillee && conseillee.nom !== formule.nom"
+            :conseillee="conseillee?.slug === formule.slug"
+            :autre-conseillee="!!conseillee && conseillee.slug !== formule.slug"
             class="w-full"
           />
         </div>

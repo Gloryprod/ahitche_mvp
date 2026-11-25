@@ -1,6 +1,7 @@
 // Valeurs du site modifiables depuis l'admin (écran « Site public », lot A) : types, formatage et lecture prudente
 // des valeurs publiées. Fonctions pures, sans état : utilisées par config/contact.ts, le bandeau et l'écran admin.
 // Le format est celui du contrat docs-internes/admin/CONTRAT-site-public-A.md ; le serveur valide, ici on affiche.
+import { COULEUR_HEX } from './couleurs'
 
 export const JOURS_SEMAINE = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] as const
 export type JourSemaine = (typeof JOURS_SEMAINE)[number]
@@ -147,20 +148,49 @@ export function fusionnerInfos(defaut: InfosSite, recu: unknown): InfosSite {
 }
 
 // --- Formules de la vitrine (lot B, docs-internes/admin/CONTRAT-site-public-B.md) ---
-// Textes publiés de chaque carte ; nom, emoji, teinte, niveau, ordre et produits restent dans le code.
+// Réglages publiés de chaque carte, par slug de pack (n'importe quel pack de la base) : affichage, ordre, emoji,
+// couleur, niveau et textes. Le nom vient de la base (« noms » de GET /api/public/site), le prix aussi ; les trois
+// cartes du code gardent leur nom. Une ancienne publication (textes des trois cartes seulement) reste lisible.
 export const TAILLES_FOYER_VALIDES = ['1', '2-3', '4-6'] as const
 export type Foyer = (typeof TAILLES_FOYER_VALIDES)[number]
+export type FoyerCarte = Foyer | '' // '' : la carte n'est proposée par aucun choix du comparateur
+
+// Couleur d'une carte : un des trois thèmes réglés pour le contraste, ou une couleur libre « #RRGGBB » (hors charte,
+// choix du porteur ; la carte choisit alors un texte blanc ou noir, components/ui/FormuleCard.vue)
+export const THEMES_FORMULE = ['savane', 'foret', 'marine'] as const
+export type ThemeFormule = (typeof THEMES_FORMULE)[number]
+export type CouleurFormule = ThemeFormule | `#${string}`
+export const estTheme = (c: string): c is ThemeFormule => (THEMES_FORMULE as readonly string[]).includes(c)
+const couleurValide = (v: unknown): v is CouleurFormule => typeof v === 'string' && (estTheme(v) || COULEUR_HEX.test(v))
 
 export interface TexteFormule {
+  afficher: boolean // Carte sur l'accueil (le serveur la masque aussi si le pack est inactif)
+  ordre: number // 0 à 99, croissant de gauche à droite
+  emoji: string // 1 à 8 caractères
+  couleur: CouleurFormule
+  niveau: 1 | 2 | 3 // Jauge « niveau de confort »
   cible: string
   accroche: string
   repas: string // « 20–30 »
   heures: string // « 2–4h »
-  foyer: Foyer
+  foyer: FoyerCarte
   recommandee: boolean
 }
-export type TextesFormules = Record<string, TexteFormule> // Par slug de la vitrine
+export type TextesFormules = Record<string, TexteFormule> // Par slug de pack
 export type PrixSite = Record<string, number | null> // Prix de vente de la base par slug ; null : celui du code
+
+// Réglages de départ d'une carte sans publication (pack créé dans l'admin) : masquée, textes à remplir avant de l'afficher
+export const CARTE_NOUVELLE: Readonly<TexteFormule> = {
+  afficher: false, ordre: 99, emoji: '🌾', couleur: 'savane', niveau: 1,
+  cible: '', accroche: '', repas: '', heures: '', foyer: '', recommandee: false,
+}
+export const REGLES_EMOJI = { min: 1, max: 8 } as const
+export const emojiValide = (v: unknown): v is string => {
+  if (typeof v !== 'string' || /[<>\r\n]/.test(v)) return false
+  const n = Array.from(v.trim()).length
+  return n >= REGLES_EMOJI.min && n <= REGLES_EMOJI.max
+}
+const SLUG_PACK = /^[a-z0-9-]{1,60}$/
 
 // Règles du contrat, reprises pour lire prudemment ce que renvoie le serveur
 export const REGLES_FORMULE = {
@@ -179,33 +209,51 @@ export function texteFormuleValide(champ: keyof typeof REGLES_FORMULE, valeur: u
   return propre.length > 0 && longueur(propre) <= regle.max && (!regle.motif || regle.motif.test(propre))
 }
 
-// Textes publiés, champ par champ : un slug absent ou un champ mal formé garde la valeur du code. La formule
-// recommandée n'est reprise que si chaque formule a un booléen et qu'il y en a au plus une ; sinon, celle du code.
-// De même, une taille de foyer par formule : deux formules sur la même taille et les foyers du code reviennent.
-export function fusionnerTextesFormules(defaut: TextesFormules, recu: unknown): TextesFormules {
+// Réglages publiés, champ par champ : un champ absent ou mal formé garde la valeur du code (ou celle d'une carte
+// nouvelle). Sans « afficher », les cartes du code restent affichées et les autres masquées.
+// Cartes lues : `slugs` s'il est donné (packs de l'admin), sinon celles du code puis les autres cartes publiées.
+// Parmi les cartes affichées, deux recommandées : les recommandées du code reviennent ; deux sur la même taille de
+// foyer : les foyers du code reviennent (aucun pour les autres cartes).
+export function fusionnerTextesFormules(defaut: TextesFormules, recu: unknown, slugs?: readonly string[]): TextesFormules {
   const publie = estObjet(recu) ? recu : {}
+  const liste = slugs ?? [...new Set([...Object.keys(defaut), ...Object.keys(publie).filter(s => SLUG_PACK.test(s) && estObjet(publie[s]))])]
   const resultat: TextesFormules = {}
-  for (const [slug, d] of Object.entries(defaut)) {
+  for (const slug of liste) {
+    const d = defaut[slug] ?? CARTE_NOUVELLE
     const v = estObjet(publie[slug]) ? publie[slug] as Record<string, unknown> : {}
     const champ = (nom: keyof typeof REGLES_FORMULE) => (texteFormuleValide(nom, v[nom]) ? (v[nom] as string).trim() : d[nom])
     resultat[slug] = {
+      afficher: typeof v.afficher === 'boolean' ? v.afficher : d.afficher,
+      ordre: Number.isInteger(v.ordre) && (v.ordre as number) >= 0 && (v.ordre as number) <= 99 ? v.ordre as number : d.ordre,
+      emoji: emojiValide(v.emoji) ? v.emoji.trim() : d.emoji,
+      couleur: couleurValide(v.couleur) ? v.couleur : d.couleur,
+      niveau: [1, 2, 3].includes(v.niveau as number) ? v.niveau as 1 | 2 | 3 : d.niveau,
       cible: champ('cible'),
       accroche: champ('accroche'),
       repas: champ('repas'),
       heures: champ('heures'),
-      foyer: TAILLES_FOYER_VALIDES.includes(v.foyer as Foyer) ? v.foyer as Foyer : d.foyer,
-      recommandee: d.recommandee,
+      foyer: v.foyer === '' || TAILLES_FOYER_VALIDES.includes(v.foyer as Foyer) ? v.foyer as FoyerCarte : d.foyer,
+      recommandee: typeof v.recommandee === 'boolean' ? v.recommandee : d.recommandee,
     }
   }
-  const choix = Object.keys(defaut).map(slug => (estObjet(publie[slug]) ? (publie[slug] as Record<string, unknown>).recommandee : undefined))
-  if (choix.every(c => typeof c === 'boolean') && choix.filter(Boolean).length <= 1) {
-    Object.keys(defaut).forEach((slug, i) => { resultat[slug]!.recommandee = choix[i] === true })
+  const affichees = Object.entries(resultat).filter(([, t]) => t.afficher)
+  if (affichees.filter(([, t]) => t.recommandee).length > 1) {
+    for (const [slug, t] of Object.entries(resultat)) t.recommandee = (defaut[slug] ?? CARTE_NOUVELLE).recommandee
   }
-  const foyers = Object.values(resultat).map(t => t.foyer)
+  const foyers = affichees.map(([, t]) => t.foyer).filter(Boolean)
   if (new Set(foyers).size !== foyers.length) {
-    for (const [slug, d] of Object.entries(defaut)) resultat[slug]!.foyer = d.foyer
+    for (const [slug, t] of Object.entries(resultat)) t.foyer = (defaut[slug] ?? CARTE_NOUVELLE).foyer
   }
   return resultat
+}
+
+// Slugs rangés par ordre croissant (à ordre égal, dans l'ordre de la liste)
+export const trierParOrdre = (t: TextesFormules) => Object.keys(t).sort((a, b) => t[a]!.ordre - t[b]!.ordre)
+
+// Noms des packs des cartes affichées (« noms » de GET /api/public/site), ou null si le serveur n'en envoie pas
+export function lireNoms(recu: unknown): Record<string, string> | null {
+  if (!estObjet(recu)) return null
+  return Object.fromEntries(Object.entries(recu).filter((e): e is [string, string] => typeof e[1] === 'string' && !!e[1].trim()))
 }
 
 // Prix de vente accepté : nombre entier de FCFA, strictement positif

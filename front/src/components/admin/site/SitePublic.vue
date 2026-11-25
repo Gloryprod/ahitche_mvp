@@ -15,6 +15,7 @@ import { appliquerActualites } from '@/config/actualites'
 import { appliquerPhotos } from '@/config/photos'
 import { appliquerTemoignages } from '@/config/temoignages'
 import { messageErreur } from '@/services/erreurs'
+import { usePacks } from '@/composables/usePacks'
 import BandeauAnnonce from '@/components/layout/BandeauAnnonce.vue'
 import OngletFormules from './OngletFormules.vue'
 import OngletFaq from './OngletFaq.vue'
@@ -27,7 +28,7 @@ import {
   type CarteActualite, type EmplacementFrise, type InfosSite, type PhotosSite, type QuestionFaq, type TemoignageSite, type TextesFormules,
 } from '@/services/valeursSite'
 import {
-  CHAMPS_BANDEAU, CHAMPS_FORMULES, CHAMPS_INFOS, STYLE_SWAL, TITRES_CONTENUS, actualitesAEnvoyer, actualitesEnFormulaire, actualitesPubliees,
+  CHAMPS_BANDEAU, CHAMPS_INFOS, PACKS_DU_CODE, champsFormules, formulesEnFormulaire, STYLE_SWAL, TITRES_CONTENUS, actualitesAEnvoyer, actualitesEnFormulaire, actualitesPubliees,
   bandeauAEnvoyer, bandeauPublie, champDeLErreur, changements, controlerActualites, controlerFaq, controlerFormules, dateHeure, ecartsActualites,
   ecartsFaq, faqAEnvoyer, faqEnFormulaire, faqPubliee, formulesAEnvoyer, formulesPubliees, infosAEnvoyer, infosPubliees, lignesActualites, lignesFaq,
   lireReponseSite, periodeBandeau,
@@ -39,7 +40,7 @@ import {
 
 // « Site public » (docs-internes/admin/CONTRAT-site-public-A.md à -D.md), section « site » : lecture admin et
 // coordinateur, publication admin seulement (le serveur fait foi). Lot A : infos pratiques et bandeau d'annonce ;
-// lot B : textes des cartes des formules (le prix, lui, se modifie dans « Formules et prix ») ; lot C : questions
+// lot B : cartes des formules, une par pack de la base (le prix, lui, se modifie dans « Formules et prix ») ; lot C : questions
 // fréquentes et actualités ; lot D : photos de la frise de l'accueil et témoignages. Chaque onglet :
 // formulaire prérempli (valeurs publiées, sinon celles du code), aperçu en direct, publication confirmée et
 // historique des 10 dernières versions.
@@ -59,10 +60,15 @@ const prixBase = computed(() => lireReponseSite(data.value).prix) // Prix de ven
 
 const onglet = ref<CleContenu>('infos')
 
+// Packs de la base : une carte chacun dans l'onglet Formules (rempli seulement avec la liste, pour n'en oublier aucun)
+const { packs, chargementPacks, erreurPacks } = usePacks()
+const packsPrets = computed(() => !chargementPacks.value && !erreurPacks.value && packs.value.length > 0)
+const packsCartes = computed(() => (packs.value.length ? packs.value : PACKS_DU_CODE))
+
 // --- Formulaires : remplis une fois au chargement, puis après chaque publication ---
 const infos = reactive<InfosSite>(infosPubliees(undefined))
 const bandeau = reactive<BandeauSite>(bandeauPublie(undefined))
-const formules = reactive<TextesFormules>(formulesPubliees(undefined))
+const formules = ref<TextesFormules>(formulesEnFormulaire(formulesPubliees(undefined)))
 const faq = ref<QuestionFormulaire[]>([])
 const actualites = ref<CarteFormulaire[]>([])
 const photos = reactive<PhotosSite>(photosPubliees(undefined))
@@ -76,16 +82,16 @@ const variables = computed(() => valeursVariables(infosDuSite.value, PRODUITS_IN
 function remplir(cle: CleContenu, contenus: ContenusSite) {
   if (cle === 'infos') Object.assign(infos, infosPubliees(contenus.infos))
   else if (cle === 'bandeau') Object.assign(bandeau, bandeauPublie(contenus.bandeau))
-  else if (cle === 'formules') Object.assign(formules, formulesPubliees(contenus.formules))
+  else if (cle === 'formules') formules.value = formulesEnFormulaire(formulesPubliees(contenus.formules, packsCartes.value))
   else if (cle === 'faq') faq.value = faqEnFormulaire(faqPubliee(contenus.faq))
   else if (cle === 'photos') Object.assign(photos, copierPhotos(photosPubliees(contenus.photos)))
   else if (cle === 'temoignages') temoignages.value = copierTemoignages(temoignagesPublies(contenus.temoignages))
   else actualites.value = actualitesEnFormulaire(actualitesPubliees(contenus.actualites, infosPubliees(contenus.infos)))
   rempli[cle] = true
 }
-watch(contenusSite, contenus => {
+watch([contenusSite, packsPrets], ([contenus]) => {
   if (!contenus) return
-  for (const cle of Object.keys(rempli) as CleContenu[]) if (!rempli[cle]) remplir(cle, contenus)
+  for (const cle of Object.keys(rempli) as CleContenu[]) if (!rempli[cle] && (cle !== 'formules' || packsPrets.value)) remplir(cle, contenus)
 }, { immediate: true })
 
 const jamaisPublie = (cle: CleContenu) => !!contenusSite.value && !contenusSite.value[cle]
@@ -94,10 +100,12 @@ const versions = (cle: CleContenu): Version[] => contenusSite.value?.[cle]?.vers
 // --- Ce qui change par rapport au site ---
 const envoiInfos = computed(() => infosAEnvoyer(infos))
 const envoiBandeau = computed(() => bandeauAEnvoyer(bandeau))
-const envoiFormules = computed(() => formulesAEnvoyer(formules))
+const envoiFormules = computed(() => formulesAEnvoyer(formules.value))
 const changementsInfos = computed(() => changements(CHAMPS_INFOS, infosPubliees(contenusSite.value?.infos), envoiInfos.value))
 const changementsBandeau = computed(() => changements(CHAMPS_BANDEAU, bandeauPublie(contenusSite.value?.bandeau), envoiBandeau.value))
-const changementsFormules = computed(() => changements(CHAMPS_FORMULES, formulesPubliees(contenusSite.value?.formules), envoiFormules.value))
+const changementsFormules = computed(() => changements(
+  champsFormules(packsCartes.value), formulesPubliees(contenusSite.value?.formules, packsCartes.value), envoiFormules.value,
+))
 const envoiFaq = computed(() => faqAEnvoyer(faq.value))
 const envoiActualites = computed(() => actualitesAEnvoyer(actualites.value))
 const changementsFaq = computed(() => ecartsFaq(faqPubliee(contenusSite.value?.faq), envoiFaq.value))
@@ -143,7 +151,7 @@ const erreurs = reactive<Record<CleContenu, { champ: string; message: string }>>
 // Une erreur affichée disparaît dès que le formulaire change (elle reviendra à la prochaine publication si besoin)
 watch(() => JSON.stringify(infos), () => { erreurs.infos = { champ: '', message: '' } })
 watch(() => JSON.stringify(bandeau), () => { erreurs.bandeau = { champ: '', message: '' } })
-watch(() => JSON.stringify(formules), () => { erreurs.formules = { champ: '', message: '' } })
+watch(() => JSON.stringify(formules.value), () => { erreurs.formules = { champ: '', message: '' } })
 watch(() => JSON.stringify(faq.value), () => { erreurs.faq = { champ: '', message: '' } })
 watch(() => JSON.stringify(actualites.value), () => { erreurs.actualites = { champ: '', message: '' } })
 watch(() => JSON.stringify(photos), () => { erreurs.photos = { champ: '', message: '' } })
@@ -158,7 +166,7 @@ const attributsErreur = (cle: CleContenu, champ: string) => (erreurDe(cle, champ
 const idsDe = (cle: CleContenu) => (cle === 'faq' ? faq.value : cle === 'actualites' ? actualites.value : cle === 'temoignages' ? temoignages.value : [])
   .map(e => e.id)
 
-async function signaler(cle: CleContenu, message: string, champ = champDeLErreur(cle, message, idsDe(cle))) {
+async function signaler(cle: CleContenu, message: string, champ = champDeLErreur(cle, message, idsDe(cle), packsCartes.value)) {
   erreurs[cle] = { champ, message }
   await nextTick()
   const cible = champ ? document.getElementById(idChamp(champ)) : document.getElementById(`erreur-haut-${cle}`)
@@ -174,7 +182,7 @@ function controler(cle: CleContenu): { champ: string; message: string } | null {
     if (infos.horaires.ouverture >= infos.horaires.fermeture) return { champ: 'horaires.fermeture', message: 'Horaires : l\'heure d\'ouverture doit précéder l\'heure de fermeture.' }
     return null
   }
-  if (cle === 'formules') return controlerFormules(envoiFormules.value)
+  if (cle === 'formules') return controlerFormules(envoiFormules.value, packsCartes.value)
   if (cle === 'faq') return controlerFaq(envoiFaq.value)
   if (cle === 'actualites') return controlerActualites(envoiActualites.value)
   if (cle === 'photos') return controlerPhotos(envoiPhotos.value)
@@ -211,7 +219,9 @@ function enregistrerReponse(cle: CleContenu, contenu: ContenuRecu, message: stri
   remplir(cle, contenus)
   if (suivreReseaux) remplir('actualites', contenus)
   if (cle === 'infos' && contenus.infos) appliquerInfos(contenus.infos.valeurs)
-  if (cle === 'formules' && contenus.formules) appliquerFormules(contenus.formules.valeurs, actuel.prix)
+  // Site de cet onglet : cartes des packs actifs, comme le serveur
+  const nomsActifs = packs.value.length ? Object.fromEntries(packs.value.filter(p => p.statut === 'actif').map(p => [p.slug, p.nom])) : undefined
+  if (cle === 'formules' && contenus.formules) appliquerFormules(contenus.formules.valeurs, actuel.prix, nomsActifs)
   if (cle === 'faq' && contenus.faq) appliquerFaq(contenus.faq.valeurs)
   if (cle === 'actualites' && contenus.actualites) appliquerActualites(contenus.actualites.valeurs)
   if (cle === 'photos' && contenus.photos) appliquerPhotos(contenus.photos.valeurs)
@@ -226,12 +236,12 @@ function enregistrerReponse(cle: CleContenu, contenu: ContenuRecu, message: stri
 
 const envoi = ref<CleContenu | ''>('')
 const OBJETS_PUBLICATION: Record<CleContenu, string> = {
-  infos: 'les infos pratiques', bandeau: 'le bandeau d\'annonce', formules: 'les textes des formules', faq: 'les questions fréquentes', actualites: 'les actualités',
+  infos: 'les infos pratiques', bandeau: 'le bandeau d\'annonce', formules: 'les cartes des formules', faq: 'les questions fréquentes', actualites: 'les actualités',
   photos: 'les photos de la frise', temoignages: 'les témoignages',
 }
 
 async function publier(cle: CleContenu) {
-  if (!ecriture.value || envoi.value || (cle === 'photos' && televersement.value)) return
+  if (!ecriture.value || envoi.value || (cle === 'photos' && televersement.value) || (cle === 'formules' && !packsPrets.value)) return
   erreurs[cle] = { champ: '', message: '' }
   const probleme = controler(cle)
   if (probleme) return signaler(cle, probleme.message, probleme.champ)
@@ -304,8 +314,9 @@ function comparerVersion(cle: CleContenu, valeurs: VersionDetaillee['valeurs']):
     const v = actualitesPubliees(enContenu<CarteActualite[]>(valeurs), infosDuSite.value)
     return { lignes: lignesActualites(v), liste: ecartsActualites(actualitesPubliees(contenusSite.value?.actualites, infosDuSite.value), v) }
   }
-  const v = formulesPubliees(enContenu<TextesFormules>(valeurs))
-  return { lignes: CHAMPS_FORMULES.map(c => ({ libelle: c.libelle, valeur: c.lire(v) })), liste: changements(CHAMPS_FORMULES, formulesPubliees(contenusSite.value?.formules), v) }
+  const v = formulesPubliees(enContenu<TextesFormules>(valeurs), packsCartes.value)
+  const champs = champsFormules(packsCartes.value)
+  return { lignes: champs.map(c => ({ libelle: c.libelle, valeur: c.lire(v) })), liste: changements(champs, formulesPubliees(contenusSite.value?.formules, packsCartes.value), v) }
 }
 
 const fenetre = reactive({ ouverte: false, cle: 'infos' as CleContenu, version: null as Version | null, chargement: false, erreur: '', lignes: [] as LigneVersion[] })
@@ -648,17 +659,19 @@ const erreurChamp = 'mt-1 text-xs font-semibold text-red-700'
             <h2 id="titre-formules" class="font-bold text-noir text-base">Formules</h2>
             <p v-if="jamaisPublie('formules')" class="text-xs p-2.5 rounded-xl bg-creme text-noir">Valeurs actuelles du site (jamais modifiées depuis l'admin)</p>
             <p v-else-if="versions('formules')[0]" class="text-xs">Publié le {{ dateHeure(versions('formules')[0]!.publieLe) }} par {{ versions('formules')[0]!.publiePar.nom || 'un administrateur' }}.</p>
-            <p class="text-xs">Textes des cartes de l'accueil. Nom, couleurs, niveau et produits restent fixes ; le prix vient de l'écran « Formules et prix ».</p>
+            <p class="text-xs">Cartes de l'accueil, une par pack de la base : affichage, place, emoji, couleur, niveau et textes. Le nom du pack et son prix viennent de la base (écran « Formules et prix ») ; un pack créé reste masqué tant que sa carte n'est pas affichée ici.</p>
           </div>
           <p v-if="erreurs.formules.message && !erreurs.formules.champ" id="erreur-haut-formules" role="alert" tabindex="-1" class="p-3 rounded-xl bg-red-50 text-red-800 text-xs font-semibold">{{ erreurs.formules.message }}</p>
 
-          <fieldset :disabled="!ecriture" class="min-w-0">
-            <legend class="sr-only">Textes des formules du site</legend>
-            <OngletFormules v-model:textes="formules" :prix="prixBase" :erreur="erreurs.formules" />
+          <p v-if="erreurPacks" role="alert" class="p-3 rounded-xl bg-red-50 text-red-800 text-xs font-semibold">La liste des packs n'a pas pu être chargée : rechargez la page avant de modifier les cartes.</p>
+          <p v-else-if="!packsPrets" role="status" class="text-xs">Chargement des packs…</p>
+          <fieldset v-else :disabled="!ecriture" class="min-w-0">
+            <legend class="sr-only">Cartes des formules du site</legend>
+            <OngletFormules v-model:textes="formules" :packs="packsCartes" :prix="prixBase" :erreur="erreurs.formules" />
           </fieldset>
 
           <div v-if="ecriture" class="pt-3 border-t border-creme2 space-y-2">
-            <button type="submit" :disabled="envoi !== '' || !aChange('formules')" :class="[bouton, 'w-full sm:w-auto bg-foret text-white hover:bg-savane px-5 text-sm']">
+            <button type="submit" :disabled="envoi !== '' || !packsPrets || !aChange('formules')" :class="[bouton, 'w-full sm:w-auto bg-foret text-white hover:bg-savane px-5 text-sm']">
               <Send class="w-4 h-4" aria-hidden="true" /> {{ envoi === 'formules' ? 'Publication…' : 'Publier' }}
             </button>
             <p v-if="nouvelleVersion.formules" role="status" class="text-xs text-foret font-semibold">{{ AVIS_CACHE }}</p>

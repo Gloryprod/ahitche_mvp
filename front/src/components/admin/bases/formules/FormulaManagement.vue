@@ -105,6 +105,20 @@ const enregistrerCycle = () => {
   if (cycleValide.value) updateCycleMutation.mutate(cycleSaisi.value as number)
 }
 
+// Ouverture à la commande (admin) : un pack « bientôt disponible » n'est pas commandable et n'a pas de carte sur l'accueil
+const disponibiliteMutation = useMutation({
+  mutationFn: async (bientotDisponible: boolean) =>
+    (await api.patch(`/api/admin/formulas/${activePack.value}/disponibilite`, { bientotDisponible })).data,
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['packDetails'] })
+    queryClient.invalidateQueries({ queryKey: ['packs'] })
+  }
+})
+const erreurDisponibilite = computed(() => {
+  const erreur = disponibiliteMutation.error.value as { response?: { data?: { message?: string } } } | null
+  return erreur ? (erreur.response?.data?.message || 'Erreur lors du changement de disponibilité.') : ''
+})
+
 const libelleCycle = (jours?: number | null) => {
   if (!jours) return 'à renseigner'
   if (jours === 30) return 'chaque mois'
@@ -369,6 +383,26 @@ const getPeriodText = computed(() => {
               <span class="text-[10px] font-bold uppercase block opacity-80">Cycle de relance</span>
               <p class="text-[11px]">Relance {{ libelleCycle(data?.formule?.cycleJours) }}</p>
             </template>
+          </div>
+
+          <!-- Commande : ouvrir le pack, ou le repasser « bientôt disponible » (admin) -->
+          <div v-if="peutModifierCycle && data?.formule" class="border-t border-black/10 pt-3 space-y-2">
+            <span class="text-[10px] font-bold uppercase block opacity-80">Commande</span>
+            <p class="text-[11px]" aria-live="polite">
+              {{ data.formule.bientotDisponible
+                ? 'Bientôt disponible : visible des clients, pas encore commandable, sans carte sur l’accueil.'
+                : 'Ouvert à la commande.' }}
+            </p>
+            <button
+              type="button"
+              @click="disponibiliteMutation.mutate(!data.formule.bientotDisponible)"
+              :disabled="disponibiliteMutation.isPending.value"
+              class="bg-noir hover:bg-noir/85 text-white font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Loader2 v-if="disponibiliteMutation.isPending.value" class="w-3.5 h-3.5 animate-spin" />
+              <span>{{ data.formule.bientotDisponible ? 'Ouvrir à la commande' : 'Repasser en « bientôt disponible »' }}</span>
+            </button>
+            <p v-if="erreurDisponibilite" class="text-[10px] font-bold text-red-600">{{ erreurDisponibilite }}</p>
           </div>
 
           <div class="border-t border-black/10 pt-3 space-y-2 text-[11px]">

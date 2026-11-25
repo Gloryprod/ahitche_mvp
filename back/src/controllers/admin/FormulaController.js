@@ -171,10 +171,39 @@ async function creerPack(req, res) {
   }
 }
 
+// Ouvrir un pack à la commande, ou le repasser « bientôt disponible » (PATCH /api/admin/formulas/:packType/disponibilite) :
+// admin seulement, journalisé. Un pack « bientôt disponible » est visible mais pas commandable, et n'a pas de prix
+// public : sa carte n'apparaît pas sur l'accueil.
+async function updateFormulaDisponibilite(req, res) {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Seul l'admin peut ouvrir un pack à la commande." });
+    const type = String(req.params.packType).toLowerCase();
+    if (!TYPE_PACK.test(type)) return res.status(400).json({ message: 'Type de pack invalide.' });
+    const { bientotDisponible } = req.body ?? {};
+    if (typeof bientotDisponible !== 'boolean') return res.status(400).json({ message: '« bientotDisponible » doit valoir true ou false.' });
+    const formule = await Formule.findOne({ slug: `ahi-${type}`, statut: 'actif' });
+    if (!formule) return res.status(404).json({ message: 'Formule introuvable' });
+    if (formule.bientotDisponible !== bientotDisponible) {
+      formule.bientotDisponible = bientotDisponible;
+      await formule.save();
+      await journaliser(req, {
+        action: 'Modification', entite: 'Formule', entiteId: formule._id,
+        resume: `${formule.nom} : ${bientotDisponible ? 'repassé « bientôt disponible » (non commandable)' : 'ouvert à la commande'}`,
+        avant: { bientotDisponible: !bientotDisponible }, apres: { bientotDisponible }
+      });
+    }
+    return res.status(200).json({ message: bientotDisponible ? `${formule.nom} : bientôt disponible.` : `${formule.nom} : ouvert à la commande.`, data: formule });
+  } catch (error) {
+    console.error('Erreur updateFormulaDisponibilite:', error.name, error.code ?? '');
+    return res.status(500).json({ message: 'Erreur lors du changement de disponibilité.' });
+  }
+}
+
 module.exports = {
   getPackDetails,
   updateFormulaPrice,
   updateFormulaCycle,
+  updateFormulaDisponibilite,
   listerPacksEquipe,
   creerPack
 };

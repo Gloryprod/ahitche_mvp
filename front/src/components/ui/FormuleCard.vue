@@ -2,13 +2,16 @@
 import { computed } from 'vue'
 import BaseButton from './BaseButton.vue'
 import { lienWhatsApp as lienWa } from '@/config/contact'
-import { formaterPrix, COULEURS_NIVEAU, type FormuleVitrine, type TeinteFormule } from '@/config/formules'
+import { formaterPrix, COULEURS_NIVEAU, type FormuleVitrine } from '@/config/formules'
+import { estTheme, type ThemeFormule } from '@/services/valeursSite'
+import { BLANC, contraste, couleurTexte } from '@/services/couleurs'
 
 const props = defineProps<{
   formule: FormuleVitrine
   valeurEstimee?: number | null // D-03 : matières × coefficient, affichée barrée au-dessus du prix
   conseillee?: boolean // Formule conseillée par le comparateur « taille du foyer »
   autreConseillee?: boolean // Une autre formule est conseillée : « Le plus choisi » s'efface
+  enteteSeule?: boolean // Aperçu de l'admin sans prix connu : l'en-tête seulement
 }>()
 
 const lienWhatsApp = computed(() => {
@@ -25,10 +28,12 @@ const enAvant = computed(() => props.conseillee || (props.formule.recommandee &&
 
 // Couleurs de chaque pack (classes écrites en entier pour que Tailwind les génère).
 // Contrastes du texte ≥ 4,5 : 1 : savane sur fond clair, blanc sur forêt, or et blanc sur marine, marine sur blanc.
-const THEMES: Record<TeinteFormule, {
+interface Theme {
   bandeau: string; pastille: string; titre: string; cible: string
   accent: string; bordure: string; lisere: boolean
-}> = {
+  styles?: { bandeau: { backgroundColor: string }; accent?: { color: string }; bordure?: { borderColor: string } }
+}
+const THEMES: Record<ThemeFormule, Theme> = {
   savane: {
     bandeau: 'bg-savane/10', pastille: 'bg-white shadow-sm', titre: 'text-savane', cible: 'text-gris',
     accent: 'text-savane', bordure: 'border-savane/25', lisere: false,
@@ -42,7 +47,22 @@ const THEMES: Record<TeinteFormule, {
     accent: 'text-marine', bordure: 'border-marine/30', lisere: true,
   },
 }
-const theme = computed(() => THEMES[props.formule.teinte])
+// Couleur libre (choix du porteur, hors charte) : bandeau de cette couleur, titre et cible en blanc ou en noir, le plus
+// lisible ; chiffres et bordure de cette couleur s'ils se lisent sur le blanc de la carte (4,5 : 1), sinon en noir
+function themeLibre(hex: string): Theme {
+  const texte = couleurTexte(hex) === 'blanc' ? 'text-white' : 'text-noir'
+  const lisible = contraste(hex, BLANC) >= 4.5
+  return {
+    bandeau: '', pastille: 'bg-white shadow-sm', titre: texte, cible: texte,
+    accent: lisible ? '' : 'text-noir', bordure: lisible ? '' : 'border-noir/20', lisere: false,
+    styles: {
+      bandeau: { backgroundColor: hex },
+      accent: lisible ? { color: hex } : undefined,
+      bordure: lisible ? { borderColor: `${hex}4D` } : undefined, // 30 % d'opacité, comme les bordures des thèmes
+    },
+  }
+}
+const theme = computed(() => (estTheme(props.formule.couleur) ? THEMES[props.formule.couleur] : themeLibre(props.formule.couleur)))
 </script>
 
 <template>
@@ -52,13 +72,14 @@ const theme = computed(() => THEMES[props.formule.teinte])
       enAvant ? 'border-2 border-or shadow-xl hover:shadow-2xl' : ['border shadow-sm hover:shadow-lg', theme.bordure],
       conseillee ? 'carte-conseillee ring-4 ring-or/30' : ''
     ]"
+    :style="enAvant ? undefined : theme.styles?.bordure"
   >
     <div v-if="enAvant" class="absolute -top-4 left-1/2 -translate-x-1/2 z-10 bg-or text-noir text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm whitespace-nowrap">
       {{ conseillee ? 'Conseillé pour votre foyer' : 'Le plus choisi' }}
     </div>
 
     <!-- En-tête aux couleurs du pack, avec sa jauge de niveau de confort -->
-    <div :class="['bandeau relative overflow-hidden rounded-t-[22px] px-6 sm:px-8 pt-11 pb-5', theme.bandeau]">
+    <div :class="['bandeau relative overflow-hidden rounded-t-[22px] px-6 sm:px-8 pt-11 pb-5', theme.bandeau, enteteSeule ? 'rounded-b-[22px]' : '']" :style="theme.styles?.bandeau">
       <span v-if="theme.lisere" class="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-or-deep via-or to-or-deep" aria-hidden="true"></span>
       <!-- Jauge « niveau de confort » façon barres de réseau, sur une pastille blanche : même lecture sur les
            trois en-têtes ; dans le coin, le nom du pack garde toute la largeur sur téléphone -->
@@ -86,17 +107,17 @@ const theme = computed(() => THEMES[props.formule.teinte])
       <span class="sr-only">Niveau de confort {{ formule.niveau }} sur 3</span>
     </div>
 
-    <div class="flex flex-col justify-between flex-1 px-6 sm:px-8 pt-5 pb-6 sm:pb-8">
+    <div v-if="!enteteSeule" class="flex flex-col justify-between flex-1 px-6 sm:px-8 pt-5 pb-6 sm:pb-8">
       <div>
         <p class="text-sm italic text-gris mb-6">« {{ formule.accroche }} »</p>
 
         <div class="grid grid-cols-2 gap-4 border-y border-creme2 py-4 mb-6">
           <div>
-            <span :class="['block text-2xl font-bold font-body', theme.accent]">{{ formule.repas }}</span>
+            <span :class="['block text-2xl font-bold font-body', theme.accent]" :style="theme.styles?.accent">{{ formule.repas }}</span>
             <span class="text-xs text-gris">repas possibles</span>
           </div>
           <div>
-            <span :class="['block text-2xl font-bold font-body', theme.accent]">{{ formule.heures }}</span>
+            <span :class="['block text-2xl font-bold font-body', theme.accent]" :style="theme.styles?.accent">{{ formule.heures }}</span>
             <span class="text-xs text-gris">économisées</span>
           </div>
         </div>
@@ -105,7 +126,7 @@ const theme = computed(() => THEMES[props.formule.teinte])
       <div>
         <div class="mb-6">
           <span v-if="prixBarre" class="block text-sm text-gris">valeur estimée <s class="whitespace-nowrap">{{ formaterPrix(prixBarre) }} FCFA</s></span>
-          <span :class="['text-3xl font-bold font-body', theme.accent]">{{ formaterPrix(formule.prix) }} <small class="text-sm font-semibold">FCFA</small></span>
+          <span :class="['text-3xl font-bold font-body', theme.accent]" :style="theme.styles?.accent">{{ formaterPrix(formule.prix) }} <small class="text-sm font-semibold">FCFA</small></span>
           <span class="block text-sm text-gris mt-1">par mois</span>
         </div>
         <BaseButton
