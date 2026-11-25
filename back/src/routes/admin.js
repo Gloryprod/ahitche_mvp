@@ -105,6 +105,10 @@ router.route('/products')
   .get(productC.getAllProducts)
   .post(productC.createProduct);
 
+// Import du référentiel (jusqu'à 200 produits par appel, admin seulement) : 30 appels par compte en 10 minutes
+router.post('/products/referentiel/import', limiteTentatives({
+  nom: 'importReferentiel', minutes: 10, maxParCompte: 30, maxParIp: 60, compteDe: (req) => String(req.user?.id ?? ''), message: "Trop d'imports à la suite."
+}), productC.importerReferentielProduits);
 router.route('/products/:id')
   .put(productC.updateProduct)
   .delete(productC.deleteProduct);

@@ -279,4 +279,4 @@ async function importerEntrees(req, texte, appliquer, session) {
   };
 }
 
-module.exports = { enregistrerEntree, importerEntrees, MAX_OCTETS };
+module.exports = { enregistrerEntree, importerEntrees, lireTableau, MAX_OCTETS };

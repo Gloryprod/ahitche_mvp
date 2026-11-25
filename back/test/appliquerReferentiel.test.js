@@ -109,9 +109,10 @@ test('application : références échangées sans perte d’historique, stock co
   assert.ok(nouilles.category, 'catégorie Féculents retrouvée');
 
   const journal = await col('auditlogs').find({}).sort({ _id: 1 }).skip(journalAvant).toArray();
-  assert.strictEqual(journal.length, 6, journal.map((j) => j.resume).join('\n'));
+  assert.strictEqual(journal.length, 7, journal.map((j) => j.resume).join('\n')); // 6 produits + le résumé
   assert.ok(journal.every((j) => j.entite === 'Produit' && String(j.utilisateur) === String(ctx.comptes.admin._id)));
   assert.ok(journal.some((j) => j.resume.startsWith('Produit P09 · Sel (référentiel) : référence V19 → P09')));
+  assert.ok(journal.some((j) => j.action === 'Import' && j.resume === 'Import du référentiel : 4 modifications, 2 créations'), journal.map((j) => j.resume).join(' / '));
 });
 
 test('relance : aucun changement, le stock n’est pas reconverti', async () => {
@@ -132,16 +133,16 @@ test('incohérences : tout est refusé, rien n’est écrit', async () => {
   ].join('\n'))]);
   assert.strictEqual(r.code, 1, r.sortie);
   for (const attendu of [
-    "rien n'a été enregistré",
-    'P07 « Riz local » : référence P07 déjà prise par « Tapioca », absent du fichier',
-    'V22 « Nouilles essai » : unité « unité » en base, « sac » dans le fichier, sans conversion',
-    'P03 « Coquillettes fines » : la référence P03 est « Coquillettes » en base',
+    '❌ Arrêt : 3 lignes à corriger',
+    'Ligne 2, P07 « Riz local » : Référence P07 déjà prise par « Tapioca », absent du tableau',
+    'Ligne 3, V22 « Nouilles essai » : Unité « unité » en base, « sac » dans le tableau, sans conversion',
+    'Ligne 4, P03 « Coquillettes fines » : La référence P03 est « Coquillettes » en base',
   ]) assert.ok(r.sortie.includes(attendu), `attendu : ${attendu}\n--- sortie ---\n${r.sortie}`);
   assert.strictEqual(await etat(), avant);
 
   const illisible = await ctx.script('appliquerReferentiel.js', [fichier('illisible.csv', `${ENTETE}\nP99;Produit;Variable;kg;abc;;;;;;;\nP98;Produit B;Fixe;sac;;1;;;;;;5`)]);
   assert.strictEqual(illisible.code, 1, illisible.sortie);
-  for (const attendu of ['Fichier à corriger', 'ne correspond pas au type', 'prix illisible', 'Ligne 3 : une conversion exige le prix de la nouvelle unité']) {
+  for (const attendu of ['2 lignes à corriger', 'Ligne 2, P99 « Produit » : La référence P99 ne correspond pas au type « Variable » ; Prix illisible (« abc »)', 'Ligne 3, P98 « Produit B » : Une conversion exige le prix de la nouvelle unité']) {
     assert.ok(illisible.sortie.includes(attendu), `attendu : ${attendu}\n--- sortie ---\n${illisible.sortie}`);
   }
   assert.strictEqual(await etat(), avant);

@@ -48,6 +48,7 @@ app.use(cors({
 
 // Import groupé des entrées de stock : 100 Ko de texte, qui en JSON (tabulations, guillemets échappés) dépassent 100 Ko
 app.use('/api/admin/stock/lots/import', express.json({ limit: '256kb' }));
+app.use('/api/admin/products/referentiel/import', express.json({ limit: '256kb' })); // Import du référentiel : même cas
 app.use(express.json());
 
 app.use(cookieParser());
